@@ -1,0 +1,102 @@
+Item description on R (A no longer shows it)
+=============================================
+
+Build:   Harvest Moon: A Wonderful Life, US, game ID GYWEE9 (hmawl_us_r0)
+main.dol sha1: 1ccfd9dfb5c250c2f45c70c74cc45e5d88d22374
+         (matches hmawl_us_r0.sha1 in this repo)
+Format:  Gecko codes for Dolphin. Two 04 (32-bit write) lines and two
+         C2 (insert ASM) hooks. All addresses are in main.dol; none are in
+         the rels.
+Status:  Tested in game. With an item held, a half-press of R shows the
+         item's description. With empty hands, R still whistles. A no
+         longer shows the description.
+
+Codes (exactly as tested)
+-------------------------
+
+$Item description on R
+042A74D0 800444FC
+042A7768 80049640
+C20430BC 00000008
+2C000000 41820038
+3880003B 909E14C0
+901E14C4 7FC3F378
+3880002A 3D808003
+618C1D7C 7D8903A6
+4E800421 3D808004
+618C3108 7D8903A6
+4E800420 00000000
+C20489F0 00000008
+2C000000 41820038
+3880003B 909F14C0
+901F14C4 7FE3FB78
+3880002A 3D808003
+618C1D7C 7D8903A6
+4E800421 3D808004
+618C8A48 7D8903A6
+4E800420 00000000
+
+What each part does
+-------------------
+
+042A74D0 / 042A7768
+    Entry 24 (the "describe held item" case) of the A-button action jump
+    tables, lbl_802A7470 (used by func_80043120, states 0/1) and
+    lbl_802A7708 (used by func_80048A5C, states 237/238). Each is pointed
+    at its switch's "no action" default.
+
+C20430BC (states 0/1, func_80042DFC, controller in r30)
+C20489F0 (states 237/238, func_800488B0, controller in r31)
+    Replaces the "item held -> skip whistle" bne in the R handler.
+    r0 = held item ID (player state +0x144).
+      cmpwi r0,0 / beq +0x38   empty hands: go to the branch-back slot
+                               and resume original code (whistle).
+      item held: +0x14C0 = 0x3B (itemdoc file), +0x14C4 = item ID,
+                 func_80031D7C(this, 0x2A)  (state 42 = show message),
+                 then jump to the function's exit.
+    Exits: 0x80043108 (epilogue of func_80042DFC) and 0x80048A48
+    (epilogue of func_800488B0).
+
+Branch offset check (against the original main.dol)
+----------------------------------------------------
+Each C2 block is 16 words. The beq is word 1 (offset 0x04), and the
+branch-back slot (the final 00000000, which Gecko turns into
+"b hook+4") is word 15 (offset 0x3C).
+  beq +0x38 -> offset 0x3C = branch-back slot   (correct, as tested)
+  beq +0x3C -> offset 0x40 = past the end of the block (wrong)
+The beq never branches into the game's code directly. It returns through
+the branch-back slot to hook+4:
+  0x800430C0 (80030148 lwz r0,0x148(r3)) for the first hook
+  0x800489F4 (80030148 lwz r0,0x148(r3)) for the second hook
+From there the original code reaches the whistle as before, e.g.
+0x800430D4 / 0x800430E8 branch to 0x800430FC (state 0x2E).
+
+Original instructions (for undoing)
+-----------------------------------
+Address     File off  Original  Meaning
+0x802A74D0  0x2A44D0  80043C24  jump table entry 24 (describe item)
+0x802A7768  0x2A4768  8004919C  jump table entry 24 (describe item)
+0x800430BC  0x03FDFC  4082004C  bne 0x80043108
+0x800489F0  0x045730  4082001C  bne 0x80048A0C
+
+Turning off the code in Dolphin does not put these back while the game
+is running. Reboot the game, or apply this once:
+
+$Undo item description on R
+042A74D0 80043C24
+042A7768 8004919C
+040430BC 4082004C
+040489F0 4082001C
+
+Known gaps
+----------
+- Watering cans (item category 3): the original A path also called
+  func_80102300 with the water level before showing the text. The R hook
+  skips that, so the number in that description may be wrong or stale.
+  Not checked in game.
+- The original A path called func_800310A4(this,1) and reset the
+  animation rate before the state change; the R hook does not (it follows
+  the whistle path). Not seen to cause problems in game.
+- The second hook exits to 0x80048A48, not to the original bne target
+  0x80048A0C, so it skips the state-0xEF check that follows. This is on
+  purpose, so that the check can't replace state 42.

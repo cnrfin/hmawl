@@ -328,3 +328,35 @@ can be rerun from a clean clone with the four original binaries in `orig/`.
   and file offset (section 1.3).
 - `cases.py`: splits `func_8010C604` into cases using the jump table in the
   original main.dol (section 2).
+
+## 6. Item description moved to R (Gecko, tested)
+
+Codes: `cheats/item-description-on-r.txt` (GYWEE9 US, main.dol sha1
+1ccfd9df…2374). All addresses are in main.dol.
+
+- **How the A press shows it.** In idle/walk, A looks up an action in
+  `lbl_80292A78[heldClass*0xAC + targetType]` (`func_8004ED60`,
+  0x8004EE3C). With an item held and no usable target, the action is 24.
+  Case 24 (0x80043C24 in `func_80043120`, 0x8004919C in `func_80048A5C`)
+  stores file 0x3B (`@itemdoc`) at controller +0x14C0 and the item ID at
+  +0x14C4, then sets state 42. State 42's enter method (0x80034CAC) opens
+  the message (`func_801020E4`, 0x80034D30).
+- **R.** R is a half-press of the analog trigger, bit 0x02000000 in the
+  pad word at `lbl_80341574`+8 (set at 0x8021369C). The R handlers
+  (0x800430A8 in `func_80042DFC`, 0x800489DC in `func_800488B0`) whistle
+  only with empty hands. With an item held they did nothing.
+- **What the codes do.** Two 32-bit writes point jump-table entry 24
+  (0x802A74D0, 0x802A7768) at the "no action" default, which turns off
+  the description on A. Two C2 hooks replace the held-item `bne` at
+  0x800430BC (was 4082004C) and 0x800489F0 (was 4082001C). With an item
+  held they set up the same message and enter state 42.
+- **Tested.** With an item held, R shows the item's description. With
+  empty hands, R still whistles. A no longer shows the description.
+- **Offset check.** The `beq +0x38` in each hook lands on the C2
+  branch-back slot (word 15 of 16), which returns to hook+4 (0x800430C0 /
+  0x800489F4). This matches the tested code. `+0x3C` would land past the
+  end of the block.
+- **Open issues.** The watering-can description may show the wrong water
+  amount: the R hook skips the `func_80102300` call the A path made. Not
+  checked in game. The `func_800310A4(this,1)` call and animation-rate
+  reset are also skipped; no problems seen.
