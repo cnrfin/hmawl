@@ -132,6 +132,22 @@ Command 0xC1 (`lbl_801115D8`), RAM 0x801115D8–0x80111610:
 at +0x8 and the minimum at +0xC from the same base. You have confirmed this
 in Dolphin.
 
+**Gold limits, read in Dolphin:**
+
+| field | offset | RAM (one Dolphin session) | value |
+|---|---|---|---|
+| gold object base | game-data + 0x11A14 | 0x81085894 (derived) | |
+| current gold | +0x4 | 0x81085898 (derived) | |
+| maximum | +0x8 | 0x8108589C | `0x05F5E0FF` = 99,999,999 |
+| minimum | +0xC | 0x810858A0 | 0 |
+
+The derived rows are worked out from the two read addresses, so in that
+session the game-data pointer at 0x803491CC held 0x81073E80. The game-data
+object is in the heap, so these RAM addresses may change between boots or
+saves. The offsets don't change; use them, not the fixed addresses, in any
+patch or cheat code. The limits are values in RAM. I haven't found where
+they are set, so changing them would mean finding the code that writes +0x8.
+
 ### 1.5 Correction to my earlier report
 
 I said the two 8-entry animal arrays (0x1B4 bytes each) were at
@@ -265,8 +281,10 @@ Record = game-data + 0x124C4 + (slot−1) × 0x124.
 
 Each one needs a Dolphin check unless it says otherwise.
 
-1. **Gold max and min.** Read +0x8 and +0xC at `*(u32*)0x803491CC + 0x11A14`
-   to see the real limits (for example 0 and 999,999,999).
+1. ~~**Gold max and min.**~~ **Resolved:** maximum 99,999,999
+   (`0x05F5E0FF`), minimum 0. See section 1.4. Still open: which code
+   writes these limits. A Dolphin write breakpoint on +0x8, set while
+   loading a save or starting a new game, would show it.
 2. **Where else gold changes.** The script command is the only *call* to
    `func_80113234`, but shops, shipping and so on could write +0x4 directly.
    Set a write breakpoint on the gold value and sell, buy and ship. If it
