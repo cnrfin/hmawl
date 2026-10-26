@@ -126,6 +126,22 @@ Example output (start of the default mode):
 # 37 cases shown (213 distinct case bodies, 222 table entries)
 ```
 
+## arclist.py: list the contents of a .arc or .arc.clz archive
+
+The game's `.arc` files are U8 archives (magic `55 AA 38 2D`). The
+`.arc.clz` files are U8 archives in a custom LZSS wrapper (magic `CLZ\0`),
+which the script decompresses in memory. The format notes are in the
+script's docstring. It reads only and writes nothing; it never extracts.
+
+**Inputs:** an archive from the extracted disc (keep these out of the repo).
+
+```sh
+python3 tools/analysis/arclist.py path/to/maps1.arc
+python3 tools/analysis/arclist.py path/to/mainchapter1.arc.clz --nested
+```
+
+`--nested` also lists the U8 and CLZ archives found inside the archive.
+
 ## Limits
 
 - The addresses in `cases.py` (`lbl_802C0078`, `func_8010C604`, and the end at
