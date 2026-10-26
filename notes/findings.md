@@ -297,14 +297,16 @@ Each one needs a Dolphin check unless it says otherwise.
 
 ## 5. How these were checked
 
-These helper scripts are not committed. They're in my scratch folder for
-this session:
+The scripts are in `tools/analysis/`. See its README for setup, inputs and
+example runs. They only read files, never write. Every result in this note
+can be rerun from a clean clone with the four original binaries in `orig/`.
 
-- `asmq.py`: searches function bodies in LF copies of the asm files. The
-  repo's `.s` files use CRLF line endings, which break most line-anchored searches.
-- `xref.py`: scans the original main.dol for branch, pointer and `lis`/`addi`
-  references, and parses the relocation tables of the three rels.
-- `dolread.py`: reads a 32-bit word by RAM address and gives its section and
-  file offset.
+- `asmq.py`: searches the main.dol asm (`asm/main/game/*.s`) by label,
+  prints a label's body, or lists callers. It handles the repo's CRLF line endings.
+- `xref.py`: scans the original main.dol for branch, pointer and
+  `lis`/`addi` references, and parses the relocation tables of the three
+  rels (sections 1.2, 1.5).
+- `dolread.py`: reads a 32-bit word by RAM address and gives its section
+  and file offset (section 1.3).
 - `cases.py`: splits `func_8010C604` into cases using the jump table in the
-  original main.dol.
+  original main.dol (section 2).
