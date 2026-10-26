@@ -5,7 +5,11 @@ usage: dolread.py MAIN_DOL ADDR [COUNT]       (ADDR in hex)
 
 Prints each word with its file offset and DOL section. Reads only.
 """
-import struct, sys
+import signal, struct, sys
+
+# Exit quietly when output is piped into head etc.
+if hasattr(signal, "SIGPIPE"):
+    signal.signal(signal.SIGPIPE, signal.SIG_DFL)
 
 if len(sys.argv) not in (3, 4):
     raise SystemExit(__doc__)

@@ -14,7 +14,11 @@ here is the code between two labels, not necessarily a real function. Check
 for a stwu r1 / mflr prologue before calling something a function start.
 Reads only; writes nothing.
 """
-import argparse, glob, os, re
+import argparse, glob, os, re, signal
+
+# Exit quietly when output is piped into head etc.
+if hasattr(signal, "SIGPIPE"):
+    signal.signal(signal.SIGPIPE, signal.SIG_DFL)
 
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 LINE = re.compile(r'^/\* ([0-9A-F]{8}) [0-9A-F]{8}  (?:[0-9A-F]{2} ){4}\*/\t(.*)$')

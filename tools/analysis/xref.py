@@ -11,7 +11,11 @@ BINDIR must contain main.dol, wlp0.rel, wlp1.rel and wlp2.rel (the originals).
             against module 0 (main.dol) whose target is in [START, END).
 Reads only; writes nothing.
 """
-import os, struct, sys
+import os, signal, struct, sys
+
+# Exit quietly when output is piped into head etc.
+if hasattr(signal, "SIGPIPE"):
+    signal.signal(signal.SIGPIPE, signal.SIG_DFL)
 
 if len(sys.argv) != 4:
     raise SystemExit(__doc__)

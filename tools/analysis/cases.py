@@ -14,7 +14,11 @@ asm/main/game/code_800F3228.s in this repo (CRLF is handled). A case runs
 from its table entry to the next distinct entry in address order.
 Reads only; writes nothing.
 """
-import argparse, os, re, struct
+import argparse, os, re, signal, struct
+
+# Exit quietly when output is piped into head etc.
+if hasattr(signal, "SIGPIPE"):
+    signal.signal(signal.SIGPIPE, signal.SIG_DFL)
 
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 ap = argparse.ArgumentParser(description=__doc__.split('\n')[0])
