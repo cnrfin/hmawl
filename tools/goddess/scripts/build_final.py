@@ -21,6 +21,7 @@ from cull import visible
 from decim import decimate
 from anmsoft import soften
 import jiggle as JG
+import skirtfollow as SF
 JIGGLE = os.environ.get('GD_JIGGLE', '0') == '1'
 NAME, OUT = sys.argv[1], sys.argv[2]
 os.makedirs(OUT, exist_ok=True)
@@ -138,7 +139,8 @@ CM = awlmodel.load(SK + 'sepi_0'); CV = CM['V']; cvb = CM['bones']
 sk = [i for i in range(len(CV)) if cvb[i] and cvb[i][0] in (3, 32, 33, 34) and 0.12 < CV[i, 1] < 0.58]
 kds = cKDTree(CV[sk]); skn_ = np.array([cvb[i][0] for i in sk])
 def skirt_node(P):
-    n = skn_[kds.query(P * [1, 1, 1])[1]]
+    """front half -> 34, back half -> 32, sides -> 33 (their mean), top band -> hips"""
+    n = np.where(P[:, 2] > 0.045, 34, np.where(P[:, 2] < -0.015, 32, 33))      # front / back / sides
     n[P[:, 1] > 0.57] = 3
     return n
 HEAD = {'face', 'eye', 'mouth', 'earpatch', 'fill', 'scalp', 'hair', 'loose', 'bun', 'tuft'}
@@ -369,13 +371,20 @@ if __name__ == '__main__':
     arc = u8([(NAME + '.act', actb), (NAME + '.gpl', gpl), (NAME + '.skn', skn), (NAME + '_b0.tpl', b0),
               (NAME + '_f0_e.tpl', f0e), (NAME + '_f0_m.tpl', f0m), ('_tmp.txt', b'')])
     # long gown: shorter strides in walk (1) and run (5), legs and Celia's skirt nodes together
-    STRIDE = {1: float(os.environ.get('GD_WALK', '0.7')), 5: float(os.environ.get('GD_RUN', '0.5'))}
+    STRIDE = {1: float(os.environ.get('GD_WALK', '1.0')), 5: float(os.environ.get('GD_RUN', '1.0'))}
     LEGSKIRT = (32, 33, 34, 36, 37, 38, 39, 40, 41, 43, 44, 45, 46, 47, 48)
     rest = [nd['Q'] for nd in nodes]
+    from awlchar import act as act_parse
+    nodes_sf = act_parse(actb)
+    SKIRT_FOLLOW = {1: float(os.environ.get('GD_SKIRT_MARGIN', '12')), 5: float(os.environ.get('GD_SKIRT_MARGIN', '12'))}   # margin (deg) inside the hem
     anims = []
     for a in range(10):
         raw = retarget_anim(open(SK + 'anm%02d.bin' % a, 'rb').read())
-        if a in STRIDE: raw, nk = soften(raw, rest, {n_: STRIDE[a] for n_ in LEGSKIRT}); print('anim', a, 'stride', STRIDE[a], 'keys', nk)
+        if a in STRIDE and STRIDE[a] != 1.0: raw, nk = soften(raw, rest, {n_: STRIDE[a] for n_ in LEGSKIRT}); print('anim', a, 'stride', STRIDE[a], 'keys', nk)
+        if a in SKIRT_FOLLOW:
+            L_, keys, dF, dB = SF.skirt_push(nodes_sf, raw, margin=SKIRT_FOLLOW[a])
+            raw = SF.replace_tracks(raw, L_, keys)
+            print('anim', a, 'skirt pushed by the feet: front up to %.0f deg, back up to %.0f deg' % (dF.max(), dB.min()))
         if JIGGLE:
             L_, off = JG.spring_offsets(nodes_j, raw, c_local, gain=float(os.environ.get('GD_JIGGLE_GAIN', '1.6')))
             amp = np.linalg.norm(off, axis=1).max()

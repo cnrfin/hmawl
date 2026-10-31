@@ -7,8 +7,8 @@ Postman/goddess test code (Z + X spawns her in character slot 37).
 
 | Path | Contents |
 |---|---|
-| `build/gd_0.arc`, `build/gd_0.anm.arc` | Game files (final test 3). 2,832 triangles, 152,256 B, 1.1x Celia. SHA-1: `gd_0.arc` `4a7322dc`, `gd_0.anm.arc` `2319b2df`. |
-| `build_jiggle/gd_0.arc`, `build_jiggle/gd_0.anm.arc` | Jiggle experiment 1 (`GD_JIGGLE=1 GD_JIGGLE_GAIN=1.2`): 51 nodes, baked bust bounce. SHA-1: `dac4b3e8`, `44253a4e`. |
+| `build/gd_0.arc`, `build/gd_0.anm.arc` | Game files (final test 4). 2,832 triangles, 152,192 B, 1.1x Celia. SHA-1: `gd_0.arc` `a6e1dccf`, `gd_0.anm.arc` `2407808f`. |
+| `build_jiggle/gd_0.arc`, `build_jiggle/gd_0.anm.arc` | Jiggle experiment (`GD_JIGGLE=1 GD_JIGGLE_GAIN=1.2`, on top of test 4): 51 nodes, baked bust bounce. SHA-1: `817ef6f4`, `577ab0bd`. |
 | `build/b0_body.png`, `build/b0_head.png` | The two texture atlases inside `gd_0_b0.tpl`. |
 | `data/goddess_FINAL_model2.pkl.gz` | The finished model as pieces (positions, UVs, triangles, texture per piece). |
 | `data/celia_hands.pkl.gz` | Celia's hands (mesh, nodes, skin-tinted texture) used on the goddess. |
@@ -43,9 +43,12 @@ Postman/goddess test code (Z + X spawns her in character slot 37).
    frame textures (f0_e / f0_m). GPL materials laid out as Muffy's `mumu_0.gpl`: eye (sel 00),
    body (sel FF), mouth (sel 01), head (sel 02).
 6. Skeleton and Celia's 10 animations scaled by `GD_SCALE` (default 1.1).
-7. Shorter strides for the long gown (`anmsoft.py`): in walk (`GD_WALK`, 0.7) and run (`GD_RUN`, 0.5) the
-   keyed rotations of the leg nodes and Celia's skirt nodes are slerped toward their rest rotation, so
-   the feet stay under the skirt.
+7. Skirt pushed by the feet (`skirtfollow.py`), walk and run: legs keep Celia's motion; per frame the front
+   skirt node (34) swings forward when a toe would pass the gown's front hem angle (+26 deg from the hip),
+   the back node (32) swings back when the ankle, toe or heel would pass the back hem angle (-22 deg),
+   12 deg margin; sides (33) follow. Gown/overskirt/sash skinned front 34, back 32, sides 33, top band 3.
+   Key controls are written equal to the key rotation (the control is a rotation, not a tangent: scaling
+   it, as the earlier shorter-stride option `anmsoft.py` / `GD_WALK`/`GD_RUN` did, made the run jitter).
 8. Optional jiggle (`GD_JIGGLE=1`, `jiggle.py`): two extra nodes under node 5 (BUST full motion, RING half
    motion) appended to the act (51 nodes); bust vertices skinned to them; per animation a damped spring
    (3.2 Hz, damping 0.22) driven by node 5's motion is baked into keyed-translation tracks (pelvis-style
@@ -61,9 +64,9 @@ it from the tools folder. The output is byte-identical to `build/`.
 As for the earlier goddess tests (only the two `gd/` files change; `pm.bin` is unchanged from goddess test 6):
 
 ```
-python3 gcbuild.py --iso HM_AWL_blank1a.iso --out HM_AWL_final3a.iso \
+python3 gcbuild.py --iso HM_AWL_blank1a.iso --out HM_AWL_final4a.iso \
   --replace gd/gd_0.arc=gd/gd_0.arc --replace gd/gd_0.anm.arc=gd/gd_0.anm.arc --allow-unreferenced
-python3 postman_npc/make_pm_dol.py HM_AWL_final3a.iso HM_AWL_final3.iso
+python3 postman_npc/make_pm_dol.py HM_AWL_final4a.iso HM_AWL_final4.iso
 ```
 
 Runs in game (tests 1-2 in Dolphin: loads, animates, face shading fixed in test 2). The archive is larger
