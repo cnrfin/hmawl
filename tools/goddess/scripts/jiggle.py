@@ -12,13 +12,13 @@ CENTER = np.array([0.0, 0.728, 0.085])        # between the two bust shapes of t
 L_C, R_C = np.array([0.05, 0.728, 0.072]), np.array([-0.05, 0.728, 0.072])
 
 L_TIP, R_TIP = np.array([0.038, 0.728, 0.115]), np.array([-0.038, 0.728, 0.115])   # front of the enlarged bust
-def bust_nodes(P, n_bust, n_ring, inner=0.042, outer=0.060):
-    """node override for body vertices (unscaled positions): -1 = keep. By distance from the bust front."""
-    d = np.minimum(np.linalg.norm(P - L_TIP, axis=1), np.linalg.norm(P - R_TIP, axis=1))
-    out = np.full(len(P), -1)
-    front = P[:, 2] > 0.025
-    out[front & (d < inner)] = n_bust
-    out[front & (d >= inner) & (d < outer)] = n_ring
+def bust_nodes(P, n_bust, n_ring):
+    """node override for body vertices (unscaled positions): -1 = keep. The whole bust volume in front of the
+    chest (y 0.665-0.780, |x| < 0.105, z > 0.055) moves fully; a band around it moves half (blends the edge)."""
+    x, y, z = np.abs(P[:, 0]), P[:, 1], P[:, 2]
+    full = (y > 0.665) & (y < 0.780) & (x < 0.105) & (z > 0.055)
+    ring = (y > 0.640) & (y < 0.805) & (x < 0.130) & (z > 0.025) & ~full
+    out = np.full(len(P), -1); out[full] = n_bust; out[ring] = n_ring
     return out
 
 # ---------------------------------------------------------------- act with extra nodes
@@ -53,7 +53,7 @@ def act_add(d, specs):
     return bytes(out)
 
 # ---------------------------------------------------------------- spring, baked per animation
-def spring_offsets(nodes, raw_anm, center_local, f_hz=3.2, zeta=0.22, gain=1.6, clamp=0.010, sub=8, fps=30.0):
+def spring_offsets(nodes, raw_anm, center_local, f_hz=3.2, zeta=0.22, gain=1.6, clamp=0.010, sub=8, fps=30.0, idle_amp=0.0):
     """local (parent-frame) offsets of the bust per integer frame 0..L over one loop"""
     tr = parse(raw_anm); L = tr[0]['length']; nf = int(round(L)) + 1
     W = [world(nodes, pose.locals_at(nodes, tr, f)) for f in range(nf)]
@@ -74,6 +74,10 @@ def spring_offsets(nodes, raw_anm, center_local, f_hz=3.2, zeta=0.22, gain=1.6, 
         offs[(f + 1) % nf if nf > 1 else 0] = o
     if nf > 1: offs[0] = offs[-1]          # the loop's last frame = its first (seamless wrap)
     local = np.array([rot[f].T @ (offs[f] * gain) for f in range(nf)])
+    if idle_amp > 0 and nf > 2:                      # test aid: a visible bob in every animation (in the chest frame's main axis)
+        ax = np.argmax(np.abs(rot[0].T @ np.array([0, 1.0, 0])))
+        cyc = max(1, round((nf - 1) / 12.0))
+        local[:, ax] += idle_amp * np.sin(2 * np.pi * cyc * np.arange(nf) / (nf - 1))
     n_ = np.linalg.norm(local, axis=1); k = np.minimum(1.0, clamp / np.maximum(n_, 1e-9))
     return L, local * k[:, None]
 

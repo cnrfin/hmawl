@@ -8,7 +8,7 @@ Postman/goddess test code (Z + X spawns her in character slot 37).
 | Path | Contents |
 |---|---|
 | `build/gd_0.arc`, `build/gd_0.anm.arc` | Game files (final test 4). 2,832 triangles, 152,192 B, 1.1x Celia. SHA-1: `gd_0.arc` `a6e1dccf`, `gd_0.anm.arc` `2407808f`. |
-| `build_jiggle/gd_0.arc`, `build_jiggle/gd_0.anm.arc` | Jiggle experiment (`GD_JIGGLE=1 GD_JIGGLE_GAIN=1.2`, on top of test 4): 51 nodes, baked bust bounce. SHA-1: `817ef6f4`, `577ab0bd`. |
+| `build_jiggle/gd_0.arc`, `build_jiggle/gd_0.anm.arc` | Jiggle test 4 (`GD_JIGGLE=1 GD_JIGGLE_GAIN=2 GD_JIGGLE_CLAMP=0.0175`, on top of test 4): 51 nodes, whole bust bounces (up to 17.5 mm walk/run, ~1.5 mm idle). SHA-1: `f23d6ff9`, `7ee0bc2d`. Jiggle tests 2-3 confirmed in game that the extra nodes work. |
 | `build/b0_body.png`, `build/b0_head.png` | The two texture atlases inside `gd_0_b0.tpl`. |
 | `data/goddess_FINAL_model2.pkl.gz` | The finished model as pieces (positions, UVs, triangles, texture per piece). |
 | `data/celia_hands.pkl.gz` | Celia's hands (mesh, nodes, skin-tinted texture) used on the goddess. |
@@ -52,7 +52,9 @@ Postman/goddess test code (Z + X spawns her in character slot 37).
 8. Optional jiggle (`GD_JIGGLE=1`, `jiggle.py`): two extra nodes under node 5 (BUST full motion, RING half
    motion) appended to the act (51 nodes); bust vertices skinned to them; per animation a damped spring
    (3.2 Hz, damping 0.22) driven by node 5's motion is baked into keyed-translation tracks (pelvis-style
-   packed 0x3EE10100), clamped to 10 mm. Not yet tried in game.
+   packed 0x3EE10100), clamped by `GD_JIGGLE_CLAMP`. Bust = y 0.665-0.78, |x| < 0.105, z > 0.055 (full);
+   a band around it at half motion. Works in game (jiggle tests 2-3: the 51-node act and extra tracks load).
+   `GD_JIGGLE_IDLE` adds a constant test bob to every animation (used only to check it in game).
 
 It needs files extracted from the disc, which are not in git: Celia (`sepi_0.*`, `anm00-09.bin`) in
 `$GD_GAME/celia`, Wally's `sua_0.gpl` in `$GD_GAME/wally`, and the model tools (`awlchar.py`, `anm.py`,

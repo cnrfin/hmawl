@@ -386,7 +386,7 @@ if __name__ == '__main__':
             raw = SF.replace_tracks(raw, L_, keys)
             print('anim', a, 'skirt pushed by the feet: front up to %.0f deg, back up to %.0f deg' % (dF.max(), dB.min()))
         if JIGGLE:
-            L_, off = JG.spring_offsets(nodes_j, raw, c_local, gain=float(os.environ.get('GD_JIGGLE_GAIN', '1.6')))
+            L_, off = JG.spring_offsets(nodes_j, raw, c_local, gain=float(os.environ.get('GD_JIGGLE_GAIN', '1.6')), clamp=float(os.environ.get('GD_JIGGLE_CLAMP', '0.010')), idle_amp=float(os.environ.get('GD_JIGGLE_IDLE', '0')))
             amp = np.linalg.norm(off, axis=1).max()
             if amp < 0.0008:
                 raw = JG.anm_add_tracks(raw, [(N_BUST, L_, None, c_local), (N_RING, L_, None, c_local)])
