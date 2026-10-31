@@ -63,10 +63,22 @@ vis = visible(geo, cand)
 # 2. decimation ratios (UV-aware); pieces not listed keep every triangle
 RATIO = {'body': 0.48, 'scalp': 0.25, 'veil': 0.30, 'bun': 0.22, 'pony': 0.55, 'gown': 0.60, 'hand': 0.65,
          'bowlobe': 0.40, 'bowflower': 0.5, 'sashflower': 0.5, 'sashtail': 0.45, 'bowtail': 0.5, 'hair': 0.8}
+def clean_face(t):
+    t = t.copy(); H_, W_ = t.shape[:2]
+    green = (t[..., 1] > t[..., 0] + 12)
+    green[:22, :92] = False                                     # keep the hairline band
+    skinpx = ~green
+    for y, x in zip(*np.where(green)):
+        for r in range(1, 6):
+            ys, xs = slice(max(0, y - r), y + r + 1), slice(max(0, x - r), x + r + 1)
+            m = skinpx[ys, xs]
+            if m.any(): t[y, x, :3] = t[ys, xs, :3][m].mean(0); break
+    return t
 pieces = []
 for k, (nm, p) in enumerate(zip(NAMES, PIECES)):
     P, Q, F, tex = np.asarray(p[0], float), np.asarray(p[1], float), np.asarray(p[2]), np.asarray(p[3], float)
     if k in vis: F = F[vis[k]]
+    if nm in ('face', 'earpatch'): tex = clean_face(tex)
     nodes_k = None
     if nm == 'hand':
         nodes_k = hand_nodes[NAMES[:k].count('hand')]
@@ -217,27 +229,37 @@ def piece_normals(P, F):
     n = np.cross(P[F[:, 1]] - P[F[:, 0]], P[F[:, 2]] - P[F[:, 0]])
     for k in range(3): np.add.at(acc, wid[F[:, k]], n)
     nn = acc[wid]; return nn / np.maximum(np.linalg.norm(nn, axis=1)[:, None], 1e-12)
+# skin pieces share one smooth normal per position (no shading seams where face, eye, mouth, ears and
+# the head/body meet, as on the vanilla models); other pieces are smoothed on their own
+SKIN = ('body', 'face', 'eye', 'mouth', 'earpatch', 'fill', 'hand', 'feet')
+skin_acc = {}
+for pc in pieces:
+    if pc['name'] not in SKIN or len(pc['F']) == 0: continue
+    P, F = pc['P'], pc['F']; n = np.cross(P[F[:, 1]] - P[F[:, 0]], P[F[:, 2]] - P[F[:, 0]])
+    for t, nn in zip(F, n):
+        for v in t: k = tuple(np.round(P[v], 4)); skin_acc[k] = skin_acc.get(k, 0) + nn
+vnorm = []
 for pc in pieces:
     P, F = pc['P'], pc['F']
     if len(F) == 0: continue
-    Nn = piece_normals(P, F)
+    if pc['name'] in SKIN:
+        Nn = np.array([skin_acc.get(tuple(np.round(p, 4)), np.array([0, 1.0, 0])) for p in P], float)
+        Nn /= np.maximum(np.linalg.norm(Nn, axis=1)[:, None], 1e-12)
+    else:
+        Nn = piece_normals(P, F)
     idx = []; uidx = []
     for i in range(len(P)):
         key = (tuple(np.round(P[i] * SCALE, 4)), int(pc['node'][i]), tuple(np.round(Nn[i], 1)))
-        if key not in vkey: vkey[key] = len(verts); verts.append((P[i] * SCALE, int(pc['node'][i])))
+        if key not in vkey: vkey[key] = len(verts); verts.append((P[i] * SCALE, int(pc['node'][i]))); vnorm.append(Nn[i].copy())
         idx.append(vkey[key])
         uk = (round(pc['UVa'][i][0] * 16384), round(pc['UVa'][i][1] * 16384))
         if uk not in ukey: ukey[uk] = len(uvs); uvs.append(tuple(pc['UVa'][i]))
         uidx.append(ukey[uk])
-    for a, b, c in F:
-        if len({idx[a], idx[b], idx[c]}) < 3: continue
-        tris[pc['mat']].append(((idx[a], idx[b], idx[c]), (uidx[a], uidx[b], uidx[c])))
+    for a, b_, c in F:
+        if len({idx[a], idx[b_], idx[c]}) < 3: continue
+        tris[pc['mat']].append(((idx[a], idx[b_], idx[c]), (uidx[a], uidx[b_], uidx[c])))
 P = np.array([v[0] for v in verts]); B = np.array([v[1] for v in verts])
-N = np.zeros_like(P)
-for gl in tris.values():
-    for (a, b, c), _ in gl:
-        n = np.cross(P[b] - P[a], P[c] - P[a]); N[a] += n; N[b] += n; N[c] += n
-N /= np.maximum(np.linalg.norm(N, axis=1)[:, None], 1e-9)
+N = np.array(vnorm); N /= np.maximum(np.linalg.norm(N, axis=1)[:, None], 1e-9)
 order = []; groups_s = []; slot = 0
 for b in sorted(set(B)):
     idx = [i for i in range(len(P)) if B[i] == b]

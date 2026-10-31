@@ -7,7 +7,7 @@ Postman/goddess test code (Z + X spawns her in character slot 37).
 
 | Path | Contents |
 |---|---|
-| `build/gd_0.arc`, `build/gd_0.anm.arc` | Game files (final test 1). 2,832 triangles, 153,600 B, 1.1x Celia. `gd_0.arc` SHA-1 starts `ac3bf08f`. |
+| `build/gd_0.arc`, `build/gd_0.anm.arc` | Game files (final test 2). 2,832 triangles, 152,256 B, 1.1x Celia. `gd_0.arc` SHA-1 starts `4a7322dc`. |
 | `build/b0_body.png`, `build/b0_head.png` | The two texture atlases inside `gd_0_b0.tpl`. |
 | `data/goddess_FINAL_model2.pkl.gz` | The finished model as pieces (positions, UVs, triangles, texture per piece). |
 | `data/celia_hands.pkl.gz` | Celia's hands (mesh, nodes, skin-tinted texture) used on the goddess. |
@@ -36,10 +36,12 @@ Postman/goddess test code (Z + X spawns her in character slot 37).
 3. Rigid skin on Celia's nodes: body by body part (as `build_blank.py`), skirt on Celia's skirt nodes
    32-34, ponytail and bow on her braid nodes 8/9, veil on the chest (6), hair/face on the head (7),
    hands on Celia's own hand nodes.
-4. Textures packed into two atlases (b0 #0 body, b0 #1 head). Eye and mouth use the animated
+4. Skin pieces (body, face, eye, mouth, ears, hands, feet) share one smooth normal per position, so
+   there are no shading seams where they meet. Stray hair paint is cleaned from the face texture.
+5. Textures packed into two atlases (b0 #0 body, b0 #1 head). Eye and mouth use the animated
    frame textures (f0_e / f0_m). GPL materials laid out as Muffy's `mumu_0.gpl`: eye (sel 00),
    body (sel FF), mouth (sel 01), head (sel 02).
-5. Skeleton and Celia's 10 animations scaled by `GD_SCALE` (default 1.1).
+6. Skeleton and Celia's 10 animations scaled by `GD_SCALE` (default 1.1).
 
 It needs files extracted from the disc, which are not in git: Celia (`sepi_0.*`, `anm00-09.bin`) in
 `$GD_GAME/celia`, Wally's `sua_0.gpl` in `$GD_GAME/wally`, and the model tools (`awlchar.py`, `anm.py`,
@@ -51,9 +53,9 @@ it from the tools folder. The output is byte-identical to `build/`.
 As for the earlier goddess tests (only the two `gd/` files change; `pm.bin` is unchanged from goddess test 6):
 
 ```
-python3 gcbuild.py --iso HM_AWL_blank1a.iso --out HM_AWL_final1a.iso \
+python3 gcbuild.py --iso HM_AWL_blank1a.iso --out HM_AWL_final2a.iso \
   --replace gd/gd_0.arc=gd/gd_0.arc --replace gd/gd_0.anm.arc=gd/gd_0.anm.arc --allow-unreferenced
-python3 postman_npc/make_pm_dol.py HM_AWL_final1a.iso HM_AWL_final1.iso
+python3 postman_npc/make_pm_dol.py HM_AWL_final2a.iso HM_AWL_final2.iso
 ```
 
 Not yet run in game. This archive is larger than earlier goddess tests (test 6 was 61 KB) and relies on
