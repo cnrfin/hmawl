@@ -388,11 +388,10 @@ if __name__ == '__main__':
         if JIGGLE:
             L_, off = JG.spring_offsets(nodes_j, raw, c_local, gain=float(os.environ.get('GD_JIGGLE_GAIN', '1.6')), clamp=float(os.environ.get('GD_JIGGLE_CLAMP', '0.010')), idle_amp=float(os.environ.get('GD_JIGGLE_IDLE', '0')))
             amp = np.linalg.norm(off, axis=1).max()
-            if amp < 0.0008:
-                raw = JG.anm_add_tracks(raw, [(N_BUST, L_, None, c_local), (N_RING, L_, None, c_local)])
-            else:
-                kb = [(f, c_local + o) for f, o in enumerate(off)]; kr = [(f, c_local + 0.5 * o) for f, o in enumerate(off)]
-                raw = JG.anm_add_tracks(raw, [(N_BUST, L_, kb), (N_RING, L_, kr)])
+            # always keyed tracks: a constant (0x3EE00001) track on the new nodes broke every animation in
+            # game (jiggle test 4); keyed-translation tracks (0x3EE10100) work (jiggle tests 2-3)
+            kb = [(f, c_local + o) for f, o in enumerate(off)]; kr = [(f, c_local + 0.5 * o) for f, o in enumerate(off)]
+            raw = JG.anm_add_tracks(raw, [(N_BUST, L_, kb), (N_RING, L_, kr)])
             print('anim', a, 'jiggle max offset mm', round(amp * 1000, 1))
         anims.append(('@', raw))
     anm = u8(anims)

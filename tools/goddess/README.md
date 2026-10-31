@@ -8,7 +8,7 @@ Postman/goddess test code (Z + X spawns her in character slot 37).
 | Path | Contents |
 |---|---|
 | `build/gd_0.arc`, `build/gd_0.anm.arc` | Game files (final test 4). 2,832 triangles, 152,192 B, 1.1x Celia. SHA-1: `gd_0.arc` `a6e1dccf`, `gd_0.anm.arc` `2407808f`. |
-| `build_jiggle/gd_0.arc`, `build_jiggle/gd_0.anm.arc` | Jiggle test 4 (`GD_JIGGLE=1 GD_JIGGLE_GAIN=2 GD_JIGGLE_CLAMP=0.0175`, on top of test 4): 51 nodes, whole bust bounces (up to 17.5 mm walk/run, ~1.5 mm idle). SHA-1: `f23d6ff9`, `7ee0bc2d`. Jiggle tests 2-3 confirmed in game that the extra nodes work. |
+| `build_jiggle/gd_0.arc`, `build_jiggle/gd_0.anm.arc` | Jiggle test 5 (`GD_JIGGLE=1 GD_JIGGLE_GAIN=2 GD_JIGGLE_CLAMP=0.0175`, on top of test 4): 51 nodes, whole bust bounces (up to 17.5 mm walk/run, ~1.5 mm idle). SHA-1: `f23d6ff9`, `73db3935`. Jiggle tests 2-3 confirmed in game that the extra nodes work; test 4 showed a constant track on them breaks every animation, so they are always keyed. |
 | `build/b0_body.png`, `build/b0_head.png` | The two texture atlases inside `gd_0_b0.tpl`. |
 | `data/goddess_FINAL_model2.pkl.gz` | The finished model as pieces (positions, UVs, triangles, texture per piece). |
 | `data/celia_hands.pkl.gz` | Celia's hands (mesh, nodes, skin-tinted texture) used on the goddess. |
