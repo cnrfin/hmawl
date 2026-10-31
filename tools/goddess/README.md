@@ -8,6 +8,7 @@ Postman/goddess test code (Z + X spawns her in character slot 37).
 | Path | Contents |
 |---|---|
 | `build/gd_0.arc`, `build/gd_0.anm.arc` | Game files (final test 3). 2,832 triangles, 152,256 B, 1.1x Celia. SHA-1: `gd_0.arc` `4a7322dc`, `gd_0.anm.arc` `2319b2df`. |
+| `build_jiggle/gd_0.arc`, `build_jiggle/gd_0.anm.arc` | Jiggle experiment 1 (`GD_JIGGLE=1 GD_JIGGLE_GAIN=1.2`): 51 nodes, baked bust bounce. SHA-1: `dac4b3e8`, `44253a4e`. |
 | `build/b0_body.png`, `build/b0_head.png` | The two texture atlases inside `gd_0_b0.tpl`. |
 | `data/goddess_FINAL_model2.pkl.gz` | The finished model as pieces (positions, UVs, triangles, texture per piece). |
 | `data/celia_hands.pkl.gz` | Celia's hands (mesh, nodes, skin-tinted texture) used on the goddess. |
@@ -45,6 +46,10 @@ Postman/goddess test code (Z + X spawns her in character slot 37).
 7. Shorter strides for the long gown (`anmsoft.py`): in walk (`GD_WALK`, 0.7) and run (`GD_RUN`, 0.5) the
    keyed rotations of the leg nodes and Celia's skirt nodes are slerped toward their rest rotation, so
    the feet stay under the skirt.
+8. Optional jiggle (`GD_JIGGLE=1`, `jiggle.py`): two extra nodes under node 5 (BUST full motion, RING half
+   motion) appended to the act (51 nodes); bust vertices skinned to them; per animation a damped spring
+   (3.2 Hz, damping 0.22) driven by node 5's motion is baked into keyed-translation tracks (pelvis-style
+   packed 0x3EE10100), clamped to 10 mm. Not yet tried in game.
 
 It needs files extracted from the disc, which are not in git: Celia (`sepi_0.*`, `anm00-09.bin`) in
 `$GD_GAME/celia`, Wally's `sua_0.gpl` in `$GD_GAME/wally`, and the model tools (`awlchar.py`, `anm.py`,

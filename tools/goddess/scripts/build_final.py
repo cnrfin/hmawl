@@ -20,6 +20,8 @@ def pload(path):
 from cull import visible
 from decim import decimate
 from anmsoft import soften
+import jiggle as JG
+JIGGLE = os.environ.get('GD_JIGGLE', '0') == '1'
 NAME, OUT = sys.argv[1], sys.argv[2]
 os.makedirs(OUT, exist_ok=True)
 SCALE = float(os.environ.get('GD_SCALE', '1.1'))
@@ -32,6 +34,7 @@ W_ = os.path.join(GAME, 'wally') + '/'
 nodes = act(open(SK + 'sepi_0.act', 'rb').read())
 newT = [np.array(nd['T']) * SCALE for nd in nodes]; K = SCALE
 Jw = np.array([w[:3, 3] for w in world(nodes)])
+N_BUST, N_RING = len(nodes), len(nodes) + 1
 
 # helper functions shared with the earlier builders (strips, display lists, skin, act, anims, TPL, U8)
 src = open(os.path.join(HERE, 'build_blank.py')).read()
@@ -155,6 +158,13 @@ for pc in pieces:
     elif nm in ('feet', 'sole'): n = NODE0[kd0.query(P)[1]]
     else: raise SystemExit('no node rule for ' + nm)
     pc['node'] = np.asarray(n, int)
+
+if JIGGLE:
+    for pc in pieces:
+        if pc['name'] == 'body':
+            ov = JG.bust_nodes(pc['P'], N_BUST, N_RING)
+            pc['node'] = np.where(ov >= 0, ov, pc['node'])
+            print('jiggle: bust vertices', int((ov == N_BUST).sum()), 'ring', int((ov == N_RING).sum()))
 
 # 4. textures -> atlases (each piece's used UV box baked, wrapping sampled, then shelf-packed)
 def sample(tex, u, v):
@@ -349,6 +359,12 @@ if __name__ == '__main__':
     f0e, f0m = frames_tpl(fr['eye']), frames_tpl(fr['mouth'])
     for gk in tris: check_strips(tris[gk])
     gpl, skn, actb = build_gpl(), build_skn(), build_act()
+    if JIGGLE:
+        from awlchar import act as act_parse
+        sn = act_parse(actb); Wb5 = world(sn)[JG.PARENT]
+        c_local = (np.linalg.inv(Wb5) @ np.r_[JG.CENTER * SCALE, 1])[:3]
+        actb = JG.act_add(actb, [(JG.PARENT, c_local, (0, 0, 0, 1.0)), (JG.PARENT, c_local, (0, 0, 0, 1.0))])
+        nodes_j = act_parse(actb); assert len(nodes_j) == N_RING + 1
     b0 = tpl([body_img, head_img])
     arc = u8([(NAME + '.act', actb), (NAME + '.gpl', gpl), (NAME + '.skn', skn), (NAME + '_b0.tpl', b0),
               (NAME + '_f0_e.tpl', f0e), (NAME + '_f0_m.tpl', f0m), ('_tmp.txt', b'')])
@@ -360,6 +376,15 @@ if __name__ == '__main__':
     for a in range(10):
         raw = retarget_anim(open(SK + 'anm%02d.bin' % a, 'rb').read())
         if a in STRIDE: raw, nk = soften(raw, rest, {n_: STRIDE[a] for n_ in LEGSKIRT}); print('anim', a, 'stride', STRIDE[a], 'keys', nk)
+        if JIGGLE:
+            L_, off = JG.spring_offsets(nodes_j, raw, c_local, gain=float(os.environ.get('GD_JIGGLE_GAIN', '1.6')))
+            amp = np.linalg.norm(off, axis=1).max()
+            if amp < 0.0008:
+                raw = JG.anm_add_tracks(raw, [(N_BUST, L_, None, c_local), (N_RING, L_, None, c_local)])
+            else:
+                kb = [(f, c_local + o) for f, o in enumerate(off)]; kr = [(f, c_local + 0.5 * o) for f, o in enumerate(off)]
+                raw = JG.anm_add_tracks(raw, [(N_BUST, L_, kb), (N_RING, L_, kr)])
+            print('anim', a, 'jiggle max offset mm', round(amp * 1000, 1))
         anims.append(('@', raw))
     anm = u8(anims)
     open(os.path.join(OUT, NAME + '.arc'), 'wb').write(arc)
