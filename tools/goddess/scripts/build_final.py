@@ -22,7 +22,8 @@ from decim import decimate
 from anmsoft import soften
 import jiggle as JG
 import skirtfollow as SF
-JIGGLE = os.environ.get('GD_JIGGLE', '0') == '1'
+JIGGLE = os.environ.get('GD_JIGGLE', '0') in ('1', 'fold')
+JIG_FOLD = os.environ.get('GD_JIGGLE', '0') == 'fold'      # 49 nodes: node 21 reused as the bust node
 NAME, OUT = sys.argv[1], sys.argv[2]
 os.makedirs(OUT, exist_ok=True)
 SCALE = float(os.environ.get('GD_SCALE', '1.1'))
@@ -164,7 +165,7 @@ for pc in pieces:
 if JIGGLE:
     for pc in pieces:
         if pc['name'] == 'body':
-            ov = JG.bust_nodes(pc['P'], N_BUST, N_RING)
+            ov = JG.bust_nodes(pc['P'], JG.FREE if JIG_FOLD else N_BUST, -1 if JIG_FOLD else N_RING)
             pc['node'] = np.where(ov >= 0, ov, pc['node'])
             print('jiggle: bust vertices', int((ov == N_BUST).sum()), 'ring', int((ov == N_RING).sum()))
 
@@ -365,8 +366,12 @@ if __name__ == '__main__':
         from awlchar import act as act_parse
         sn = act_parse(actb); Wb5 = world(sn)[JG.PARENT]
         c_local = (np.linalg.inv(Wb5) @ np.r_[JG.CENTER * SCALE, 1])[:3]
-        actb = JG.act_add(actb, [(JG.PARENT, c_local, (0, 0, 0, 1.0)), (JG.PARENT, c_local, (0, 0, 0, 1.0))])
-        nodes_j = act_parse(actb); assert len(nodes_j) == N_RING + 1
+        if JIG_FOLD:
+            actb, _ = JG.act_fold(actb, c_local); nodes_j = act_parse(actb); assert len(nodes_j) == 49
+            assert nodes_j[JG.FREE]['parent'] == JG.PARENT and nodes_j[JG.FREE_CHILD]['parent'] == JG.PARENT
+        else:
+            actb = JG.act_add(actb, [(JG.PARENT, c_local, (0, 0, 0, 1.0)), (JG.PARENT, c_local, (0, 0, 0, 1.0))])
+            nodes_j = act_parse(actb); assert len(nodes_j) == N_RING + 1
     b0 = tpl([body_img, head_img])
     arc = u8([(NAME + '.act', actb), (NAME + '.gpl', gpl), (NAME + '.skn', skn), (NAME + '_b0.tpl', b0),
               (NAME + '_f0_e.tpl', f0e), (NAME + '_f0_m.tpl', f0m), ('_tmp.txt', b'')])
@@ -386,6 +391,11 @@ if __name__ == '__main__':
             raw = SF.replace_tracks(raw, L_, keys)
             print('anim', a, 'skirt pushed by the feet: front up to %.0f deg, back up to %.0f deg' % (dF.max(), dB.min()))
         if JIGGLE:
+            if JIG_FOLD:   # spring from the unfolded skeleton (21 is not the bust yet in 'raw')
+                L_, off = JG.spring_offsets(nodes_sf, raw, c_local, gain=float(os.environ.get('GD_JIGGLE_GAIN', '1.6')), clamp=float(os.environ.get('GD_JIGGLE_CLAMP', '0.010')))
+                raw = JG.anm_fold(raw, [(f, c_local + o) for f, o in enumerate(off)], L_)
+                print('anim', a, 'jiggle (node 21) max offset mm', round(float(np.linalg.norm(off, axis=1).max()) * 1000, 1))
+                anims.append(('@', raw)); continue
             L_, off = JG.spring_offsets(nodes_j, raw, c_local, gain=float(os.environ.get('GD_JIGGLE_GAIN', '1.6')), clamp=float(os.environ.get('GD_JIGGLE_CLAMP', '0.010')), idle_amp=float(os.environ.get('GD_JIGGLE_IDLE', '0')))
             amp = np.linalg.norm(off, axis=1).max()
             # always keyed tracks: a constant (0x3EE00001) track on the new nodes broke every animation in

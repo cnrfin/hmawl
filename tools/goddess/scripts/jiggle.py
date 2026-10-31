@@ -103,3 +103,62 @@ def anm_add_tracks(raw, tracks):
     out = bytearray(d[:8]); struct.pack_into('>H', out, 4, N)
     for t in tab: out += struct.pack('>fIHHI', *t)
     return bytes(out) + body + extra
+
+# ---------------------------------------------------------------- 49-node variant: reuse node 21
+# The game breaks with more than 49 nodes (jiggle tests 3-5). Node 21 (right clavicle base, child of 5)
+# is constant at its rest pose in all 10 animations and unused by the skin: fold it into its child 22
+# (22 hangs from 5 directly, its rest and every key pre-multiplied by 21's fixed transform) and use 21 as
+# the bust node (parent 5).
+FREE, FREE_CHILD = 21, 22
+def qmul(a, b):
+    ax, ay, az, aw = a; bx, by, bz, bw = b
+    return np.array([aw * bx + ax * bw + ay * bz - az * by, aw * by - ax * bz + ay * bw + az * bx,
+                     aw * bz + ax * by - ay * bx + az * bw, aw * bw - ax * bx - ay * by - az * bz])
+def act_fold(d, bust_T):
+    d = bytearray(d); n = struct.unpack_from('>I', d, 4)[0]
+    e = lambda i: 0x20 + 0x1C * i
+    rd = lambda i: list(struct.unpack_from('>7I', d, e(i)))
+    x21 = rd(FREE)[0]; x22 = rd(FREE_CHILD)[0]
+    v21 = struct.unpack_from('>I10f', d, x21); v22 = struct.unpack_from('>I10f', d, x22)
+    q21, t21 = np.array(v21[4:8]), np.array(v21[8:11]); q22, t22 = np.array(v22[4:8]), np.array(v22[8:11])
+    R21 = qmat(q21)
+    struct.pack_into('>4f', d, x22 + 0x10, *qmul(q21, q22)); struct.pack_into('>3f', d, x22 + 0x20, *(t21 + R21 @ t22))
+    struct.pack_into('>4f', d, x21 + 0x10, 0, 0, 0, 1.0); struct.pack_into('>3f', d, x21 + 0x20, *bust_T)
+    # links: 22 becomes a child of 5 right after 21; 21 has no children
+    r21 = rd(FREE); r22 = rd(FREE_CHILD)
+    r22[3] = r21[3]                                  # parent = 5
+    r22[2] = r21[2]; r22[1] = e(FREE)                # siblings: 21 -> 22 -> (21's old next)
+    if r21[2]:
+        rn = rd((r21[2] - 0x20) // 0x1C); rn[1] = e(FREE_CHILD); struct.pack_into('>7I', d, r21[2], *rn)
+    r21[2] = e(FREE_CHILD); r21[4] = 0
+    struct.pack_into('>7I', d, e(FREE), *r21); struct.pack_into('>7I', d, e(FREE_CHILD), *r22)
+    return bytes(d), (q21, t21)
+def anm_fold(raw, bust_keys, L):
+    """22's track pre-multiplied by 21's (constant) local transform; 21's track = bust keyed translation"""
+    d = bytearray(raw); n = struct.unpack_from('>H', d, 4)[0]
+    tab = [list(struct.unpack_from('>fIHHI', d, 8 + 16 * i)) for i in range(n)]
+    offs = sorted(set(t[1] for t in tab)) + [len(d)]
+    get = lambda t: struct.unpack_from('>%dh' % ((offs[offs.index(t[1]) + 1] - t[1]) // 2), d, t[1])
+    t21 = [t for t in tab if t[3] == FREE][0]; t22 = [t for t in tab if t[3] == FREE_CHILD][0]
+    assert t21[4] == 0x3E000009, hex(t21[4])                 # constant rotation (all comps) + translation
+    h = get(t21); q21 = np.array(h[0:4]) / 16384.; T21 = np.array(h[4:7]) / 16384.; R21 = qmat(q21 / np.linalg.norm(q21))
+    p = t22[4]; b2, b3 = (p >> 8) & 0xFF, p & 0xFF; b1 = (p >> 16) & 0xFF
+    assert b1 & 0xE0 == 0 and not (b2 & 0x01), hex(p)        # all four components stored, no keyed translation
+    o = t22[1]; h = list(get(t22)); k = 0
+    S = lambda v: [int(np.clip(round(c * 16384), -32768, 32767)) for c in v]
+    if b3 & 0x08:
+        h[k:k + 4] = S(qmul(q21, np.array(h[k:k + 4]) / 16384.)); k += 4
+    if b3 & 0x01:
+        h[k:k + 3] = S(T21 + R21 @ (np.array(h[k:k + 3]) / 16384.)); k += 3
+    else:
+        h_ins = S(T21)                                       # (no case in Celia's data: 22 always has a translation)
+    if b2 & 0x70:
+        while k + 9 <= len(h):
+            h[k + 1:k + 5] = S(qmul(q21, np.array(h[k + 1:k + 5]) / 16384.))
+            h[k + 5:k + 9] = S(qmul(q21, np.array(h[k + 5:k + 9]) / 16384.))
+            k += 9
+    struct.pack_into('>%dh' % len(h), d, o, *h)
+    blob = b''.join(struct.pack('>4h', int(f), *S(xyz)) for f, xyz in bust_keys); blob += bytes((-len(blob)) % 4)
+    t21[1] = len(d); t21[2] = len(bust_keys); t21[4] = 0x3EE10100; t21[0] = L
+    for i, t in enumerate(tab): struct.pack_into('>fIHHI', d, 8 + 16 * i, *t)
+    return bytes(d) + blob

@@ -8,7 +8,7 @@ Postman/goddess test code (Z + X spawns her in character slot 37).
 | Path | Contents |
 |---|---|
 | `build/gd_0.arc`, `build/gd_0.anm.arc` | Game files (final test 4). 2,832 triangles, 152,192 B, 1.1x Celia. SHA-1: `gd_0.arc` `a6e1dccf`, `gd_0.anm.arc` `2407808f`. |
-| `build_jiggle/gd_0.arc`, `build_jiggle/gd_0.anm.arc` | Jiggle test 5 (`GD_JIGGLE=1 GD_JIGGLE_GAIN=2 GD_JIGGLE_CLAMP=0.0175`, on top of test 4): 51 nodes, whole bust bounces (up to 17.5 mm walk/run, ~1.5 mm idle). SHA-1: `f23d6ff9`, `73db3935`. Jiggle tests 2-3 confirmed in game that the extra nodes work; test 4 showed a constant track on them breaks every animation, so they are always keyed. |
+| `build_jiggle/gd_0.arc`, `build_jiggle/gd_0.anm.arc` | Jiggle test 6 (`GD_JIGGLE=fold GD_JIGGLE_GAIN=2 GD_JIGGLE_CLAMP=0.0175`, on top of test 4): 49 nodes, node 21 reused as the bust bone. SHA-1: `b608bff2`, `c0c522d6`. Not yet tried in game. |
 | `build/b0_body.png`, `build/b0_head.png` | The two texture atlases inside `gd_0_b0.tpl`. |
 | `data/goddess_FINAL_model2.pkl.gz` | The finished model as pieces (positions, UVs, triangles, texture per piece). |
 | `data/celia_hands.pkl.gz` | Celia's hands (mesh, nodes, skin-tinted texture) used on the goddess. |
@@ -53,7 +53,12 @@ Postman/goddess test code (Z + X spawns her in character slot 37).
    motion) appended to the act (51 nodes); bust vertices skinned to them; per animation a damped spring
    (3.2 Hz, damping 0.22) driven by node 5's motion is baked into keyed-translation tracks (pelvis-style
    packed 0x3EE10100), clamped by `GD_JIGGLE_CLAMP`. Bust = y 0.665-0.78, |x| < 0.105, z > 0.055 (full);
-   a band around it at half motion. Works in game (jiggle tests 2-3: the 51-node act and extra tracks load).
+   a band around it at half motion. BROKEN IN GAME: every 51-node build (jiggle tests 3-5) wrecked her
+   model as soon as she spawned - the game evidently can't take more than Celia's 49 nodes.
+   `GD_JIGGLE=fold` stays at 49: node 21 (right clavicle base; constant at its rest in all 10 animations,
+   unused by the skin) is folded into its child 22 (22's rest and every key pre-multiplied by 21's fixed
+   transform; verified: every other node matches test 4 in every frame) and reused as the bust node.
+   One free node only, so no half-motion ring.
    `GD_JIGGLE_IDLE` adds a constant test bob to every animation (used only to check it in game).
 
 It needs files extracted from the disc, which are not in git: Celia (`sepi_0.*`, `anm00-09.bin`) in
