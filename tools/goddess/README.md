@@ -7,7 +7,7 @@ Postman/goddess test code (Z + X spawns her in character slot 37).
 
 | Path | Contents |
 |---|---|
-| `build/gd_0.arc`, `build/gd_0.anm.arc` | Game files (final test 2). 2,832 triangles, 152,256 B, 1.1x Celia. `gd_0.arc` SHA-1 starts `4a7322dc`. |
+| `build/gd_0.arc`, `build/gd_0.anm.arc` | Game files (final test 3). 2,832 triangles, 152,256 B, 1.1x Celia. SHA-1: `gd_0.arc` `4a7322dc`, `gd_0.anm.arc` `2319b2df`. |
 | `build/b0_body.png`, `build/b0_head.png` | The two texture atlases inside `gd_0_b0.tpl`. |
 | `data/goddess_FINAL_model2.pkl.gz` | The finished model as pieces (positions, UVs, triangles, texture per piece). |
 | `data/celia_hands.pkl.gz` | Celia's hands (mesh, nodes, skin-tinted texture) used on the goddess. |
@@ -42,6 +42,9 @@ Postman/goddess test code (Z + X spawns her in character slot 37).
    frame textures (f0_e / f0_m). GPL materials laid out as Muffy's `mumu_0.gpl`: eye (sel 00),
    body (sel FF), mouth (sel 01), head (sel 02).
 6. Skeleton and Celia's 10 animations scaled by `GD_SCALE` (default 1.1).
+7. Shorter strides for the long gown (`anmsoft.py`): in walk (`GD_WALK`, 0.7) and run (`GD_RUN`, 0.5) the
+   keyed rotations of the leg nodes and Celia's skirt nodes are slerped toward their rest rotation, so
+   the feet stay under the skirt.
 
 It needs files extracted from the disc, which are not in git: Celia (`sepi_0.*`, `anm00-09.bin`) in
 `$GD_GAME/celia`, Wally's `sua_0.gpl` in `$GD_GAME/wally`, and the model tools (`awlchar.py`, `anm.py`,
@@ -53,10 +56,10 @@ it from the tools folder. The output is byte-identical to `build/`.
 As for the earlier goddess tests (only the two `gd/` files change; `pm.bin` is unchanged from goddess test 6):
 
 ```
-python3 gcbuild.py --iso HM_AWL_blank1a.iso --out HM_AWL_final2a.iso \
+python3 gcbuild.py --iso HM_AWL_blank1a.iso --out HM_AWL_final3a.iso \
   --replace gd/gd_0.arc=gd/gd_0.arc --replace gd/gd_0.anm.arc=gd/gd_0.anm.arc --allow-unreferenced
-python3 postman_npc/make_pm_dol.py HM_AWL_final2a.iso HM_AWL_final2.iso
+python3 postman_npc/make_pm_dol.py HM_AWL_final3a.iso HM_AWL_final3.iso
 ```
 
-Not yet run in game. This archive is larger than earlier goddess tests (test 6 was 61 KB) and relies on
-the 256 KB pool-B spacer from test 6.
+Runs in game (tests 1-2 in Dolphin: loads, animates, face shading fixed in test 2). The archive is larger
+than the earlier goddess tests (test 6 was 61 KB) and relies on the 256 KB pool-B spacer from test 6.

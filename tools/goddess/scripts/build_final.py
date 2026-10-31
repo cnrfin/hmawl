@@ -19,6 +19,7 @@ def pload(path):
     return pickle.load(gzip.open(path + '.gz', 'rb') if not os.path.exists(path) and os.path.exists(path + '.gz') else open(path, 'rb'))
 from cull import visible
 from decim import decimate
+from anmsoft import soften
 NAME, OUT = sys.argv[1], sys.argv[2]
 os.makedirs(OUT, exist_ok=True)
 SCALE = float(os.environ.get('GD_SCALE', '1.1'))
@@ -351,7 +352,16 @@ if __name__ == '__main__':
     b0 = tpl([body_img, head_img])
     arc = u8([(NAME + '.act', actb), (NAME + '.gpl', gpl), (NAME + '.skn', skn), (NAME + '_b0.tpl', b0),
               (NAME + '_f0_e.tpl', f0e), (NAME + '_f0_m.tpl', f0m), ('_tmp.txt', b'')])
-    anm = u8([('@', retarget_anim(open(SK + 'anm%02d.bin' % a, 'rb').read())) for a in range(10)])
+    # long gown: shorter strides in walk (1) and run (5), legs and Celia's skirt nodes together
+    STRIDE = {1: float(os.environ.get('GD_WALK', '0.7')), 5: float(os.environ.get('GD_RUN', '0.5'))}
+    LEGSKIRT = (32, 33, 34, 36, 37, 38, 39, 40, 41, 43, 44, 45, 46, 47, 48)
+    rest = [nd['Q'] for nd in nodes]
+    anims = []
+    for a in range(10):
+        raw = retarget_anim(open(SK + 'anm%02d.bin' % a, 'rb').read())
+        if a in STRIDE: raw, nk = soften(raw, rest, {n_: STRIDE[a] for n_ in LEGSKIRT}); print('anim', a, 'stride', STRIDE[a], 'keys', nk)
+        anims.append(('@', raw))
+    anm = u8(anims)
     open(os.path.join(OUT, NAME + '.arc'), 'wb').write(arc)
     open(os.path.join(OUT, NAME + '.anm.arc'), 'wb').write(anm)
     body_img.save(os.path.join(OUT, 'b0_body.png')); head_img.save(os.path.join(OUT, 'b0_head.png'))
