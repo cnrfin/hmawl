@@ -195,3 +195,57 @@ void joe_dig_frame(void)
     float p = share[ch];
     *(u16 *)(DIG_TAB + 6) = (u16)((float)others * p / (1.0f - p) + 0.5f);
 }
+
+/* ---- villagers hate the $JOE coin
+   func_80117B10(villager, record, &group, &line) picks a villager's talk line for a talk record (the
+   villager's NPC_NormalTalk table, 78-byte records); the held-item chain sends the coin's talk class
+   (item flags bit 20) to record 0x3E, shared with every dig-site find. pm_talk_stub wraps it: when the
+   record is 0x3E and the player holds the coin (0x442), the line becomes that villager's own dislike
+   line (no give-it-to-me prompt), the "may offer a gift" flag 0x80349348 is cleared, and the villager
+   loses JOE_HATE affection (record +0x28, via the game's setter), once a day per villager. */
+#define HELD_ITEM   (*(volatile u16 *)(*(u8 **)0x803491CC + 0x11CC6))
+#define GIFT_FLAG   (*(volatile u8 *)0x80349348)
+#define villager_rec F(0x8000DC24, u8 *, (u8 *, s32))
+#define set_affection F(0x800782D8, s32, (u8 *, s32))
+#define JOE_HATE    10
+#define G_OTHER     42
+static const u16 hate_line[46] = {   /* by message group: that villager's own dislike line; 0 = shared line */
+    [0] = 0x3C,  /* badog:   I really hate that. Please try and remember that. */
+    [1] = 0x55,  /* bahn:    I don't like that at all. */
+    [3] = 0x61,  /* carter:  What's that?? Throw that away. */
+    [4] = 0x91,  /* daryl:   I don't want that. */
+    [10] = 0x2E, /* ghali:   No matter how much I look at it, I still don't like it. */
+    [11] = 0x39, /* godey:   I can't stand that junk. */
+    [13] = 0x45, /* gustafa: Get that away from me. */
+    [15] = 0x4A, /* kate:    I don't want that. */
+    [17] = 0x31, /* kris:    I really don't like that at all. */
+    [19] = 0x87, /* mash:    That's unusual... I'm not interested in it, though. */
+    [20] = 0x49, /* moi:     I don't want t-that... */
+    [23] = 0x1A3,/* nami:    Okay, okay. You keep it for yourself, okay? */
+    [24] = 0x23, /* nina:    No matter which way I look at it, I don't like it. Sorry dear. */
+    [25] = 0x2A, /* pasaran: Can you please get rid of that? Throw it into the Sun or something... */
+    [27] = 0x2E, /* romana:  I don't want that. */
+    [35] = 0xB0, /* takakura: Sorry, I don't like that very much. */
+    [37] = 0x78, /* vesta:   I'm not interested. */
+};
+static u8 hate_day_seen[64];
+static u32 hate_day = 0xFFFFFFFFu;
+s32 joe_talk_post(s32 who, s32 rec, s32 *grp, s32 *msg, s32 ret)
+{
+    if (rec != 0x3E || HELD_ITEM != 0x442) return ret;
+    s32 g = *grp;
+    if (g >= 0 && g < 46 && hate_line[g]) *msg = hate_line[g];
+    else { *msg = (g == 14 || g == 18) ? 0x42 : 0x43; *grp = G_OTHER; }   /* Yuck... Go away. / What is that?? Throw it away. */
+    GIFT_FLAG = 0;
+    u32 day = CLOCK / T_DAY;
+    if (day != hate_day) { for (s32 i = 0; i < 64; i++) hate_day_seen[i] = 0; hate_day = day; }
+    if (who >= 0 && who < 64 && !hate_day_seen[who]) {
+        u8 *r = villager_rec(*(u8 **)0x803491CC, who);
+        if (r) {
+            s32 a = *(short *)(r + 0x28) - JOE_HATE;
+            set_affection(r, a < 0 ? 0 : a);
+        }
+        hate_day_seen[who] = 1;
+    }
+    return ret;
+}

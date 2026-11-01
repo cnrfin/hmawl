@@ -123,3 +123,28 @@ pm_nosell_stub:
     .globl pm_tv_stub
 pm_tv_stub:
     b     joe_tv
+
+# Villager talk line: 0x80117B10 (func_80117B10(villager, record, &group, &line), was stwu r1,-0x40(r1)).
+# Runs the original, then joe_talk_post(villager, record, &group, &line, result) may swap the line.
+    .globl pm_talk_stub
+pm_talk_stub:
+    stwu  r1, -0x20(r1)
+    mflr  r0
+    stw   r0, 0x24(r1)
+    stw   r3, 0x8(r1)
+    stw   r4, 0xc(r1)
+    stw   r5, 0x10(r1)
+    stw   r6, 0x14(r1)
+    bl    1f
+    mr    r7, r3
+    lwz   r3, 0x8(r1)
+    lwz   r4, 0xc(r1)
+    lwz   r5, 0x10(r1)
+    lwz   r6, 0x14(r1)
+    bl    joe_talk_post
+    lwz   r0, 0x24(r1)
+    mtlr  r0
+    addi  r1, r1, 0x20
+    blr
+1:  stwu  r1, -0x40(r1)             # original first instruction
+    b     talk_hook_return          # 0x80117B14

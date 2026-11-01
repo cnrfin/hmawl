@@ -36,3 +36,16 @@ take a look at it, if they're old coins..."), so the coin can't get its own line
 "villager asks to buy the held item" pick (func_8011811C end, pm_nosell_stub) now also returns "nothing"
 for 0x442. hook.s grew 8 bytes: pm_tv_stub is now at pm.bin +0x14C (make_pm_dol HOOK8_OFF). pm.bin 9c... see zip.
 Still to do: a hate reaction + affection drop (needs the show/gift reaction code).
+
+## Coin test 6: villagers hate it (how villager item talk works)
+- Villager talk tables: `NPC_NormalTalk_1..6.arc` (one per chapter), 36 CLZ members (one per villager,
+  member = func_80118940(villager)), each 158 records x 78 bytes: 3 pages of 4 (group, line) pairs + u32,
+  then 3 (group, line, flag) extras. Decompressed at talk start into lbl_802F3F44 (func_8017837C).
+- func_80113FBC picks the record: for a held item, func_80012134(item, K) tests bit K-1 of item flags
+  (+0x1C) >> 5; the coin's flags give K = 20 -> record 0x3E (shared by every dig-site find).
+- func_80117B10(villager, record, &group, &line) picks the page (by times shown) or an extra.
+- Villager records: game + 0x124C4 + 0x124 x (func_8007846C(id) - 1); affection = s16 at +0x28 (setter
+  func_800782D8), gift-today byte +0x25. Hugh's coin gift: 50 -> 131.
+- Test 6 hooks func_80117B10 (pm_talk_stub, pm.bin +0x150): record 0x3E with the coin held -> the
+  villager's own dislike line (table in joetv.c by message group, else other.mes 0x43 / 0x42), gift flag
+  0x80349348 cleared, affection -10 once a day per villager. `talktab.py` reads the tables.

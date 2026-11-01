@@ -33,6 +33,8 @@ HOOK7_OFF = 0x130                                     # pm_nosell_stub in pm.bin
 HOOK6_OFF = 0xF4                                      # pm_exit_stub in pm.bin (after pm_sfx_stub)
 HOOK8 = 0x8008E298
 HOOK8_OFF = 0x14C                                     # pm_tv_stub in pm.bin (after pm_nosell_stub)
+HOOK9 = 0x80117B10
+HOOK9_OFF = 0x150                                     # pm_talk_stub in pm.bin (after pm_tv_stub)
 PATCHES = [  # (RAM address, original word, new word, why)
     (0x801B0EE4, 0x80630030, 0x3C608036, 'OSInit: arena low = 0x80366000 (was BootInfo->arenaLo or __ArenaLo) ...'),
     (0x801B0EE8, 0x28030000, 0x38636000, '... + 0x6000'),
@@ -57,6 +59,7 @@ PATCHES = [  # (RAM address, original word, new word, why)
     (0x8028E8F0, 0x0DFF11AB, 0x08001200, '...'),
     (HOOK7, 0x80610020, None, 'villager item pick (func_8011811C end) -> pm_nosell_stub: never the Cursed Axe'),
     (HOOK8, 0x9421FFE0, None, 'TV channel 3 caption (func_8008E298) -> pm_tv_stub: $JOE Coin Daily'),
+    (HOOK9, 0x9421FFC0, None, 'villager talk line (func_80117B10) -> pm_talk_stub: villagers hate the $JOE coin'),
     (0x8028C74C, 0x00020000, 0x00000000, '$JOE coin (item 0x442): price 0 (was 2; ships for 0 G, shops/Van see no value)'),
     (0x80109D24, 0x4BF08245, 0x4BF08209, 'cmd_91 item model: symbol (rucksack) model for every item, centred spin'),
     (0x800038E8, 0x38600000, 'axe', 'baked Cursed Axe code, A path 1 (li r3,0) -> bl pm_axe_stub: log hits'),
@@ -93,13 +96,14 @@ def main():
     if CODE_ADDR + len(code) > ARENA_LO: die('code does not fit below the new arena start')
     entry = CODE_ADDR                                   # pm_hook is the first thing in pm.bin
     if be32(code, HOOK2_OFF) != 0x9421FFE0: die('pm.bin does not have pm_hook2 at +0x14')
-    targets = {HOOK: entry, HOOK2: entry + HOOK2_OFF, HOOK3: entry + HOOK3_OFF, HOOK4: entry + HOOK4_OFF, HOOK5: entry + HOOK5_OFF, HOOK6: entry + HOOK6_OFF, HOOK7: entry + HOOK7_OFF, HOOK8: entry + HOOK8_OFF}
+    targets = {HOOK: entry, HOOK2: entry + HOOK2_OFF, HOOK3: entry + HOOK3_OFF, HOOK4: entry + HOOK4_OFF, HOOK5: entry + HOOK5_OFF, HOOK6: entry + HOOK6_OFF, HOOK7: entry + HOOK7_OFF, HOOK8: entry + HOOK8_OFF, HOOK9: entry + HOOK9_OFF}
     if be32(code, HOOK3_OFF) >> 16 != 0x3D80: die('pm.bin does not have pm_player_stub at +0x58')
     if be32(code, HOOK4_OFF) != 0x9421FFF0: die('pm.bin does not have pm_label_stub at +0x68')
     if be32(code, HOOK5_OFF) != 0x9421FFD0: die('pm.bin does not have pm_sfx_stub at +0x98')
     if be32(code, HOOK6_OFF) != 0x2C000001: die('pm.bin does not have pm_exit_stub at +0xF4')
     if be32(code, HOOK7_OFF) != 0x80610020: die('pm.bin does not have pm_nosell_stub at +0x130')
     if be32(code, HOOK8_OFF) >> 26 != 18: die('pm.bin does not have pm_tv_stub at +0x14C')
+    if be32(code, HOOK9_OFF) != 0x9421FFE0: die('pm.bin does not have pm_talk_stub at +0x150')
     if be32(code, AXE_STUB_OFF) >> 26 != 18: die('pm.bin does not have pm_axe_stub at +0x54')
     with open(src, 'rb') as f:
         hdr = f.read(0x440)
