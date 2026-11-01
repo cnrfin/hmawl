@@ -78,3 +78,9 @@ The schedulers (job table methods 0x80133D54 / DA4 / DB8 / E08: set time pairs a
 from the villager daily plan func_80060EF8, in the branch for villager 7 = Takakura (0x80061168..0x80061298),
 after checking the shipping containers game+0x111BC / +0x1119C (addis 1 + 0x11BC) (func_80053234). Test 11 logs every daily plan
 (hook 0x80060EF8 -> pm_van_stub -> plan_log, buffer plan_log_buf at 0x80365990).
+
+## Bench sit test 11 result / test 12
+Plan log: every villager plans its day at its wake time (day 1: Takakura 7 at 5:01, others 6:00-13:06). After a
+bench night, day 2 shows only 10/18/17 at 6:00 (just after the skip) - Takakura's 5:00 plan never ran, so no trade
+jobs were scheduled. His wake check only fires in a short window that the 5-minute steps jump over. Test 12 steps
+1 game minute per frame for 4:50-6:10 (5 minutes elsewhere). Probe log kept.

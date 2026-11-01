@@ -465,7 +465,11 @@ void pm_frame(void)
             u32 *clk = *(u32 **)0x80349218, old = *clk, step;
             u8 *tm = *(u8 **)0x80349194;
             PAD_PRESS = 0; PAD_HELD = 0;
-            step = bench_target - old > 3000u ? 3000u : bench_target - old;
+            {   /* 5 game minutes a frame; 1 minute around 4:50-6:10, where Takakura wakes (~5:00) and plans the day's
+                   trade jobs (pickup 5:10) - his wake check only fires in a short window */
+                u32 tod = old % T_DAY, lim = (tod >= 174000u && tod < 222000u) ? 600u : 3000u;
+                step = bench_target - old > lim ? lim : bench_target - old;
+            }
             *clk = old + step;
             ship_check(*(u8 **)0x803491CC);                  /* farm-side timed checks (shipping pickup 5:10-5:40, payout 12:00-12:30); only wlp2 (farm/house) calls this */
             {   /* the trade manager (*0x803491EC, vtable 0x802C1940 at +0x10): its update (slot 0x10, 0x80134104) runs the
