@@ -19,3 +19,9 @@ a folder holding `N.npy` / `net.json` exported from it).
 Build: on top of HM_AWL_joe5.iso (sit14 code + Joe test 5): gd_0.arc (test 6), then make_pm_dol.py, which now
 replaces an existing Postman section (update mode). pm.bin SHA-1 95a81d22, make_pm_dol.py see below.
 make_pm_dol.py with update mode: SHA-1 aeeb6c11.
+
+## Test 2: no second sit down
+The game cross-fades clips (in local space). Sit down -> sitting flips his facing 180 degrees, so the fade
+started from the sit down's last pose under the new facing and looked like a second sit down. `joe_motion`
+starts clip 7 twice in that frame, so the fade runs from clip 7 into itself. pm.bin SHA-1 cd29a76b
+(ends 0x80365F94). Stand up (no turn) was already fixed by test 7's held last pose.

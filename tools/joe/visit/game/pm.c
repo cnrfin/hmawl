@@ -407,9 +407,14 @@ s32 joe_visit_day(u32 day);
 static s32 joe_forced, joe_here;
 static void joe_motion(s32 m)               /* start a clip once (sit down / stand up must not restart) */
 {
+    s32 flip = S.motion == JM_SITDOWN && m == JM_SIT;
     if (S.motion == m) return;
     S.motion = m;
     actor_motion(S.actor, m);
+    /* sit down -> sitting turns him 180 degrees: the game cross-fades clips, and fading from the sit down's
+       last pose under the new facing showed him sitting down a second time. Starting the clip again in
+       the same frame makes the fade run from the sitting clip into itself. */
+    if (flip) actor_motion(S.actor, m);
 }
 static void joe_place(float s)
 {
