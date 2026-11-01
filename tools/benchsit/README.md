@@ -31,3 +31,9 @@ start 0x11B28 / end 0x11B30), which a single clock jump skips. Test 4: the scrip
 (1 evening / 2 morning), fades out and ends on black; pm.c steps the clock 5 game minutes per frame (+ the copy at
 lbl_80349194+0x404) to 18:00 / next 6:00 with pad input held off, then refills stamina, clears the sleepy values
 and fades back in. Common.arc 60ff57c7, debug.mes 4dd04c6d.
+
+## Bench sit test 5
+Test 4: shipping paid, but loading a 5:00 save ran the clock to 6:00 - event counters 0-29 count up every day
+(all 1 in the dump), so counter 27 turned "on" at each day change. Test 5 uses counter 40 (no Chapter/Common
+script touches it) and pm.c only acts on the values 7771 (evening) / 7772 (morning). Tiredness: still not
+found (the three cleared values are already 0 in the tired session). Common.arc 700e4ae4, pm.bin aa6b8002.

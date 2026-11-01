@@ -33,7 +33,8 @@ new_mes = body + bytes(len(ev) - len(body))
 assert mes_entries(new_mes)[EVE] == enc(TEXT[EVE])
 
 V_ANS = 2
-REST = 27                                                    # event counter 27 = 1/2 on Yes: pm.c skips to 18:00 / 6:00
+REST = 40                                                    # event counter 40 (no script uses it; 0-29 count up daily)
+EVE_REQ, MORN_REQ = 7771, 7772                               # values pm.c accepts: skip to 18:00 / 6:00
 a = Asm(); L = a.new
 a.sys(0x10); a.sys(0x00)                                     # event start
 def fade(cmd):
@@ -51,9 +52,9 @@ def ask(msg, target):
 early, go_eve = L('early'), L('eve')
 a.sys(0x4A); a.num(6); a.emit('cmp'); a.jlt(early)          # hour < 6  -> morning
 a.sys(0x4A); a.num(18); a.emit('cmp'); a.jlt(go_eve)        # hour < 18 -> evening
-ask(MORN, 2)
-a.label(early); ask(MORN, 2)
-a.label(go_eve); ask(EVE, 1)
+ask(MORN, MORN_REQ)
+a.label(early); ask(MORN, MORN_REQ)
+a.label(go_eve); ask(EVE, EVE_REQ)
 a.label(done)
 a.emit('end'); a.emit('end')
 script = a.build()

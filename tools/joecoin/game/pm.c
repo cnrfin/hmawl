@@ -62,7 +62,7 @@ typedef struct { float x, y, z; } Vec;
 #define EVENT     406
 struct { u32 presses, started, rested; s32 map, ev680, ev58c; u32 control; } bench_dbg;   /* bench sit test 2 debug */
 static u32 bench_target;                    /* bench time skip: clock target, 0 = idle */
-#define BENCH_CNT 27                        /* event counter 27: set by the bench script on Yes */
+#define BENCH_CNT 40                        /* event counter 40: set by the bench script on Yes (0-29 count up daily) */
 #define BENCH_EVENT 407                     /* bench: sit until evening / morning */
 #define BENCH_X   137.65f                   /* turned bench by the tree: seat centre (mapobj col box) */
 #define BENCH_Z   176.60f
@@ -435,7 +435,6 @@ void pm_frame(void)
             bench_dbg.ev680 = ev ? *(s32 *)(ev + 0x680) : -2; bench_dbg.ev58c = ev ? *(s32 *)(ev + 0x58C) : -2;
             if (ev && *(s32 *)(ev + 0x680) == -1 && !*(s32 *)(ev + 0x58C) && CONTROL != 3) {
                 PAD_PRESS &= ~0x100u; PAD_HELD &= ~0x100u;   /* the player does not act on this A */
-                *(s32 *)(g + 0x12194 + BENCH_CNT * 4) = 0;
                 bench_dbg.started += event_start(ev, BENCH_EVENT, 0, 0) & 0xFF ? 1 : 0;
             }
         }
@@ -447,9 +446,10 @@ void pm_frame(void)
     {
         s32 *req = (s32 *)(g + 0x12194 + BENCH_CNT * 4);
         u8 *ev = EVMGR;
-        if (*req && !bench_target && ev && *(s32 *)(ev + 0x680) == -1) {
+        s32 want = *req == 7771 * 128 || *req == 7771 ? 1 : *req == 7772 * 128 || *req == 7772 ? 2 : 0;
+        if (want && !bench_target && ev && *(s32 *)(ev + 0x680) == -1) {
             u32 c = CLOCK, base = c / T_DAY * T_DAY, h = c % T_DAY;
-            if (*req / 128 == 1 || *req == 1) bench_target = base + 18 * 36000u;
+            if (want == 1) bench_target = base + 18 * 36000u;
             else bench_target = h < 6 * 36000u ? base + 6 * 36000u : base + T_DAY + 6 * 36000u;
             if (bench_target <= c) bench_target = c + 1;
             *req = 0;
