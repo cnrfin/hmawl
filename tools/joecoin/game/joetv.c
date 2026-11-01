@@ -170,3 +170,28 @@ void *joe_tv(void *prog, void *str)
     (void)prog;
     return str;
 }
+
+/* ---- dig site: the $JOE coin halves every chapter (10%, 5%, 2.5%, 1.25%, ...)
+   The dig table (lbl_802928C8: 18 rows of item u32, group u16, weight u16, chapter mask u8, repeatable u8)
+   is read when the dig site is set up: each row open in this chapter (mask bit) gets weight / sum.
+   Every frame the other rows get their original weight x 100 and the coin (row 0, item 0x442) the weight
+   that makes its share exactly the chapter's target among the rows open in that chapter. */
+#define DIG_TAB   ((u8 *)0x802928C8)
+#define chapter_of F(0x8000FEE8, s32, (void *))
+static u16 dig_base[18];
+void joe_dig_frame(void)
+{
+    static const float share[6] = { 0.10f, 0.05f, 0.025f, 0.0125f, 0.00625f, 0.003125f };
+    void *clk = *(void **)0x80349218;
+    if (!clk || *(u32 *)DIG_TAB != 0x442) return;
+    if (!dig_base[1]) for (s32 i = 0; i < 18; i++) dig_base[i] = *(u16 *)(DIG_TAB + 12 * i + 6);
+    s32 ch = chapter_of(clk); if (ch < 0) ch = 0; if (ch > 5) ch = 5;
+    u32 others = 0;
+    for (s32 i = 1; i < 18; i++) {
+        u8 *r = DIG_TAB + 12 * i;
+        *(u16 *)(r + 6) = (u16)(dig_base[i] * 100);
+        if (r[8] >> ch & 1) others += dig_base[i] * 100;
+    }
+    float p = share[ch];
+    *(u16 *)(DIG_TAB + 6) = (u16)((float)others * p / (1.0f - p) + 0.5f);
+}

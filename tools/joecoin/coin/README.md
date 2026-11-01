@@ -15,3 +15,10 @@ The emblem didn't look like Joe. Test 2 gives image 30 a 128x256 texture made fr
 (`coin_tex_x4.png`, face 112 px): appended to symbol.tpl (32-aligned) with image 30's header pointed at it
 (the model's UVs are 0-1, so they scale). commonall.arc.clz a970336f (3,839,604 B).
 Confirmed in game (rucksack menu: icon, name with $, description, 3D coin with Joe's face).
+
+## Coin test 3: dig-site halving
+Dig table lbl_802928C8 (18 rows: item u32, group u16, weight u16, chapter mask u8, repeatable u8): the
+dig scene (wlp2 lbl_00001D20, chapter from func_8000FEE8(clock), 0-5) gives each row open in the chapter
+weight / sum. `joe_dig_frame` (joetv.c, called from pm_frame) rewrites the weights every frame: others x100,
+the coin the weight for exactly 10 / 5 / 2.5 / 1.25 / 0.625 / 0.3125 % of dig-site finds in chapters 1-6.
+pm.bin a9929cdd (23,532 B).
