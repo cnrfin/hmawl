@@ -35,3 +35,7 @@ start 50 G, growth +75 %/year, volatility 60 %, daily jitter ±12 %, crypto-wint
 - Output SHA-1: tv-console2.tpl e9efc4ff, font.tpl e5c4b578 (test 2), pm.bin 16aec257.
 - TV test 1 worked in game except the `$`: the US game draws text from font.tpl image 1 (Western font, 16x16 cells,
   same code order), where 0x80FD is "ä". Test 2 also draws `$` there (`dollar16.npy`).
+- TV test 4: the game reads font.tpl from **preload.arc.clz** (loaded at boot), not the loose root copy, so
+  the loose font edit did nothing. `build_preload.py` draws '$' into preload's own font.tpl (image 1, cell
+  0x80FD; its image 0 differs from the loose copy, so the file isn't swapped) and recompresses (CLZ).
+  preload.arc.clz 408,721 -> 403,276 B, SHA-1 65c38d8b. The loose font.tpl change is harmless and not needed.
