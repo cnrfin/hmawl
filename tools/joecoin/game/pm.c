@@ -408,8 +408,13 @@ void pm_frame(void)
     joe_dig_frame();                          /* $JOE coin dig-site halving (joetv.c) */
     van_frame(g);                             /* van test 5: log the stall Van's daily plan (joetv.c) */
     if ((PAD_HELD & 0x10) && (PAD_PRESS & 0x200)) {   /* test: Z + B = clock to 22:00 today (then bed = next morning) */
-        u32 *clk = *(u32 **)0x80349218;
-        if (*clk % T_DAY < 792000u) *clk = *clk / T_DAY * T_DAY + 792000u;
+        u32 *clk = *(u32 **)0x80349218, old = *clk, *copy = 0;
+        u8 *tm = *(u8 **)0x80349194;                 /* holds a second copy of the clock at +0x404 */
+        if ((u32)tm >= 0x80000000u && (u32)tm < 0x81800000u && *(u32 *)(tm + 0x404) == old) copy = (u32 *)(tm + 0x404);
+        if (old % T_DAY < 792000u) {
+            *clk = old / T_DAY * T_DAY + 792000u;
+            if (copy) *copy = *clk;
+        }
         PAD_PRESS &= ~0x200u;
     }
     if (day != 7 && !S.forced && flag_get(g + 0x12078, FLAG_MET)) flag_clear(g + 0x12078, FLAG_MET);
