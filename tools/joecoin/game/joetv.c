@@ -250,25 +250,7 @@ s32 joe_talk_post(s32 who, s32 rec, s32 *grp, s32 *msg, s32 ret)
     return ret;
 }
 
-/* Van day log (van test 5): every frame, the stall Van's daily plan byte (villager 0x24 record +0x24:
-   1/2 = works the stall, 4/5 = away) is logged when the day or the byte changes:
-   van_log = {magic 'VANL', n, then 64 rows of (day, tenths of the day, plan, record +0x25..+0x27)}. */
-struct van_row { u32 day, tod; u8 plan, b25, b26, b27; };
-struct { u32 magic, n; struct van_row row[64]; } van_log;
 s32 pick_log(u8 *obj, s32 res) { return res; }
-void van_frame(u8 *g)
-{
-    static u32 last_day = 0xFFFFFFFFu; static u8 last_plan = 0xFF;
-    u8 *r = villager_rec(g, 0x24);
-    u32 day = CLOCK / T_DAY;
-    if (!r || *(u16 *)(r + 4) != 0x24) return;
-    if (day != last_day || r[0x24] != last_plan) {
-        struct van_row *w = &van_log.row[van_log.n & 63];
-        w->day = day; w->tod = CLOCK % T_DAY; w->plan = r[0x24]; w->b25 = r[0x25]; w->b26 = r[0x26]; w->b27 = r[0x27];
-        van_log.magic = 0x56414E4C; van_log.n++;
-        last_day = day; last_plan = r[0x24];
-    }
-}
 
 /* bench sit test 11 probe: every villager daily plan (func_80060EF8) is logged:
    plan_log_buf = {magic 'PLAN', n, 64 rows of (day, tenths of the day, villager id, Takakura only: shipping

@@ -387,7 +387,6 @@ void skill_frame(u8 *g, u32 pad_held, u32 pad_press);
 void spring_release(void);
 void spring_frame(u8 *g, s32 map, u32 pad_held, u32 pad_press);
 void joe_dig_frame(void);
-void van_frame(u8 *g);
 
 void pm_scene_change(void)
 {
@@ -415,7 +414,6 @@ void pm_frame(void)
     skill_frame(g, PAD_HELD, PAD_PRESS);      /* tool skill on the HUD (skill.c) */
     spring_frame(g, map, PAD_HELD, PAD_PRESS);  /* offerings at the goddess pond (spring.c) */
     joe_dig_frame();                          /* $JOE coin dig-site halving (joetv.c) */
-    van_frame(g);                             /* van test 5: log the stall Van's daily plan (joetv.c) */
     if ((PAD_HELD & 0x10) && (PAD_PRESS & 0x200)) {   /* test: Z + B = clock to 22:00 today (then bed = next morning) */
         u32 *clk = *(u32 **)0x80349218, old = *clk, *copy = 0;
         u8 *tm = *(u8 **)0x80349194;                 /* holds a second copy of the clock at +0x404 */
@@ -466,10 +464,13 @@ void pm_frame(void)
             u32 *clk = *(u32 **)0x80349218, old = *clk, step;
             u8 *tm = *(u8 **)0x80349194;
             PAD_PRESS = 0; PAD_HELD = 0;
-            {   /* 5 game minutes a frame; 1 minute around 4:50-6:10, where Takakura wakes (~5:00) and plans the day's
-                   trade jobs (pickup 5:10) - his wake check only fires in a short window */
-                u32 tod = old % T_DAY, lim = (tod >= 174000u && tod < 222000u) ? 600u : 3000u;
-                step = bench_target - old > lim ? lim : bench_target - old;
+            {   /* jump the clock (villagers place themselves for the new time, as with one jump) except through the farm's
+                   windows, stepped 1 game minute a frame: 4:58-5:45 (Takakura's plan, pickup 5:10-5:40) and
+                   11:58-12:35 (payout 12:00-12:30) */
+                u32 tod = old % T_DAY, base = old - tod, nxt;
+                if ((tod >= 178800u && tod < 207000u) || (tod >= 430800u && tod < 453000u)) nxt = old + 600u;
+                else nxt = tod < 178800u ? base + 178800u : tod < 430800u ? base + 430800u : base + T_DAY + 178800u;
+                step = (nxt < bench_target ? nxt : bench_target) - old;
             }
             *clk = old + step;
             {   /* Takakura (villager 7) plans the day's trade jobs (pickup 5:10, payout 12:00) when he wakes at ~5:00,

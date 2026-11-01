@@ -90,3 +90,8 @@ Still no Takakura plan on day 2 with 1-minute steps: his wake-up isn't processed
 The NPC manager (*0x8034916C) holds the villager objects at +4*id (Takakura = +0x1C). func_80060EF8 only reads
 state+8, so test 13 calls it with a stand-in state {0, 0, Takakura} once per day of a bench skip at 5:00-5:10;
 the 1-minute steps, trade_update and ship_check then run the 5:10 pickup. Code ends at 0x80365F88 (arena 0x80366000).
+
+## Bench sit test 14
+Stepping the whole skip left villagers where they stood (test 1's single jump placed them right). Test 14 jumps
+the clock except through two stepped windows (1 game minute per frame): 4:58-5:45 (Takakura's plan + pickup) and
+11:58-12:35 (payout). The van test 5 day logger is removed (space: code now ends 0x80365BC4; plan log at 0x803656B8).
