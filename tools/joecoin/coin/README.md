@@ -14,3 +14,4 @@ Still to do: dig-site rarity, sell price/buyers, villager reactions.
 The emblem didn't look like Joe. Test 2 gives image 30 a 128x256 texture made from the user's coin art
 (`coin_tex_x4.png`, face 112 px): appended to symbol.tpl (32-aligned) with image 30's header pointed at it
 (the model's UVs are 0-1, so they scale). commonall.arc.clz a970336f (3,839,604 B).
+Confirmed in game (rucksack menu: icon, name with $, description, 3D coin with Joe's face).
