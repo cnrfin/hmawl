@@ -148,3 +148,14 @@ pm_talk_stub:
     blr
 1:  stwu  r1, -0x40(r1)             # original first instruction
     b     talk_hook_return          # 0x80117B14
+
+# Villager liked/wanted-item list check: 0x80148A4C (func_80148A4C(list, item), was stwu r1,-0x30(r1)).
+# The $JOE coin (0x442) is in no villager's lists: no "can I have it?", no gift acceptance.
+    .globl pm_want_stub
+pm_want_stub:
+    cmpwi r5, 0x442
+    bne   1f
+    li    r3, 0
+    blr
+1:  stwu  r1, -0x30(r1)             # original first instruction
+    b     want_hook_return          # 0x80148A50

@@ -9,6 +9,7 @@ exit_wait = 0x800332E8;
 exit_frames = 0x8003319C;
 nosell_return = 0x80118870;
 talk_hook_return = 0x80117B14;
+want_hook_return = 0x80148A50;
 SECTIONS {
   . = 0x8035EFA0;
   .pm : { *(.text.hook) *(.text*) *(.rodata*) *(.sdata*) *(.data*) *(.sbss*) *(.bss*) }
