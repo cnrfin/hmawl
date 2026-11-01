@@ -33,3 +33,20 @@ func_8017DB28 reads word 1 bits 6-10 as cross-fade frames (31 = default 10) for 
 pm.bin SHA-1 c54eae7b (ends 0x80365F90).
 (actor_motion passes f1 through unset to func_8017D74C, which stores it as the playback-rate factor:
 worth checking if a clip ever plays at the wrong speed.)
+
+## Test 4: trading at the bench
+- The number picker: the game's global script picker at 0x802F3D70 (class 0x802BD754, ctor func_80106504;
+  the one Vesta's and Van's shops show), driven by script commands D5 (open, buy: max = 198 - held), D6 (poll,
+  1 when done), D7 (value, 0 on cancel), D9/DA/DB (sell: max from the held count). Found by diffing two dumps
+  of Vesta's picker at 3 and 4. CC(slot, n) sets message number slots (<2A 00 nn>), C1/C2 gold, D3/DC add/remove.
+- `build_joe_trade.py`: event 408 (Common.arc node 108) + debug.mes 11-20 ("I'm selling $JOE for <price>G
+  today", buy yes/no, picker, sell yes/no, "What!? You're selling your $JOE?", "Hm, ok, I'll buy your $JOE
+  bags for <price>G", ...). Inputs: the bench build (Common 700e4ae4, debug 4dd04c6d) -> `trade/` (Common
+  0cb841e9, debug 6c1b2dbc).
+- pm.c: A next to Joe while he sits starts event 408 (counter 44 = $JOE held, number slot 0 = today's price,
+  `joe_price_today` = the TV's price); the script asks via counter 41 (1 buy / 4 sell, count in 42) and pm.c
+  does the gold and coins (the script VM's x128 multiply would overflow). Same price both ways.
+- pm.bin grew past 0x80366000: arena start moved to 0x8036A000 (OSInit main and debug paths);
+  make_pm_dol.py's update mode accepts the earlier arena words. Checked on a mock disc (fresh then update).
+- No expressions yet (the angry "What!?" line is plain).
+pm.bin cca2dccd, make_pm_dol.py ce24f38c.

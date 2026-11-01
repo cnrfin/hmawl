@@ -82,6 +82,7 @@ static s32 joe_today(u32 t)
 }
 
 s32 joe_visit_day(u32 day) { return joe_today(day); }
+s32 joe_price_today(void) { return price(CLOCK / T_DAY); }
 
 /* ---- text: ASCII -> the game's message bytes ('|' = wait for A) */
 static u8 msg[400];

@@ -408,7 +408,38 @@ s32 joe_visit_day(u32 day);
 #define JM_SITDOWN 6
 #define JM_SIT 7
 #define JM_STANDUP 8
-static s32 joe_forced, joe_here;
+static s32 joe_forced, joe_here, joe_trading;
+#define JOE_ITEM   0x442
+#define JOE_EVENT  408                     /* Common.arc node 108: the bench trade (build_joe_trade.py) */
+#define JCNT(i)    (*(s32 *)(g + 0x12194 + (i) * 4))   /* event counters 41 request, 42 count, 44 held */
+#define GOLD       (*(u32 *)(g + 0x11A14 + 4))
+#define GOLD_MAX   99999999u
+#define item_count F(0x8004FD68, s32, (u8 *, s32))
+#define msg_number F(0x80102300, void, (u8 *, s32, s32))
+#define MSGMGR     (*(u8 **)0x803491C4)
+s32 joe_price_today(void);
+/* the trade event asks through counter 41: 1 buy / 4 sell (count in 42); answer 2 bought, 3 short of gold, 5 sold */
+static void joe_trade(u8 *g)
+{
+    s32 req = JCNT(41), n = JCNT(42);
+    u32 p = (u32)joe_price_today(), total;
+    if (req >= 128 && !(req & 127)) req >>= 7;
+    if (n >= 128 && !(n & 127)) n >>= 7;
+    if (MSGMGR) msg_number(MSGMGR, 0, (s32)p);
+    if (n < 0) n = 0;
+    total = p * (u32)n;
+    if (req == 1) {
+        if (GOLD < total) JCNT(41) = 3;
+        else { GOLD -= total; rucksack_add(g + 0x50, JOE_ITEM, n, -1); JCNT(41) = 2; }
+    } else if (req == 4) {
+        s32 have = item_count(g + 0x50, JOE_ITEM);
+        if (n > have) n = have;
+        rucksack_add(g + 0x50, JOE_ITEM, -n, -1);
+        total = p * (u32)n;
+        GOLD = GOLD + total > GOLD_MAX ? GOLD_MAX : GOLD + total;
+        JCNT(41) = 5;
+    }
+}
 static void joe_motion(s32 m)               /* start a clip once (sit down / stand up must not restart) */
 {
     if (S.motion == m) return;
@@ -452,6 +483,10 @@ static s32 joe_frame(u8 *g, s32 map, u32 t)
         if (S.loaded && !S.actor) restore_names();
         return 1;
     }
+    if (joe_trading) {                        /* our trade event: settle its requests */
+        if (no_event()) { joe_trading = 0; JCNT(41) = 0; }
+        else { joe_trade(g); return 1; }
+    }
     if (!no_event()) return 1;
     if (S.loaded && S.who != 2) { if (S.actor) despawn(); release_model(); }
     if (!S.actor) {
@@ -476,6 +511,18 @@ static s32 joe_frame(u8 *g, s32 map, u32 t)
     actor_setpos(S.actor, &S.pos);
     actor_setdir(S.actor, &S.dir);
     joe_motion(m);
+    /* A next to Joe on the bench (player free, facing him): the trade */
+    if (joe_here && (PAD_PRESS & 0x100) && !(PAD_HELD & 0x10) && CONTROL == 1 && !(FADER && *(u8 *)(FADER + 0x60))) {
+        float *p = (float *)(g + 0x29C78), *d = (float *)(g + 0x29F84);
+        float dx = (BENCH_X - 0.3f) - p[0], dz = BENCH_Z - p[2], d2 = dx * dx + dz * dz;
+        if (d2 < 2.2f * 2.2f && d2 > 0.0001f && (dx * d[0] + dz * d[2]) * rsqrt(d2) > 0.3f) {
+            PAD_PRESS &= ~0x100u; PAD_HELD &= ~0x100u;
+            JCNT(41) = 0; JCNT(42) = 0; JCNT(44) = item_count(g + 0x50, JOE_ITEM);
+            if (MSGMGR) msg_number(MSGMGR, 0, joe_price_today());
+            joe_trading = 1;
+            event_start(EVMGR, JOE_EVENT, 0, 0);
+        }
+    }
     return 1;
 }
 

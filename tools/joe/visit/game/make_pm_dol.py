@@ -16,7 +16,7 @@ import os, struct, sys, hashlib
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 CODE_ADDR = 0x8035EFA0
-ARENA_LO = 0x80366000
+ARENA_LO = 0x8036A000
 AXE_STUB_OFF = 0x54                                    # pm_axe_stub in pm.bin (after pm_hook2)
 HOOK = 0x80213CFC
 HOOK2 = 0x8017755C
@@ -39,11 +39,13 @@ HOOK10 = 0x80148A4C
 HOOK10_OFF = 0x1A0                                    # pm_want_stub in pm.bin (after pm_talk_stub)
 HOOK11 = 0x80060EF8
 HOOK11_OFF = 0x1B8                                    # pm_van_stub in pm.bin (after pm_want_stub)
+PREV = {0x801B0EE4: (0x3C608036,), 0x801B0EE8: (0x38636000,), 0x801B0F2C: (0x38636000,)}   # earlier builds' words (update mode)
 PATCHES = [  # (RAM address, original word, new word, why)
-    (0x801B0EE4, 0x80630030, 0x3C608036, 'OSInit: arena low = 0x80366000 (was BootInfo->arenaLo or __ArenaLo) ...'),
-    (0x801B0EE8, 0x28030000, 0x38636000, '... + 0x6000'),
+    (0x801B0EE4, 0x80630030, 0x3C608037, 'OSInit: arena low = 0x8036A000 (was BootInfo->arenaLo or __ArenaLo) ...'),
+    (0x801B0EE8, 0x28030000, 0x3863A000, '... - 0x6000'),
     (0x801B0EEC, 0x40820010, 0x48000010, '... then OSSetArenaLo'),
-    (0x801B0F2C, 0x3863CFA0, 0x38636000, 'OSInit debug path: arena low = 0x80366000 (was _stack_addr)'),
+    (0x801B0F28, 0x3C608036, 0x3C608037, 'OSInit debug path: arena low = 0x8036A000 (was _stack_addr) ...'),
+    (0x801B0F2C, 0x3863CFA0, 0x3863A000, '... - 0x6000'),
     (HOOK, 0x80010014, None, 'pad update end -> Postman code'),
     (HOOK2, 0x9421FFF0, None, 'g_system update start -> scene-change check'),
     (HOOK3, 0x9421F5D0, None, 'field A handler start -> pm_player_stub (remember the player)'),
@@ -152,7 +154,7 @@ def main():
         return new
     for addr, old, new, why in PATCHES:
         cur = be32(dol, at(addr))
-        if cur != old and not (update and cur == final(addr, new)):
+        if cur != old and not (update and (cur == final(addr, new) or cur in PREV.get(addr, ()))):
             die(f'{addr:#010x} ({why}): main.dol has {cur:08x}, expected {old:08x}')
     print('all patch sites match the original code')
 
