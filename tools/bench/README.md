@@ -21,3 +21,8 @@ missed it). One rectangle (2 triangles, 4 corners used by nothing else) covers b
 z 176.89-177.69. `move_bench.py` now moves those 4 corners to the turned bench: x 137.25-138.05,
 z 175.39-177.81 (bench 0.64 x 2.24 plus the original margins). SHA-1 (first 8): mapc1 `a99b6ae6`,
 mapc2 `af50911e`, mapc3 `44324ee3`, mapc4 `b5847d2b`, mapc5 `0f4c150a`.
+
+## Bench + logs (fix)
+Bench tests 1-2 were built from vanilla mapc1..5.arc, which dropped the choppable-log placements (logs test 23
+`snow/mapc*.arc`: logs + winter snow sets in map{N}-p-other.oqt). Rebuilt: `move_bench.py <logs test 23 snow/> OUT`.
+SHA-1 (first 8): mapc1 `5e533d5e`, mapc2 `f65d331d`, mapc3 `797ac568`, mapc4 `e8522433`, mapc5 `4c1aa2e3`.
