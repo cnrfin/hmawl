@@ -32,4 +32,6 @@ start 50 G, growth +75 %/year, volatility 60 %, daily jitter ±12 %, crypto-wint
 - `build_tvdata.py`: tv-console2.tpl + the 7 screens (`../screens/`, CMPR via `../cmpr.py`), image 9's
   singer animation pieces made transparent; font.tpl gets '$' (`dollar.npy`) at glyph 0x80FD (unused in
   the US text). Font: US glyph codes are 0x8000 digits, 0x800B A-Z, 0x80D8 a-z, '+' 0x80C6, '%' 0x80D7.
-- Output SHA-1: tv-console2.tpl e9efc4ff, font.tpl e54e346c, pm.bin 16aec257.
+- Output SHA-1: tv-console2.tpl e9efc4ff, font.tpl e5c4b578 (test 2), pm.bin 16aec257.
+- TV test 1 worked in game except the `$`: the US game draws text from font.tpl image 1 (Western font, 16x16 cells,
+  same code order), where 0x80FD is "ä". Test 2 also draws `$` there (`dollar16.npy`).

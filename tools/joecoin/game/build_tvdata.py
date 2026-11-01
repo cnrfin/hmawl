@@ -57,5 +57,15 @@ def main(tv, font, sdir, od):
             x, y = x0 + xx, y0 + yy; v = int(D[yy, xx]) // 17
             tile = (y // 8) * tiles_x + x // 8; p = do + tile * 32 + (y % 8) * 4 + (x % 8) // 2
             f[p] = (f[p] & 0x0F) | (v << 4) if x % 2 == 0 else (f[p] & 0xF0) | v
-    open(os.path.join(od, 'font.tpl'), 'wb').write(f); print('font.tpl', len(f), 'glyph 0x80FD = $')
+    # the US game draws text with image 1 (the Western font, 672x112, 42 cells of 16x16 per row, same
+    # code order): 0x80FD there is 'a-umlaut', unused in the US text
+    ih = struct.unpack_from('>I', f, tab + 8)[0]; h, w, fmt, do = struct.unpack_from('>HHII', f, ih); assert (w, h, fmt) == (672, 112, 0)
+    D = np.load(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'dollar16.npy'))
+    r, c = divmod(0xFD, 42); x0, y0 = c * 16, r * 16; tiles_x = w // 8
+    for yy in range(16):
+        for xx in range(16):
+            x, y = x0 + xx, y0 + yy; v = int(D[yy, xx]) // 17
+            tile = (y // 8) * tiles_x + x // 8; p = do + tile * 32 + (y % 8) * 4 + (x % 8) // 2
+            f[p] = (f[p] & 0x0F) | (v << 4) if x % 2 == 0 else (f[p] & 0xF0) | v
+    open(os.path.join(od, 'font.tpl'), 'wb').write(f); print('font.tpl', len(f), 'glyph 0x80FD = $ (both fonts)')
 if __name__ == '__main__': main(*sys.argv[1:5])
