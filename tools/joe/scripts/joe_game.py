@@ -14,7 +14,16 @@ for node in ast.parse(src).body:
     if isinstance(node,ast.FunctionDef) and node.name in {'strips','dl','check_strips','build_skn','c565','un565','cmpr','tpl','u8'}:
         exec(compile(ast.Module([node],[]),'b','exec'),globals())
 nodes=act(open(VAN+'ban_0.act','rb').read())
-S=1.07; DZ=-0.066
+JS=float(os.environ.get('JOE_SCALE','1'))     # 0.9: Joe 10% smaller (mesh, skeleton and animation translations)
+S=1.07*JS; DZ=-0.066*JS
+CIG=os.environ.get('JOE_CIG')                 # path of a sit-animation build (joe_sit.py) -> cigarette mesh on node 29
+CIG_NODE=29; CIG_PARENT=28
+def game_nodes():
+    nd=[dict(v) for v in nodes]
+    for k in range(len(nd)): nd[k]['T']=tuple(np.array(nd[k]['T'])*JS)
+    if CIG:
+        for k,(q,t) in CIG_REST.items(): nd[k]['Q']=tuple(q); nd[k]['T']=tuple(t)
+    return nd
 def G(P): P=np.asarray(P,float); return np.stack([P[:,0]*S,(P[:,2]+0.412)*S,-P[:,1]*S+DZ],1)
 E=os.path.join(SP,'emotis')+'/'
 d=pickle.load(open(E+'joe_pieces.pkl','rb')); cam=pickle.load(open(E+'face_cam.pkl','rb')); span=cam['span']*1.12
@@ -97,6 +106,12 @@ for key,nodeL,nodeR,tex in (('gloves',18,39,'emoti'),('shoes',8,48,'shoes')):
         print(key,sd,'flipped',int(flip.sum()),'of',len(FF))
         PP=P[FF].reshape(-1,3); QQ=Q[FF].reshape(-1,2); QQ=np.stack([QQ[:,0],1-QQ[:,1]],1)
         pieces.append((f'{key}{"L" if sd>0 else "R"}',G(PP),QQ,np.arange(len(PP)).reshape(-1,3),tex,nd))
+# cigarette (sit animations only): its own node, parked at the head's centre (inside the ball) by every other clip
+if CIG:
+    cz=json.load(open(CIG))
+    CIG_REST={CIG_PARENT:((0,0,0,1),(0,0,0)),CIG_NODE:((0,0,0,1),tuple(cz['park']))}
+    W29=world(game_nodes())[CIG_NODE]
+    Pl=np.array(cz['mesh_P']); pieces.append(('cig',(W29[:3,:3]@Pl.T).T+W29[:3,3],np.array(cz['mesh_band']),np.array(cz['mesh_F']),'cig',CIG_NODE))
 # textures -> body atlas (gloves crop + shoes), head atlas (skin)
 emo=Image.open(E+'tex_EmotiguyDefault.png').convert('RGBA'); sho=Image.open(E+'tex_ShoesTex.png').convert('RGBA')
 gq=np.vstack([p[2] for p in pieces if p[0].startswith('gloves')]); u0,v0=gq.min(0); u1,v1=gq.max(0)
@@ -105,14 +120,31 @@ gbox=(int(u0*1024)-2,int(v0*1024)-2,int(u1*1024)+2,int(v1*1024)+2)
 body=Image.new('RGBA',(512,256),(255,255,255,255)); body.paste(gcrop,(0,0)); body.paste(sho.resize((256,256),Image.LANCZOS),(256,0))
 head=FR.BASE.resize((128,128),Image.LANCZOS); hb=Image.new('RGBA',(128,128)); 
 hd=np.array(head); a=hd[...,3]>0; col=np.median(hd[...,:3][a],0); hd[~a,:3]=col; hd[...,3]=255; head=Image.fromarray(hd)
+CIG_CELL=[]
 def atlas_uv(p):
     n,P,Q,F,t,nd=p
+    if t=='cig': return np.array([[(CIG_CELL[int(b)][0]+4)/512,(CIG_CELL[int(b)][1]+4)/256] for b in Q]),1
     if t=='emoti':
         u=(Q[:,0]*1024-gbox[0])/(gbox[2]-gbox[0]); v=(Q[:,1]*1024-gbox[1])/(gbox[3]-gbox[1]); return np.stack([np.clip(u,0,1)*0.5,np.clip(v,0,1)],1),1
     if t=='shoes': return np.stack([0.5+np.clip(Q[:,0]%1,0,1)*0.5,np.clip(Q[:,1]%1,0,1)],1),1
     if t=='head': return np.clip(Q,0,1),3
     if t=='eyeframe': return Q,0
     if t=='mouthframe': return Q,2
+CIG_COL=[(205,140,70),(238,234,222),(150,150,150),(250,105,20)]   # filter, paper, ash, ember
+if CIG:
+    from PIL import ImageDraw
+    mask=Image.new('L',(512,256),0); md=ImageDraw.Draw(mask)
+    for p in pieces:
+        if p[4] in ('emoti','shoes'):
+            uv=atlas_uv(p)[0]
+            for f in p[3]: md.polygon([(uv[i][0]*512,uv[i][1]*256) for i in f],fill=255)
+    mk=np.array(mask)
+    for by in range(0,256,8):
+        for bx in range(0,512,8):
+            if len(CIG_CELL)<4 and not mk[max(by-4,0):by+12,max(bx-4,0):bx+12].any(): CIG_CELL.append((bx,by))
+    assert len(CIG_CELL)==4, CIG_CELL
+    for (bx,by),c in zip(CIG_CELL,CIG_COL): body.paste(c+(255,),(bx,by,bx+8,by+8))
+    print('cigarette colours at',CIG_CELL)
 # vertices / skin groups (as the goddess builder)
 verts=[];vkey={};uvs=[];ukey={};tris={0:[],1:[],2:[],3:[]}
 def nrm(P,F):
@@ -188,13 +220,25 @@ def frames_tpl(fr,n):
     for bb,_ in blobs: out+=al(bb,0x20)
     return bytes(out)
 def build_act():
-    dd=bytearray(open(VAN+'ban_0.act','rb').read()); i=dd.find(b'ban_0.gpl'); dd[i:i+9]=(NAME+'.gpl').encode()[:9]; return bytes(dd)
+    dd=bytearray(open(VAN+'ban_0.act','rb').read()); i=dd.find(b'ban_0.gpl'); dd[i:i+9]=(NAME+'.gpl').encode()[:9]
+    n=struct.unpack_from('>I',dd,4)[0]
+    for k in range(n):
+        x=struct.unpack_from('>I',dd,0x20+0x1C*k)[0]
+        if CIG and k in CIG_REST: struct.pack_into('>4f',dd,x+0x10,*CIG_REST[k][0]); struct.pack_into('>3f',dd,x+0x20,*CIG_REST[k][1])
+        else: struct.pack_into('>3f',dd,x+0x20,*[v*JS for v in struct.unpack_from('>3f',dd,x+0x20)])
+    return bytes(dd)
 if __name__=='__main__':
     for g in tris: check_strips(tris[g])
     gpl,skn,actb=build_gpl(),build_skn(),build_act()
     b0=tpl([body,head]); f0e=frames_tpl(FR.eye_frames(),58); f0m=frames_tpl(FR.mouth_frames(),36)
     arc=u8([(NAME+'.act',actb),(NAME+'.gpl',gpl),(NAME+'.skn',skn),(NAME+'_b0.tpl',b0),(NAME+'_f0_e.tpl',f0e),(NAME+'_f0_m.tpl',f0m),('_tmp.txt',b'')])
     anims=[open(VAN+'anm%02d.bin'%a,'rb').read() for a in range(int(os.environ.get('JOE_ANIMS','6')))]   # only what Joe needs (Van's 0 idle, 1 walk, 2-5)
+    import joe_anm
+    if JS!=1: anims=[joe_anm.scale_T(a,JS) for a in anims]
+    if os.environ.get('JOE_WALK'): anims[1]=joe_anm.retime(anims[1],float(os.environ['JOE_WALK']))
+    if CIG:
+        anims=[joe_anm.replace_tracks(a,CIG_REST) for a in anims]
+        for f in cz['clips']: anims.append(open(os.path.join(os.path.dirname(CIG),f),'rb').read())
     anm=u8([('@',x) for x in anims])
     open(os.path.join(OUT,NAME+'.arc'),'wb').write(arc); open(os.path.join(OUT,NAME+'.anm.arc'),'wb').write(anm)
     for n_,dd in (('act',actb),('gpl',gpl),('skn',skn)): open(os.path.join(OUT,NAME+'.'+n_),'wb').write(dd)

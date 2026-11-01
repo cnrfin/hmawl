@@ -40,3 +40,21 @@ python3 gcbuild.py --iso HM_AWL_blank1a.iso --out HM_AWL_joe1x.iso --replace gd/
 python3 gcbuild.py --iso HM_AWL_joe1x.iso --out HM_AWL_joe1a.iso --replace gd/gd_0.anm.arc=gd/gd_0.anm.arc --allow-unreferenced
 python3 postman_npc/make_pm_dol.py HM_AWL_joe1a.iso HM_AWL_joe1.iso
 ```
+
+## Test 5: 90% Joe, faster walk, bench clips (`build/test5/`)
+
+```
+cd ~/Desktop/games/sit   # any scratch folder; joe_game.py runs from joeexpr/ (frames.py reads final_set.json there)
+python3 joe_sit.py ../joegame/sit_out                       # anm_sitdown/sitloop/standup.bin + cig.json
+JOE_SCALE=0.9 JOE_CIG=$PWD/../joegame/sit_out/cig.json JOE_WALK=28 python3 ../joegame/joe_game.py gd_0 OUT
+```
+- `JOE_SCALE=0.9`: mesh, skeleton translations and every animation translation x0.9 (`joe_anm.scale_T`).
+- `JOE_WALK=28`: Van's walk (clip 1) retimed 34 -> 28 frames (1.2x). Ground speed to match: ~1.17x Van's.
+- Cigarette: 42-vertex mesh on node 29 (an unused face node). Nodes 28/29 get identity rest locals, 29 parked
+  at the head ball's centre; clips 0-5 get constant 28/29 tracks (checked: the cigarette stays inside the
+  head in every frame). Colours: four 8x8 cells in a free corner of the body atlas.
+- New clips (`joe_sit.py`, all 50 tracks, 30 fps, squad control = key -> slerp):
+  - 6 sit down, 59 frames, NPC standing 0.75 in front of the bench facing it; twists round and sits.
+  - 7 sitting loop, 300 frames, NPC on the same spot facing away (turn the NPC 180 degrees when 6 ends).
+  - 8 stand up, 40 frames, same frame as 7; ends on idle frame 0.
+- Read back from the built files: `previews/test5_readback.png`. Sizes: gd_0.arc 275,104 B, gd_0.anm.arc 47,712 B.
