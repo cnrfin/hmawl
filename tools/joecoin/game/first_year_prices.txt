@@ -1,0 +1,40 @@
+Y1 Spring  1    34G    +0%  
+Y1 Spring  2    35G    +3%  
+Y1 Spring  3    39G   +11%  
+Y1 Spring  4    41G    +5%  
+Y1 Spring  5    49G   +20%  Joe in town
+Y1 Spring  6    52G    +6%  
+Y1 Spring  7    54G    +4%  
+Y1 Spring  8    69G   +28%  
+Y1 Spring  9    72G    +4%  Joe in town
+Y1 Spring 10    75G    +4%  
+Y1 Summer  1    73G    -3%  
+Y1 Summer  2    80G   +10%  
+Y1 Summer  3    64G   -20%  
+Y1 Summer  4    23G   -64%  DUMP 
+Y1 Summer  5   199G  +765%  PUMP Joe in town
+Y1 Summer  6    30G   -85%  DUMP 
+Y1 Summer  7    82G  +173%  
+Y1 Summer  8    72G   -12%  
+Y1 Summer  9    72G    +0%  
+Y1 Summer 10    23G   -68%  DUMP Joe in town
+Y1 Fall    1    53G  +130%  
+Y1 Fall    2    54G    +2%  Joe in town
+Y1 Fall    3    54G    +0%  
+Y1 Fall    4    62G   +15%  
+Y1 Fall    5    67G    +8%  
+Y1 Fall    6   123G   +84%  PUMP 
+Y1 Fall    7    54G   -56%  
+Y1 Fall    8    67G   +24%  
+Y1 Fall    9    54G   -19%  
+Y1 Fall   10    58G    +7%  Joe in town
+Y1 Winter  1    43G   -26%  
+Y1 Winter  2    48G   +12%  
+Y1 Winter  3    44G    -8%  
+Y1 Winter  4    35G   -20%  
+Y1 Winter  5    34G    -3%  
+Y1 Winter  6    32G    -6%  
+Y1 Winter  7    35G    +9%  
+Y1 Winter  8    36G    +3%  
+Y1 Winter  9    43G   +19%  
+Y1 Winter 10    56G   +30%  

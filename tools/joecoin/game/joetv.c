@@ -1,0 +1,174 @@
+/* $JOE Coin Daily: TV channel 3 shows the day's $JOE price instead of the entertainment programs.
+   func_8008E298 (channel 3's caption builder, called only by the TV scene in wlp2) is replaced by
+   joe_tv (hook: b pm_tv_stub at its first instruction). The price is a pure function of a seed and
+   the day number (clock / 864000), so it never changes on reload; the formula and settings match
+   tools/joecoin/joe_market.html. The day's picture (tv-console2.tpl images 14-20, appended to the
+   file) is copied over channel 3's pictures (1, 2, 3, 6), so whichever one the program uses shows it. */
+typedef unsigned int u32;
+typedef int s32;
+typedef unsigned short u16;
+typedef unsigned char u8;
+
+#define F(addr, ret, args) ((ret (*) args)(addr))
+#define str_set        F(0x800FCBB8, void, (void *, const u8 *))
+#define DCFlushRange   F(0x801B23C8, void, (void *, u32))
+#define GXInvalidateTexAll F(0x801D03B4, void, (void))
+#define CLOCK       (**(u32 **)0x80349218)        /* tenths of a second since the start */
+#define T_DAY       864000u
+
+#define SEED     1890u
+#define BASE_LN  3.91202300543f    /* ln 50 G */
+#define GROW_LN  0.55961578794f    /* ln 1.75 per year */
+#define VOL      0.60f
+#define DAILY    0.12f
+#define DIP      0.50f
+#define PUMP_P   (3.0f / 40.0f)
+
+__attribute__((noinline)) static u32 h32(u32 a, u32 b)
+{
+    u32 x = (a * 0x9E3779B1u) ^ ((b + 0x7F4A7C15u) * 0x85EBCA77u);
+    x ^= x >> 15; x *= 0x2C1B3C6Du; x ^= x >> 12; x *= 0x297A2D39u; x ^= x >> 15;
+    return x;
+}
+__attribute__((noinline)) static float uni(u32 n, u32 k) { return (float)h32(SEED ^ (k * 0x632BE5ABu), n) * (1.0f / 4294967296.0f); }
+__attribute__((noinline)) static float vnoise(float x, u32 k)
+{
+    u32 i = (u32)x; float f = x - (float)i, w = f * f * (3.0f - 2.0f * f);
+    return (uni(i, k) * (1.0f - w) + uni(i + 1, k) * w) * 2.0f - 1.0f;
+}
+typedef union { float f; u32 u; } FU;
+__attribute__((noinline)) static float flog(float x)
+{
+    FU v; v.f = x; s32 e = (s32)((v.u >> 23) & 255) - 127;
+    v.u = (v.u & 0x007FFFFFu) | 0x3F800000u;                      /* mantissa in [1, 2) */
+    float t = (v.f - 1.0f) / (v.f + 1.0f), t2 = t * t;
+    return (float)e * 0.69314718f + 2.0f * t * (1.0f + t2 * (1.0f / 3 + t2 * (1.0f / 5 + t2 * (1.0f / 7 + t2 * (1.0f / 9)))));
+}
+__attribute__((noinline)) static float fexp(float x)
+{
+    float k = x * 1.44269504f; s32 n = (s32)(k + (k >= 0 ? 0.5f : -0.5f));
+    float r = x - (float)n * 0.69314718f, s = 1.0f, term = 1.0f;
+    for (s32 i = 1; i < 9; i++) { term *= r / (float)i; s += term; }
+    FU v; v.u = (u32)(n + 127) << 23;
+    return s * v.f;
+}
+static const float SIN11[10] = { 0.28173256f, 0.54064082f, 0.75574957f, 0.90963200f, 0.98982144f,
+                                 0.98982144f, 0.90963200f, 0.75574957f, 0.54064082f, 0.28173256f };
+static s32 event(u32 t)                                 /* 1 pump, -1 dump, 0 none */
+{
+    float r = uni(t, 4);
+    return r < PUMP_P / 2 ? 1 : r < PUMP_P ? -1 : 0;
+}
+__attribute__((noinline)) static s32 price(u32 t)
+{
+    u32 season = (t / 10) % 4, d = t % 10;
+    float lg = BASE_LN + GROW_LN * (float)t / 40.0f;
+    lg += VOL * (0.65f * vnoise((float)t / 12.0f, 1) + 0.35f * vnoise((float)t / 4.0f, 2));
+    lg += DAILY * (uni(t, 3) * 2.0f - 1.0f);
+    if (season == 3) lg += flog(1.0f - DIP * (0.5f + 0.5f * SIN11[d]));
+    if (season == 0 && t >= 40) lg += flog(1.0f - DIP * 0.5f * (1.0f - (float)d / 9.0f));
+    s32 ev = event(t);
+    if (ev > 0) lg += flog(2.0f + uni(t, 5));
+    else if (ev < 0) lg += flog(0.3f + 0.2f * uni(t, 5));
+    s32 p = (s32)(fexp(lg) + 0.5f);
+    return p < 5 ? 5 : p > 9999 ? 9999 : p;
+}
+static s32 joe_today(u32 t)
+{
+    u32 year = t / 40, season = (t / 10) % 4, day = t % 10 + 1, k = year * 4 + season;
+    static const u8 early[4] = { 1, 2, 4, 5 }, late[3] = { 6, 9, 10 };
+    if (season == 3) return 0;
+    return day == early[h32(SEED ^ 0xA5A5u, k) % 4] || day == late[h32(SEED ^ 0x5A5Au, k) % 3];
+}
+
+/* ---- text: ASCII -> the game's message bytes ('|' = wait for A) */
+static u8 msg[400];
+static u32 mlen;
+__attribute__((noinline)) static void put2(u32 g) { msg[mlen++] = (u8)(g >> 8); msg[mlen++] = (u8)g; }
+static void puts_(const char *s)
+{
+    for (; *s; s++) {
+        char c = *s;
+        if (c >= 'A' && c <= 'Z') put2(0x800B + c - 'A');
+        else if (c >= 'a' && c <= 'z') put2(0x80D8 + c - 'a');
+        else if (c >= '0' && c <= '9') put2(0x8000 + c - '0');
+        else if (c == ' ') msg[mlen++] = 0x02;
+        else if (c == '\n') msg[mlen++] = 0x01;
+        else if (c == '|') msg[mlen++] = 0x30;
+        else if (c == '.') put2(0x80C8);
+        else if (c == '!') put2(0x80CB);
+        else if (c == '\'') put2(0x80F2);
+        else if (c == '+') put2(0x80C6);
+        else if (c == '%') put2(0x80D7);
+        else if (c == '$') put2(0x80FD);
+        else if (c == '-') put2(0x800A);
+    }
+}
+static void putn(s32 n)
+{
+    char b[12]; s32 i = 11; b[i] = 0;
+    if (n == 0) b[--i] = '0';
+    while (n > 0) { b[--i] = '0' + n % 10; n /= 10; }
+    puts_(b + i);
+}
+
+/* ---- picture */
+#define TPL_N      21
+#define PIC_BYTES  (192 * 144 / 2)
+static u8 *tpl;
+static s32 shown = -1;
+__attribute__((noinline)) static u8 *pic(u8 *t, s32 i)
+{
+    u8 *h = *(u8 **)(t + 12 + 8 * i);
+    if ((u32)h < 0x80000000u || (u32)h >= 0x817FFFE0u || ((u32)h & 3)) return 0;
+    return *(u16 *)h == 144 && *(u16 *)(h + 2) == 192 && *(u32 *)(h + 4) == 14 && *(u32 *)(h + 8) >= 0x80000000u && *(u32 *)(h + 8) < 0x817F0000u ? *(u8 **)(h + 8) : 0;
+}
+static s32 is_tv_tpl(u8 *t)
+{
+    return *(u32 *)t == 0xFFFFFFFFu && *(u32 *)(t + 4) == TPL_N && *(u32 *)(t + 8) == (u32)(t + 12)
+        && pic(t, 6) && pic(t, 14) && pic(t, 20);
+}
+static void show_picture(s32 k)
+{
+    static const u8 dst[4] = { 1, 2, 3, 6 };
+    if (!tpl || !is_tv_tpl(tpl)) {                  /* the bound file: magic -> 0xFFFFFFFF, offsets -> pointers */
+        tpl = 0; shown = -1;
+        for (u8 *p = (u8 *)0x80364000; p < (u8 *)0x81800000; p += 32)
+            if (is_tv_tpl(p)) { tpl = p; break; }
+        if (!tpl) return;
+    }
+    if (shown == k) return;
+    u8 *src = pic(tpl, 14 + k);
+    for (s32 j = 0; j < 4; j++) {
+        u8 *d = pic(tpl, dst[j]); u32 *a = (u32 *)d, *b = (u32 *)src;
+        for (u32 i = 0; i < PIC_BYTES / 4; i++) a[i] = b[i];
+        DCFlushRange(d, PIC_BYTES);
+    }
+    GXInvalidateTexAll();
+    shown = k;
+}
+
+enum { P_BACK, P_JOEVER, P_LIL, P_HODL, P_CRAB, P_WINTER, P_TOWN };
+void *joe_tv(void *prog, void *str)
+{
+    u32 t = CLOCK / T_DAY, season = (t / 10) % 4;
+    s32 p = price(t), y = t ? price(t - 1) : p, ev = event(t), joe = joe_today(t);
+    s32 chg = (s32)((float)(p - y) * 100.0f / (float)y + (p >= y ? 0.5f : -0.5f));
+    s32 k;
+    mlen = 0;
+    puts_("$JOE Coin Daily\n....................|\n1 $JOE is worth\n"); putn(p); puts_("G today.\n");
+    if (chg >= 0) puts_("+"); else { puts_("-"); chg = -chg; }
+    putn(chg); puts_("% since yesterday|\n");
+    if (season == 3)      { puts_("Crypto winter. Joe\nis hibernating.\nHODL."); k = P_WINTER; }
+    else if (ev > 0)      { puts_("We're JOE BACK!"); k = P_BACK; }
+    else if (ev < 0)      { puts_("It's so Joever.."); k = P_JOEVER; }
+    else if (chg >= 8 && p > y) { puts_("$JOE doing a lil\nsomething.."); k = P_LIL; }
+    else if (chg >= 8)    { puts_("Just a dip. HODL."); k = P_HODL; }
+    else                  { puts_("Crab market today."); k = P_CRAB; }
+    if (joe) { puts_("|\nJoe is in town today!"); if (ev == 0) k = P_TOWN; }
+    msg[mlen++] = 0;
+    show_picture(k);
+    str_set(str, msg);
+    (void)prog;
+    return str;
+}

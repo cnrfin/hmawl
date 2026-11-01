@@ -1,0 +1,189 @@
+#!/usr/bin/env python3
+"""Add the Postman NPC to a Harvest Moon: A Wonderful Life (US) disc image.
+
+usage: python3 make_pm_dol.py IN.iso OUT.iso
+
+main.dol gets one new text section (slot 2) at 0x8035EFA0 holding the Postman code (pm.bin), the
+heap arena start moves from 0x8035EFA0 (or the stack top 0x8035CFA0 on the debug path) to
+0x80366000 so nothing else uses that memory, the end of the pad update (0x80213CFC) branches
+into the code once per frame, and the start of g_system's update (0x8017755C) branches to a check
+that unloads the Postman before a scene change (doors). Every patched instruction is compared with the original first; on
+any mismatch nothing is written. The larger main.dol is written back in place when the space
+after it is free, otherwise into the lowest unreferenced disc area that fits (boot.bin 0x420 is
+updated; the old copy is left as it was). Needs the pm/pm_0.arc + pm/pm_0.anm.arc files and the
+Common.arc with event 406 that are already on the model7 disc. Turn off every Postman Gecko code."""
+import os, struct, sys, hashlib
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+CODE_ADDR = 0x8035EFA0
+ARENA_LO = 0x80366000
+AXE_STUB_OFF = 0x54                                    # pm_axe_stub in pm.bin (after pm_hook2)
+HOOK = 0x80213CFC
+HOOK2 = 0x8017755C
+HOOK2_OFF = 0x14                                      # pm_hook2 in pm.bin (after pm_hook's 5 instructions)
+HOOK3 = 0x80043120
+HOOK3_OFF = 0x58                                      # pm_player_stub in pm.bin (after pm_axe_stub)
+HOOK4 = 0x8004368C
+HOOK4_OFF = 0x68                                      # pm_label_stub in pm.bin (after pm_player_stub)
+HOOK5 = 0x8018B224
+HOOK5_OFF = 0x98                                      # pm_sfx_stub in pm.bin (after pm_label_stub)
+HOOK6 = 0x80033170
+HOOK7 = 0x8011886C
+HOOK7_OFF = 0x130                                     # pm_nosell_stub in pm.bin (after pm_exit_stub)
+HOOK6_OFF = 0xF4                                      # pm_exit_stub in pm.bin (after pm_sfx_stub)
+HOOK8 = 0x8008E298
+HOOK8_OFF = 0x144                                     # pm_tv_stub in pm.bin (after pm_nosell_stub)
+PATCHES = [  # (RAM address, original word, new word, why)
+    (0x801B0EE4, 0x80630030, 0x3C608036, 'OSInit: arena low = 0x80366000 (was BootInfo->arenaLo or __ArenaLo) ...'),
+    (0x801B0EE8, 0x28030000, 0x38636000, '... + 0x6000'),
+    (0x801B0EEC, 0x40820010, 0x48000010, '... then OSSetArenaLo'),
+    (0x801B0F2C, 0x3863CFA0, 0x38636000, 'OSInit debug path: arena low = 0x80366000 (was _stack_addr)'),
+    (HOOK, 0x80010014, None, 'pad update end -> Postman code'),
+    (HOOK2, 0x9421FFF0, None, 'g_system update start -> scene-change check'),
+    (HOOK3, 0x9421F5D0, None, 'field A handler start -> pm_player_stub (remember the player)'),
+    (HOOK4, 0x931F0128, None, 'field A handler, chosen A action -> pm_label_stub (swing label at a log)'),
+    (HOOK5, 0xA07F0014, None, 'sound start, id -> pm_sfx_stub (wood hit at a log)'),
+    (HOOK6, 0x4800002C, None, 'swing end check -> pm_exit_stub (hoes/axe: 30 frames / motion speed)'),
+    (0x8004D9BC, 0x380003E8, 0x380001F4, 'tool proficiency: a level every 500 points (was 1000)'),
+    (0x8028E5E8, 0x1501761A, 0x1C400B1A, 'Lumber (item 0x51C, was Record13), row as Golden Wool: category 0x1C, rucksack tab 0x40, symbol model 11'),
+    (0x8028E5EC, 0x0071003F, 0x022A003F, '... symbol texture 554 (0x22A)'),
+    (0x8028E5F4, 0x00000000, 0x00780000, '... price 120 (ships for 600G)'),
+    (0x8028E5FC, 0x0A002710, 0x01002710, '... menu byte 1 (as wool)'),
+    (0x8028E604, 0x00000001, 0x00000019, '... flags as wool'),
+    (0x8028E608, 0x00124924, 0x00092492, '... as wool'),
+    (0x8028E8E4, 0x0E00F59B, 0x0E00F200, 'symbol model 11 display box (menus): Lumber, x +-0.22, y 0..0.25, z +-0.125, r 0.28'),
+    (0x8028E8E8, 0x0000F1B9, 0x0000F800, '...'),
+    (0x8028E8EC, 0x09EF0600, 0x0E001000, '...'),
+    (0x8028E8F0, 0x0DFF11AB, 0x08001200, '...'),
+    (HOOK7, 0x80610020, None, 'villager item pick (func_8011811C end) -> pm_nosell_stub: never the Cursed Axe'),
+    (HOOK8, 0x9421FFE0, None, 'TV channel 3 caption (func_8008E298) -> pm_tv_stub: $JOE Coin Daily'),
+    (0x80109D24, 0x4BF08245, 0x4BF08209, 'cmd_91 item model: symbol (rucksack) model for every item, centred spin'),
+    (0x800038E8, 0x38600000, 'axe', 'baked Cursed Axe code, A path 1 (li r3,0) -> bl pm_axe_stub: log hits'),
+    (0x80003900, 0x38600000, 'axe', 'baked Cursed Axe code, A path 2 (li r3,0) -> bl pm_axe_stub: log hits'),
+]
+be32 = lambda b, o: struct.unpack_from('>I', b, o)[0]
+OPTIONAL = [  # (RAM address, word expected, new word, why): changed only when the expected word is there
+    (0x80033178, 0x2C000028, 0x2C00003C, 'swing end, category 3: 60 frames again (a mod had 40)'),
+    (0x800331A0, 0x2C00000A, 0x2C00001E, 'swing end, other tools: 30 frames again (a mod had 10)'),
+    (0x80003628, 0x2C0C0014, 0x2C0C0041, 'HUD stamina/food bars: show after 65 still frames (was 20)'),
+]
+
+
+def die(msg):
+    sys.exit('stopping, nothing written: ' + msg)
+
+
+def fst_files(fst):
+    n = be32(fst, 8); st = 12 * n; out = []
+    for i in range(1, n):
+        w0, off, size = struct.unpack_from('>III', fst, 12 * i)
+        if not (w0 >> 24):
+            out.append((off, size))
+    return out
+
+
+def main():
+    if len(sys.argv) != 3:
+        sys.exit(__doc__)
+    src, out = sys.argv[1:]
+    if os.path.exists(out): die(f'{out} exists')
+    if os.path.realpath(src) == os.path.realpath(out): die('output equals input')
+    code = open(os.path.join(HERE, 'pm.bin'), 'rb').read()
+    if CODE_ADDR + len(code) > ARENA_LO: die('code does not fit below the new arena start')
+    entry = CODE_ADDR                                   # pm_hook is the first thing in pm.bin
+    if be32(code, HOOK2_OFF) != 0x9421FFE0: die('pm.bin does not have pm_hook2 at +0x14')
+    targets = {HOOK: entry, HOOK2: entry + HOOK2_OFF, HOOK3: entry + HOOK3_OFF, HOOK4: entry + HOOK4_OFF, HOOK5: entry + HOOK5_OFF, HOOK6: entry + HOOK6_OFF, HOOK7: entry + HOOK7_OFF, HOOK8: entry + HOOK8_OFF}
+    if be32(code, HOOK3_OFF) >> 16 != 0x3D80: die('pm.bin does not have pm_player_stub at +0x58')
+    if be32(code, HOOK4_OFF) != 0x9421FFF0: die('pm.bin does not have pm_label_stub at +0x68')
+    if be32(code, HOOK5_OFF) != 0x9421FFD0: die('pm.bin does not have pm_sfx_stub at +0x98')
+    if be32(code, HOOK6_OFF) != 0x2C000001: die('pm.bin does not have pm_exit_stub at +0xF4')
+    if be32(code, HOOK7_OFF) != 0x80610020: die('pm.bin does not have pm_nosell_stub at +0x130')
+    if be32(code, HOOK8_OFF) >> 26 != 18: die('pm.bin does not have pm_tv_stub at +0x144')
+    if be32(code, AXE_STUB_OFF) >> 26 != 18: die('pm.bin does not have pm_axe_stub at +0x54')
+    with open(src, 'rb') as f:
+        hdr = f.read(0x440)
+        if hdr[:4] != b'GYWE': die(f'not the US disc (game id {hdr[:6]!r})')
+        dol_off, fst_off, fst_size = struct.unpack_from('>III', hdr, 0x420)
+        f.seek(0x2440); hdr_app = f.read(0x20)
+        f.seek(dol_off); dh = f.read(0x100)
+        offs = list(struct.unpack_from('>18I', dh, 0)); addrs = list(struct.unpack_from('>18I', dh, 0x48))
+        sizes = list(struct.unpack_from('>18I', dh, 0x90))
+        dol_size = max(o + s for o, s in zip(offs, sizes) if s)
+        f.seek(dol_off); dol = bytearray(f.read(dol_size))
+        f.seek(fst_off); fst = f.read(fst_size)
+        f.seek(0, 2); disc_size = f.tell()
+
+    if sizes[2] or offs[2]:
+        if addrs[2] == CODE_ADDR: die('this main.dol already has the Postman section')
+        die('text section slot 2 is in use')
+    for o, a, s in zip(offs, addrs, sizes):
+        if s and a < ARENA_LO and CODE_ADDR < a + s:
+            die(f'a section at {a:#x} overlaps the code area')
+
+    def at(addr):
+        for o, a, s in zip(offs, addrs, sizes):
+            if s and a <= addr < a + s: return o + addr - a
+        die(f'{addr:#x} is not in main.dol')
+    for addr, want in ((0x800038E0, 0x2C1A0502), (0x800038EC, 0x48040020), (0x800038F8, 0x2C1A0502), (0x80003904, 0x48040078)):
+        if be32(dol, at(addr)) != want: die(f'{addr:#010x}: the baked Cursed Axe code is not there (has {be32(dol, at(addr)):08x})')
+    for addr, old, new, why in PATCHES:
+        cur = be32(dol, at(addr))
+        if cur != old: die(f'{addr:#010x} ({why}): main.dol has {cur:08x}, expected {old:08x}')
+    print('all patch sites match the original code')
+
+    # new main.dol: original bytes + the code section
+    for addr, old, new, why in PATCHES:
+        if new is None:                                  # b CODE_ADDR (relative)
+            new = 0x48000000 | ((targets[addr] - addr) & 0x03FFFFFC)
+        elif new == 'axe':                               # bl pm_axe_stub
+            new = 0x48000001 | ((entry + AXE_STUB_OFF - addr) & 0x03FFFFFC)
+        struct.pack_into('>I', dol, at(addr), new)
+        print(f'  {addr:#010x}: {old:08x} -> {new:08x}  {why}')
+    for addr, want, new, why in OPTIONAL:
+        if be32(dol, at(addr)) == want:
+            struct.pack_into('>I', dol, at(addr), new); print(f'  {addr:#010x}: {want:08x} -> {new:08x}  {why}')
+        else:
+            print(f'  {addr:#010x}: left as {be32(dol, at(addr)):08x} (not the expected {want:08x})  {why}')
+    sec_off = (len(dol) + 0x1F) & ~0x1F
+    body = code + bytes((-len(code)) % 0x20)
+    dol += bytes(sec_off - len(dol)) + body
+    struct.pack_into('>I', dol, 0x00 + 4 * 2, sec_off)
+    struct.pack_into('>I', dol, 0x48 + 4 * 2, CODE_ADDR)
+    struct.pack_into('>I', dol, 0x90 + 4 * 2, len(body))
+    print(f'  text section 2: file {sec_off:#x}, RAM {CODE_ADDR:#x}, {len(body):#x} bytes')
+
+    # where the new main.dol goes on the disc
+    app_end = 0x2440 + 0x20 + be32(hdr_app, 0x14) + be32(hdr_app, 0x18)
+    used = [(0, app_end), (dol_off, dol_off + dol_size), (fst_off, fst_off + fst_size)] + [(o, o + s) for o, s in fst_files(fst)]
+    used.sort()
+    nxt = min([s for s, e in used if s >= dol_off + dol_size] + [disc_size])
+    if dol_off + len(dol) <= nxt:
+        new_off = dol_off
+        print(f'main.dol stays at {dol_off:#x} (free space after it up to {nxt:#x})')
+    else:
+        new_off = None; cur = 0
+        for s, e in used + [(disc_size, disc_size)]:
+            start = (max(cur, 0x10000) + 0x7FFF) & ~0x7FFF
+            if start + len(dol) <= s:
+                new_off = start; break
+            cur = max(cur, e)
+        if new_off is None: die('no free disc area for the larger main.dol')
+        print(f'main.dol moves from {dol_off:#x} to {new_off:#x} (unreferenced area; old copy left in place)')
+
+    print(f'copying {src} -> {out} ...')
+    with open(src, 'rb') as f, open(out, 'xb') as o:
+        while True:
+            chunk = f.read(1 << 22)
+            if not chunk: break
+            o.write(chunk)
+        o.seek(new_off); o.write(dol)
+        if new_off != dol_off:
+            o.seek(0x420); o.write(struct.pack('>I', new_off))
+    with open(out, 'rb') as o:
+        o.seek(0x420); assert be32(o.read(4), 0) == new_off
+        o.seek(new_off); assert o.read(len(dol)) == bytes(dol)
+    print('done; main.dol sha1', hashlib.sha1(dol).hexdigest())
+
+
+if __name__ == '__main__':
+    main()

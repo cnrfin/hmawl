@@ -22,3 +22,14 @@ start 50 G, growth +75 %/year, volatility 60 %, daily jitter ±12 %, crypto-wint
 - Old coin: item "Coin" 0x442 (`item.mes`), description `itemdoc03.mes` #55.
 - Joe's days: early {1,2,4,5}, late {6,9,10} per season by hash(seed, year*4+season); none in winter.
   Van fixed to the 3rd and 7th, postman the 8th.
+
+## TV test 1 (`game/`)
+- `joetv.c`: replaces channel 3's caption builder (0x8008E298, hook `pm_tv_stub` at pm.bin +0x144 in
+  `hook.s`); builds "$JOE Coin Daily" from the price formula (identical to the simulator for every day
+  checked) and copies the day's screen (tv-console2.tpl images 14-20) over channel 3's pictures 1, 2, 3, 6.
+  Seed fixed at 1890 for the test. Built together with the postman code (pm.c, logs.c, skill.c, spring.c).
+- `make_pm_dol.py`: adds HOOK8 and moves the heap start 0x80364000 -> 0x80366000 (code is 23 KB now).
+- `build_tvdata.py`: tv-console2.tpl + the 7 screens (`../screens/`, CMPR via `../cmpr.py`), image 9's
+  singer animation pieces made transparent; font.tpl gets '$' (`dollar.npy`) at glyph 0x80FD (unused in
+  the US text). Font: US glyph codes are 0x8000 digits, 0x800B A-Z, 0x80D8 a-z, '+' 0x80C6, '%' 0x80D7.
+- Output SHA-1: tv-console2.tpl e9efc4ff, font.tpl e54e346c, pm.bin 16aec257.
