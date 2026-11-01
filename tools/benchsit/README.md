@@ -18,3 +18,7 @@ gave the vanilla "Newly painted... Not really..." until a scene change, and repe
 running" (event manager +0x680 == -1, +0x58C == 0, CONTROL != 3) instead of the field check / CONTROL == 1;
 bench_dbg (pm.c) records presses/started/rested and the checked values. On Yes the script sets event counter 27;
 pm.c then refills stamina (game+0x11B84 = max +0x11B88). Common.arc e03a8b1f, debug.mes 4dd04c6d (same).
+
+## Bench sit test 3
+Sleepy dump (day 7 9:04, stamina full) vs 4 rested dumps: game+0x11BB0 high u16 14 (low u16 0x121 always),
++0x11BB8 17, +0x11BD0 140; all 0 when rested. On Yes pm.c also zeroes these (sleepiness).
