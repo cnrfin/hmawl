@@ -127,9 +127,15 @@ def main():
         f.seek(fst_off); fst = f.read(fst_size)
         f.seek(0, 2); disc_size = f.tell()
 
+    update = False
     if sizes[2] or offs[2]:
-        if addrs[2] == CODE_ADDR: die('this main.dol already has the Postman section')
-        die('text section slot 2 is in use')
+        if addrs[2] != CODE_ADDR: die('text section slot 2 is in use')
+        # update mode: the disc already has an earlier Postman build. Drop its code section (the last thing
+        # in main.dol) and re-apply everything; patch sites may already hold this build's words.
+        if offs[2] + sizes[2] != dol_size: die('the old Postman section is not at the end of main.dol')
+        update = True
+        dol = dol[:offs[2]]; offs[2] = sizes[2] = addrs[2] = 0
+        print('main.dol already has a Postman section: replacing it')
     for o, a, s in zip(offs, addrs, sizes):
         if s and a < ARENA_LO and CODE_ADDR < a + s:
             die(f'a section at {a:#x} overlaps the code area')
@@ -140,17 +146,19 @@ def main():
         die(f'{addr:#x} is not in main.dol')
     for addr, want in ((0x800038E0, 0x2C1A0502), (0x800038EC, 0x48040020), (0x800038F8, 0x2C1A0502), (0x80003904, 0x48040078)):
         if be32(dol, at(addr)) != want: die(f'{addr:#010x}: the baked Cursed Axe code is not there (has {be32(dol, at(addr)):08x})')
+    def final(addr, new):
+        if new is None: return 0x48000000 | ((targets[addr] - addr) & 0x03FFFFFC)
+        if new == 'axe': return 0x48000001 | ((entry + AXE_STUB_OFF - addr) & 0x03FFFFFC)
+        return new
     for addr, old, new, why in PATCHES:
         cur = be32(dol, at(addr))
-        if cur != old: die(f'{addr:#010x} ({why}): main.dol has {cur:08x}, expected {old:08x}')
+        if cur != old and not (update and cur == final(addr, new)):
+            die(f'{addr:#010x} ({why}): main.dol has {cur:08x}, expected {old:08x}')
     print('all patch sites match the original code')
 
     # new main.dol: original bytes + the code section
     for addr, old, new, why in PATCHES:
-        if new is None:                                  # b CODE_ADDR (relative)
-            new = 0x48000000 | ((targets[addr] - addr) & 0x03FFFFFC)
-        elif new == 'axe':                               # bl pm_axe_stub
-            new = 0x48000001 | ((entry + AXE_STUB_OFF - addr) & 0x03FFFFFC)
+        new = final(addr, new)                           # b / bl into pm.bin for the hooks
         struct.pack_into('>I', dol, at(addr), new)
         print(f'  {addr:#010x}: {old:08x} -> {new:08x}  {why}')
     for addr, want, new, why in OPTIONAL:

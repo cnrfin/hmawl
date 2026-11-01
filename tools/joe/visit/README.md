@@ -16,5 +16,6 @@ a folder holding `N.npy` / `net.json` exported from it).
 - Test key: Z + D-Up = today is Joe's day, clock forward to his next stage (6:20, 9:25, 11:55, 17:58, 20:14).
 - Bench sit test 11 probe removed (plan_log is an empty function, its hook kept). pm.bin 28,624 B, ends 0x80365F70.
 
-Build (from HM_AWL_sit5b.iso): gd_0.arc (test 6), gd_0.anm.arc (test 5), then make_pm_dol.py.
-pm.bin SHA-1 95a81d22, make_pm_dol.py 7aa233f6.
+Build: on top of HM_AWL_joe5.iso (sit14 code + Joe test 5): gd_0.arc (test 6), then make_pm_dol.py, which now
+replaces an existing Postman section (update mode). pm.bin SHA-1 95a81d22, make_pm_dol.py see below.
+make_pm_dol.py with update mode: SHA-1 aeeb6c11.
