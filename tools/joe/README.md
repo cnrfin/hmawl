@@ -44,7 +44,7 @@ python3 postman_npc/make_pm_dol.py HM_AWL_joe1a.iso HM_AWL_joe1.iso
 ## Test 5: 90% Joe, faster walk, bench clips (`build/test5/`)
 
 ```
-cd ~/Desktop/games/sit   # any scratch folder; joe_game.py runs from joeexpr/ (frames.py reads final_set.json there)
+# run from the joeexpr/ work folder (frames.py reads final_set.json there)
 python3 joe_sit.py ../joegame/sit_out                       # anm_sitdown/sitloop/standup.bin + cig.json
 JOE_SCALE=0.9 JOE_CIG=$PWD/../joegame/sit_out/cig.json JOE_WALK=28 python3 ../joegame/joe_game.py gd_0 OUT
 ```
