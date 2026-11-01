@@ -8,7 +8,7 @@ goddess test slot (`gd/gd_0`, Z + X spawns him).
 
 | Path | Contents |
 |---|---|
-| `build/gd_0.arc`, `build/gd_0.anm.arc` | Joe test 3. 2,380 triangles, 273,088 B (sharper face frames and gloves/shoes textures); Van's first 6 animations (26,848 B). Test 2 ran in game with face, gloves and shoes correct. |
+| `build/gd_0.arc`, `build/gd_0.anm.arc` | Joe test 4 (test 3 + skin 22% brighter, `JOE_SKIN`). 2,380 triangles, 273,088 B (sharper face frames and gloves/shoes textures); Van's first 6 animations (26,848 B). Test 2 ran in game with face, gloves and shoes correct. |
 | `data/joe_pieces.pkl.gz` | Gloves, shoes (decimated, with UVs) and the plain head (eyes/mouth removed), exported from the user's Blender file. |
 | `data/parts_lib.json.gz` | Expression parts library (brows, eyes, mouth for 57 shape keys), rendered from the full-quality model; used by the face editor and the frame builder. |
 | `data/final_set.json` | The chosen eye/brow and mouth frames. |

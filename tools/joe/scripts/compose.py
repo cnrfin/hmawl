@@ -10,6 +10,9 @@ for g,ps in L['lib'].items():
         else: seen[n]=1
         lib[(g,n)]=(p,Image.open(io.BytesIO(base64.b64decode(p['png']))).convert('RGBA'))
 BASE=Image.open(io.BytesIO(base64.b64decode(L['base']))).convert('RGBA')
+import os as _os
+_k=float(_os.environ.get('JOE_SKIN','1.22'))          # brighter skin (head and face-frame backgrounds together)
+_b=np.array(BASE).astype(float); _b[...,:3]=np.clip(_b[...,:3]*_k,0,255); BASE=Image.fromarray(_b.astype(np.uint8))
 def part(g,src,half=None,t=None):
     p,im=lib[(g,src)]; t=t or {}
     layer=Image.new('RGBA',(512,512),(0,0,0,0)); layer.alpha_composite(im,(p['x'],p['y']))
