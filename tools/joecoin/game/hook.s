@@ -108,13 +108,15 @@ pm_exit_stub:
 1:  b     exit_frames               # 0x8003319C: the original frame count
 
 # Villager-asks-for-an-item pick: 0x8011886C (end of func_8011811C, was lwz r3,0x20(r1)); the
-# Cursed Axe (0x502) is never offered for sale: it comes back as 0, the callers' "nothing" case.
+# Cursed Axe (0x502) and the $JOE coin (0x442) are never offered for sale: they come back as 0, the callers' "nothing" case.
     .globl pm_nosell_stub
 pm_nosell_stub:
     lwz   r3, 0x20(r1)              # original instruction
-    cmpwi r3, 0x502
+    cmpwi r3, 0x502                 # the Cursed Axe
+    beq   2f
+    cmpwi r3, 0x442                 # the $JOE coin: only Joe buys it
     bne   1f
-    li    r3, 0
+2:  li    r3, 0
 1:  b     nosell_return
 
 # TV channel 3 caption: 0x8008E298 (func_8008E298, was stwu r1,-0x20(r1)) -> joe_tv(prog, str), returns str.

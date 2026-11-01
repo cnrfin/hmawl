@@ -28,3 +28,11 @@ Item table +0xC = price: shops charge price x 10, the shipping bin pays price x 
 price*5*count over 0x211 items); Van's code (func_80134E38) checks price*10 == 0. make_pm_dol.py sets the
 coin's price word 0x8028C74C 0x00020000 -> 0 so only Joe (TV price) pays for it. Untested: whether the bin
 still takes it (for 0 G) and whether Van refuses it. pm.bin unchanged (a9929cdd).
+
+## Coin test 5: villagers never ask to buy it
+Test 4 in game: Van says "You can't sell that to me." and the shipping bin refuses it.
+Villagers' show-item lines are chosen by item category (0x1E = every dig-site item, e.g. Hugh 0x85 "I'll
+take a look at it, if they're old coins..."), so the coin can't get its own line by data alone. The
+"villager asks to buy the held item" pick (func_8011811C end, pm_nosell_stub) now also returns "nothing"
+for 0x442. hook.s grew 8 bytes: pm_tv_stub is now at pm.bin +0x14C (make_pm_dol HOOK8_OFF). pm.bin 9c... see zip.
+Still to do: a hate reaction + affection drop (needs the show/gift reaction code).

@@ -32,7 +32,7 @@ HOOK7 = 0x8011886C
 HOOK7_OFF = 0x130                                     # pm_nosell_stub in pm.bin (after pm_exit_stub)
 HOOK6_OFF = 0xF4                                      # pm_exit_stub in pm.bin (after pm_sfx_stub)
 HOOK8 = 0x8008E298
-HOOK8_OFF = 0x144                                     # pm_tv_stub in pm.bin (after pm_nosell_stub)
+HOOK8_OFF = 0x14C                                     # pm_tv_stub in pm.bin (after pm_nosell_stub)
 PATCHES = [  # (RAM address, original word, new word, why)
     (0x801B0EE4, 0x80630030, 0x3C608036, 'OSInit: arena low = 0x80366000 (was BootInfo->arenaLo or __ArenaLo) ...'),
     (0x801B0EE8, 0x28030000, 0x38636000, '... + 0x6000'),
@@ -99,7 +99,7 @@ def main():
     if be32(code, HOOK5_OFF) != 0x9421FFD0: die('pm.bin does not have pm_sfx_stub at +0x98')
     if be32(code, HOOK6_OFF) != 0x2C000001: die('pm.bin does not have pm_exit_stub at +0xF4')
     if be32(code, HOOK7_OFF) != 0x80610020: die('pm.bin does not have pm_nosell_stub at +0x130')
-    if be32(code, HOOK8_OFF) >> 26 != 18: die('pm.bin does not have pm_tv_stub at +0x144')
+    if be32(code, HOOK8_OFF) >> 26 != 18: die('pm.bin does not have pm_tv_stub at +0x14C')
     if be32(code, AXE_STUB_OFF) >> 26 != 18: die('pm.bin does not have pm_axe_stub at +0x54')
     with open(src, 'rb') as f:
         hdr = f.read(0x440)
