@@ -4,7 +4,7 @@ from compose import *
 from PIL import Image, ImageFilter
 S=json.load(open('final_set.json'))
 EYE_BOX=(104,30,412,298); MOUTH_BOX=(72,222,504,508)
-EYE_SIZE=(80,64); MOUTH_SIZE=(80,56)
+EYE_SIZE=(112,96); MOUTH_SIZE=(112,72)
 def layers_eyes(spec):
     out=Image.new('RGBA',(512,512),(0,0,0,0)); ex=spec.get('extras',{})
     if ex.get('blush'):
@@ -22,6 +22,11 @@ def frame(layer,box,size):
     img=BASE.copy(); img.alpha_composite(layer)
     a=np.array(layer)[...,3]>6
     m=Image.fromarray((a*255).astype(np.uint8)).filter(ImageFilter.MaxFilter(5))
+    # cleaner eyes: whites lifted towards white, pupils solid
+    arr=np.array(img).astype(float); rgb=arr[...,:3]; mx=rgb.max(-1); mn=rgb.min(-1); sat=(mx-mn)/np.maximum(mx,1)
+    feat=np.array(layer)[...,3]>128
+    white=feat&(sat<0.18)&(mx>110); rgb[white]=np.clip(rgb[white]*1.18+18,0,250)
+    pupil=feat&(mx<45); rgb[pupil]=(10,8,8); arr[...,:3]=rgb; img=Image.fromarray(arr.astype(np.uint8))
     c=img.crop(box).resize(size,Image.LANCZOS); mk=np.array(m.crop(box).resize(size,Image.BILINEAR))>60
     c=np.array(c); c[...,3]=np.where(mk,255,0); return Image.fromarray(c)
 def blush_variant(spec,eyes):

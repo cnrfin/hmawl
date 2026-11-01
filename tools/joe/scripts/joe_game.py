@@ -100,9 +100,9 @@ for key,nodeL,nodeR,tex in (('gloves',18,39,'emoti'),('shoes',8,48,'shoes')):
 # textures -> body atlas (gloves crop + shoes), head atlas (skin)
 emo=Image.open(E+'tex_EmotiguyDefault.png').convert('RGBA'); sho=Image.open(E+'tex_ShoesTex.png').convert('RGBA')
 gq=np.vstack([p[2] for p in pieces if p[0].startswith('gloves')]); u0,v0=gq.min(0); u1,v1=gq.max(0)
-gcrop=emo.crop((int(u0*1024)-2,int(v0*1024)-2,int(u1*1024)+2,int(v1*1024)+2)).resize((128,128),Image.LANCZOS)
+gcrop=emo.crop((int(u0*1024)-2,int(v0*1024)-2,int(u1*1024)+2,int(v1*1024)+2)).resize((256,256),Image.LANCZOS)
 gbox=(int(u0*1024)-2,int(v0*1024)-2,int(u1*1024)+2,int(v1*1024)+2)
-body=Image.new('RGBA',(256,128),(255,255,255,255)); body.paste(gcrop,(0,0)); body.paste(sho.resize((128,128),Image.LANCZOS),(128,0))
+body=Image.new('RGBA',(512,256),(255,255,255,255)); body.paste(gcrop,(0,0)); body.paste(sho.resize((256,256),Image.LANCZOS),(256,0))
 head=FR.BASE.resize((128,128),Image.LANCZOS); hb=Image.new('RGBA',(128,128)); 
 hd=np.array(head); a=hd[...,3]>0; col=np.median(hd[...,:3][a],0); hd[~a,:3]=col; hd[...,3]=255; head=Image.fromarray(hd)
 def atlas_uv(p):
@@ -194,7 +194,7 @@ if __name__=='__main__':
     gpl,skn,actb=build_gpl(),build_skn(),build_act()
     b0=tpl([body,head]); f0e=frames_tpl(FR.eye_frames(),58); f0m=frames_tpl(FR.mouth_frames(),36)
     arc=u8([(NAME+'.act',actb),(NAME+'.gpl',gpl),(NAME+'.skn',skn),(NAME+'_b0.tpl',b0),(NAME+'_f0_e.tpl',f0e),(NAME+'_f0_m.tpl',f0m),('_tmp.txt',b'')])
-    anims=[open(VAN+'anm%02d.bin'%a,'rb').read() for a in range(22)]
+    anims=[open(VAN+'anm%02d.bin'%a,'rb').read() for a in range(int(os.environ.get('JOE_ANIMS','6')))]   # only what Joe needs (Van's 0 idle, 1 walk, 2-5)
     anm=u8([('@',x) for x in anims])
     open(os.path.join(OUT,NAME+'.arc'),'wb').write(arc); open(os.path.join(OUT,NAME+'.anm.arc'),'wb').write(anm)
     for n_,dd in (('act',actb),('gpl',gpl),('skn',skn)): open(os.path.join(OUT,NAME+'.'+n_),'wb').write(dd)
