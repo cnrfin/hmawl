@@ -40,4 +40,4 @@ the 3rd (bit 2) and 7th (bit 6). Probe hook removed (its code stays in pm.bin, u
 
 ## Van test 5
 Test 4 data patch + a day log: van_frame (joetv.c, from pm_frame) logs villager 0x24 record +0x24..+0x27
-(daily plan: 1/2 stall, 4/5 away) whenever the day or the plan byte changes (van_log at 0x80364F78).
+(daily plan: 1/2 stall, 4/5 away) whenever the day or the plan byte changes (van_log at 0x80364FE4). Test key Z + B: clock to 22:00 today, so the bed goes to the next morning.

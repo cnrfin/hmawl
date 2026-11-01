@@ -407,6 +407,11 @@ void pm_frame(void)
     spring_frame(g, map, PAD_HELD, PAD_PRESS);  /* offerings at the goddess pond (spring.c) */
     joe_dig_frame();                          /* $JOE coin dig-site halving (joetv.c) */
     van_frame(g);                             /* van test 5: log the stall Van's daily plan (joetv.c) */
+    if ((PAD_HELD & 0x10) && (PAD_PRESS & 0x200)) {   /* test: Z + B = clock to 22:00 today (then bed = next morning) */
+        u32 *clk = *(u32 **)0x80349218;
+        if (*clk % T_DAY < 792000u) *clk = *clk / T_DAY * T_DAY + 792000u;
+        PAD_PRESS &= ~0x200u;
+    }
     if (day != 7 && !S.forced && flag_get(g + 0x12078, FLAG_MET)) flag_clear(g + 0x12078, FLAG_MET);
     if (day != 7 && !S.forced && flag_get(g + 0x12078, FLAG_FED)) flag_clear(g + 0x12078, FLAG_FED);
     active = day == 7 && tod >= T_START && tod < T_END;
