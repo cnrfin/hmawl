@@ -4,7 +4,7 @@
 - 2 days a season, never on Van's days (3rd, 7th) or the postman's (8th): early one of {1,2,4,5}, late one of
   {6,9,10}, picked per season by hash(seed, year*4+season). No visits in winter (crypto winter); the fall visit
   warns he won't be back until spring.
-- Comes in any weather (default, not discussed).
+- Comes in any weather, rain or snow (snow outside winter does not happen in vanilla anyway).
 
 ## $JOE at the dig site (decided earlier)
 - The old "Coin" item becomes the stackable $JOE coin, dug up at the dig site, rarer than other finds.
