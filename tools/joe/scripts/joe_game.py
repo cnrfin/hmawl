@@ -106,6 +106,27 @@ for key,nodeL,nodeR,tex in (('gloves',18,39,'emoti'),('shoes',8,48,'shoes')):
         print(key,sd,'flipped',int(flip.sum()),'of',len(FF))
         PP=P[FF].reshape(-1,3); QQ=Q[FF].reshape(-1,2); QQ=np.stack([QQ[:,0],1-QQ[:,1]],1)
         pieces.append((f'{key}{"L" if sd>0 else "R"}',G(PP),QQ,np.arange(len(PP)).reshape(-1,3),tex,nd))
+        if key=='shoes':                        # the shoes are open (sole seam, ankle, small gaps): black caps, both sides
+            import collections
+            tmc=trimesh.Trimesh(P,FF,process=False); tmc.merge_vertices()
+            cnt=collections.Counter(tuple(sorted(e)) for e in tmc.edges); bd=[e for e,v in cnt.items() if v==1]
+            nbr=collections.defaultdict(list)
+            for a_,b_ in bd: nbr[a_].append(b_); nbr[b_].append(a_)
+            seen=set(); CP=[];CF=[]
+            for v0 in list(nbr):
+                if v0 in seen: continue
+                loop=[v0]; seen.add(v0); prev=None; cur=v0
+                while True:
+                    nx=[w for w in nbr[cur] if w!=prev and w not in seen]
+                    if not nx: break
+                    prev,cur=cur,nx[0]; loop.append(cur); seen.add(cur)
+                if len(loop)<3: continue
+                pts=tmc.vertices[loop]; c0=len(CP); CP.append(pts.mean(0)); CP+=list(pts)
+                for k in range(len(loop)):
+                    a_,b_=c0+1+k,c0+1+(k+1)%len(loop); CF+=[[c0,a_,b_],[c0,b_,a_]]
+            if CF:
+                CP=np.array(CP); pieces.append((f'shoecap{"L" if sd>0 else "R"}',G(CP),np.zeros((len(CP),2)),np.array(CF),'black',nd))
+                print('shoe caps',sd,len(CF),'tris')
 # cigarette (sit animations only): its own node, parked at the head's centre (inside the ball) by every other clip
 if CIG:
     cz=json.load(open(CIG))
@@ -123,6 +144,7 @@ hd=np.array(head); a=hd[...,3]>0; col=np.median(hd[...,:3][a],0); hd[~a,:3]=col;
 CIG_CELL=[]
 def atlas_uv(p):
     n,P,Q,F,t,nd=p
+    if t=='black': return np.array([[(CIG_CELL[4][0]+4)/512,(CIG_CELL[4][1]+4)/256]]*len(Q)),1
     if t=='cig': return np.array([[(CIG_CELL[int(b)][0]+4)/512,(CIG_CELL[int(b)][1]+4)/256] for b in Q]),1
     if t=='emoti':
         u=(Q[:,0]*1024-gbox[0])/(gbox[2]-gbox[0]); v=(Q[:,1]*1024-gbox[1])/(gbox[3]-gbox[1]); return np.stack([np.clip(u,0,1)*0.5,np.clip(v,0,1)],1),1
@@ -130,8 +152,8 @@ def atlas_uv(p):
     if t=='head': return np.clip(Q,0,1),3
     if t=='eyeframe': return Q,0
     if t=='mouthframe': return Q,2
-CIG_COL=[(205,140,70),(238,234,222),(150,150,150),(250,105,20)]   # filter, paper, ash, ember
-if CIG:
+CIG_COL=[(205,140,70),(238,234,222),(150,150,150),(250,105,20),(12,12,12)]   # cigarette filter, paper, ash, ember; shoe insides
+if True:
     from PIL import ImageDraw
     mask=Image.new('L',(512,256),0); md=ImageDraw.Draw(mask)
     for p in pieces:
@@ -141,10 +163,10 @@ if CIG:
     mk=np.array(mask)
     for by in range(0,256,8):
         for bx in range(0,512,8):
-            if len(CIG_CELL)<4 and not mk[max(by-4,0):by+12,max(bx-4,0):bx+12].any(): CIG_CELL.append((bx,by))
-    assert len(CIG_CELL)==4, CIG_CELL
+            if len(CIG_CELL)<5 and not mk[max(by-4,0):by+12,max(bx-4,0):bx+12].any(): CIG_CELL.append((bx,by))
+    assert len(CIG_CELL)==5, CIG_CELL
     for (bx,by),c in zip(CIG_CELL,CIG_COL): body.paste(c+(255,),(bx,by,bx+8,by+8))
-    print('cigarette colours at',CIG_CELL)
+    print('colour cells (cigarette x4, black) at',CIG_CELL)
 # vertices / skin groups (as the goddess builder)
 verts=[];vkey={};uvs=[];ukey={};tris={0:[],1:[],2:[],3:[]}
 def nrm(P,F):

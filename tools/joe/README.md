@@ -58,3 +58,8 @@ JOE_SCALE=0.9 JOE_CIG=$PWD/../joegame/sit_out/cig.json JOE_WALK=28 python3 ../jo
   - 7 sitting loop, 300 frames, NPC on the same spot facing away (turn the NPC 180 degrees when 6 ends).
   - 8 stand up, 40 frames, same frame as 7; ends on idle frame 0.
 - Read back from the built files: `previews/test5_readback.png`. Sizes: gd_0.arc 275,104 B, gd_0.anm.arc 47,712 B.
+
+## Test 6 (`build/test6/`): shoe insides
+Test 5 + black caps over every open boundary loop of the shoes (sole seam, ankle opening, small gaps), both
+windings (130 triangles); black is a fifth 8x8 cell next to the cigarette colours. gd_0.arc 278,080 B;
+gd_0.anm.arc unchanged. Preview `previews/test6_shoes.png`.
