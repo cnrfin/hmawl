@@ -39,3 +39,6 @@ start 50 G, growth +75 %/year, volatility 60 %, daily jitter ±12 %, crypto-wint
   the loose font edit did nothing. `build_preload.py` draws '$' into preload's own font.tpl (image 1, cell
   0x80FD; its image 0 differs from the loose copy, so the file isn't swapped) and recompresses (CLZ).
   preload.arc.clz 408,721 -> 403,276 B, SHA-1 65c38d8b. The loose font.tpl change is harmless and not needed.
+- TV test 5: test 4 still showed 'ä'. The US preload font replaces unused kanji in image 0 (the 24x24 font
+  the text boxes draw from) with European letters (0x80FB-0x8107, 0x8432-0x8463); 0x80FD there is 'ä'.
+  `build_preload.py` now draws '$' into image 0 too. preload.arc.clz SHA-1 47f843f8.
