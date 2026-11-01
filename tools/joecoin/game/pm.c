@@ -50,6 +50,7 @@ typedef struct { float x, y, z; } Vec;
 #define col_config    F(0x80152218, void, (u8 *, s32))
 #define game_rand     F(0x8017D3E8, s32, (void))
 #define event_start   F(0x8010AAC4, s32, (u8 *, s32, s32, s32))
+#define ship_check    F(0x80136260, void, (u8 *))   /* func_80136260: farm daily checks -> func_801331A4(game+0x11B58) */
 #define fade_start    F(0x80189128, void, (u8 *, u32 *, u32 *, s32, s32, float))  /* fader, from, to, hold, 0, seconds */
 #define flag_get      F(0x801129A0, s32, (u8 *, s32))
 #define flag_clear    F(0x80112A30, void, (u8 *, s32))
@@ -462,6 +463,7 @@ void pm_frame(void)
             PAD_PRESS = 0; PAD_HELD = 0;
             step = bench_target - old > 3000u ? 3000u : bench_target - old;
             *clk = old + step;
+            ship_check(*(u8 **)0x803491CC);                  /* farm-side timed checks (shipping pickup 5:10-5:40, payout 12:00-12:30): only the farm/house module (wlp2) calls this, so the valley never would */
             if ((u32)tm >= 0x80000000u && (u32)tm < 0x81800000u && *(u32 *)(tm + 0x404) == old) *(u32 *)(tm + 0x404) = *clk;
             if (*clk >= bench_target) {
                 bench_target = 0;

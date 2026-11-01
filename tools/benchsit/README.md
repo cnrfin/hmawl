@@ -43,3 +43,9 @@ Bed dumps (day 4 18:53 -> day 5 1:44): game+0x11C9C (last woke up) day 3 21:00 -
 (last went to bed) day 1 5:20 -> day 4 18:35 (the session had only bench sits since the start). Test 6 sets
 these at the end of a sit: +0x11CA4 = the sit's start, +0x11C9C = now. Shipping: the pickup is the 12:00-12:30
 job (not 5:00); days 1-3 had no pickup in the user's run (to check against vanilla).
+
+## Bench sit test 7
+Bed run: milk picked up at 5:00 day 2, paid by 12:30. The checks that flag the pickup (func_801331DC: window
+game+0x11B38..0x11B40 = 5:10-5:40, event flag 0x3A) and the payout (func_801335DC: 12:00-12:30, flags 0x3B/0x3C)
+run from func_80136260 -> func_801331A4(game+0x11B58), which only wlp2 (farm/house) calls - on the valley the
+bench skip passes the windows with nobody checking. Test 7 calls func_80136260 on every step of the bench skip.
