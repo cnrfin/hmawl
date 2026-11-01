@@ -37,3 +37,7 @@ and 8th. In the daily planner (0x80060EF8): mask bit clear -> option 2 (works th
 (away), plus option 1 (stall anyway) when rand(1..100) <= byte 4 (80) and rand(50..100) <= record +7.
 Test 4 (make_pm_dol.py data patch, word 0x802952D4): 0x5000037B -> 0x000003BB = chance 0, mask clear only on
 the 3rd (bit 2) and 7th (bit 6). Probe hook removed (its code stays in pm.bin, unhooked).
+
+## Van test 5
+Test 4 data patch + a day log: van_frame (joetv.c, from pm_frame) logs villager 0x24 record +0x24..+0x27
+(daily plan: 1/2 stall, 4/5 away) whenever the day or the plan byte changes (van_log at 0x80364F78).

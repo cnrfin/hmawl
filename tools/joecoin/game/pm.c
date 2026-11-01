@@ -378,6 +378,7 @@ void skill_frame(u8 *g, u32 pad_held, u32 pad_press);
 void spring_release(void);
 void spring_frame(u8 *g, s32 map, u32 pad_held, u32 pad_press);
 void joe_dig_frame(void);
+void van_frame(u8 *g);
 
 void pm_scene_change(void)
 {
@@ -405,6 +406,7 @@ void pm_frame(void)
     skill_frame(g, PAD_HELD, PAD_PRESS);      /* tool skill on the HUD (skill.c) */
     spring_frame(g, map, PAD_HELD, PAD_PRESS);  /* offerings at the goddess pond (spring.c) */
     joe_dig_frame();                          /* $JOE coin dig-site halving (joetv.c) */
+    van_frame(g);                             /* van test 5: log the stall Van's daily plan (joetv.c) */
     if (day != 7 && !S.forced && flag_get(g + 0x12078, FLAG_MET)) flag_clear(g + 0x12078, FLAG_MET);
     if (day != 7 && !S.forced && flag_get(g + 0x12078, FLAG_FED)) flag_clear(g + 0x12078, FLAG_FED);
     active = day == 7 && tod >= T_START && tod < T_END;

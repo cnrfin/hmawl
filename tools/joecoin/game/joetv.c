@@ -250,19 +250,22 @@ s32 joe_talk_post(s32 who, s32 rec, s32 *grp, s32 *msg, s32 ret)
     return ret;
 }
 
-/* Van probe (van test 3): pm_pick_stub wraps the weighted pick func_80147F60(obj) (obj+4 count, obj+8 weights).
-   Picks from Van's schedule weights (0x802DD4E4..0x802DD4EF: 25 25 50 25 45 30 100 0 0 20 80 0) are logged:
-   van_log = {magic 'VANL', n, then 64 rows of (day, tenths of the day, weight offset, count, result)}. */
-struct van_row { u32 day, tod; u8 off, cnt, res, pad; };
+/* Van day log (van test 5): every frame, the stall Van's daily plan byte (villager 0x24 record +0x24:
+   1/2 = works the stall, 4/5 = away) is logged when the day or the byte changes:
+   van_log = {magic 'VANL', n, then 64 rows of (day, tenths of the day, plan, record +0x25..+0x27)}. */
+struct van_row { u32 day, tod; u8 plan, b25, b26, b27; };
 struct { u32 magic, n; struct van_row row[64]; } van_log;
-s32 pick_log(u8 *obj, s32 res)
+s32 pick_log(u8 *obj, s32 res) { return res; }
+void van_frame(u8 *g)
 {
-    u32 w = *(u32 *)(obj + 8);
-    if (w >= 0x802DD4E4u && w < 0x802DD4F0u) {
-        struct van_row *r = &van_log.row[van_log.n & 63];
-        r->day = CLOCK / T_DAY; r->tod = CLOCK % T_DAY;
-        r->off = w - 0x802DD4E4u; r->cnt = *(u32 *)(obj + 4); r->res = res;
+    static u32 last_day = 0xFFFFFFFFu; static u8 last_plan = 0xFF;
+    u8 *r = villager_rec(g, 0x24);
+    u32 day = CLOCK / T_DAY;
+    if (!r || *(u16 *)(r + 4) != 0x24) return;
+    if (day != last_day || r[0x24] != last_plan) {
+        struct van_row *w = &van_log.row[van_log.n & 63];
+        w->day = day; w->tod = CLOCK % T_DAY; w->plan = r[0x24]; w->b25 = r[0x25]; w->b26 = r[0x26]; w->b27 = r[0x27];
         van_log.magic = 0x56414E4C; van_log.n++;
+        last_day = day; last_plan = r[0x24];
     }
-    return res;
 }
