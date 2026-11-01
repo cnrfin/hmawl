@@ -63,3 +63,8 @@ JOE_SCALE=0.9 JOE_CIG=$PWD/../joegame/sit_out/cig.json JOE_WALK=28 python3 ../jo
 Test 5 + black caps over every open boundary loop of the shoes (sole seam, ankle opening, small gaps), both
 windings (130 triangles); black is a fifth 8x8 cell next to the cigarette colours. gd_0.arc 278,080 B;
 gd_0.anm.arc unchanged. Preview `previews/test6_shoes.png`.
+
+## Test 7 (`build/test7/gd_0.anm.arc`): no restart at the end of sit down / stand up
+The game loops every clip, and in game the sit down / stand up ended before the code switched to the next
+clip (visible jump back). Clips 6 and 8 now end with 90 frames holding their last pose (lengths 149 / 130).
+gd_0.arc unchanged from test 6.

@@ -129,10 +129,12 @@ def solve(Wk, root, cig):
     for n in range(NN):
         p = gn[n]['parent']; L[n] = np.linalg.inv(W[p] if p >= 0 else np.eye(4)) @ W[n]
     return L
-def clip(frames_fn, nfr, step, root):
-    keys = {n: [] for n in range(NN)}; fr = list(range(0, nfr, step)) + [nfr]
+def clip(frames_fn, nfr, step, root, hold=0):
+    """hold: extra frames repeating the last pose (the game loops clips; if one ends before the code switches
+    to the next, it holds still instead of restarting)"""
+    keys = {n: [] for n in range(NN)}; fr = list(range(0, nfr, step)) + [nfr] + ([nfr + hold] if hold else [])
     for f in fr:
-        Wk, cig = frames_fn(f)
+        Wk, cig = frames_fn(min(f, nfr))
         Wk = {n: root @ to_game(M) for n, M in Wk.items()}
         L = solve(Wk, root, cig)
         for n in range(NN): keys[n].append((f, L[n]))
@@ -148,7 +150,7 @@ def clip(frames_fn, nfr, step, root):
                 if prev is not None and np.dot(q, prev) < 0: q = -q
                 prev = q; out.append((f, q, M[:3, 3]))
             tracks.append((n, 'keys', out))
-    return joe_anm.rebuild(open(VAN + 'anm00.bin', 'rb').read(), float(nfr), tracks)
+    return joe_anm.rebuild(open(VAN + 'anm00.bin', 'rb').read(), float(nfr + hold), tracks)
 
 ROOT_FACE = np.linalg.inv(Tr([0, 0, ZS]) @ Ryh(np.pi))     # bench frame -> NPC facing the bench
 ROOT_AWAY = np.linalg.inv(Tr([0, 0, ZS]))                   # bench frame -> NPC facing away
@@ -160,9 +162,10 @@ def f_loop(f):
     W = posedW(spec_at(f / FPS)); return {n: W[n] for n in KEYED[:-1]}, True
 def f_up(f):
     t = f / FPS / SPEED; return standup(t), f == 0
-clips = {'anm_sitdown.bin': clip(f_down, n_down, 2, ROOT_FACE),
+HOLD = 90
+clips = {'anm_sitdown.bin': clip(f_down, n_down, 2, ROOT_FACE, HOLD),
          'anm_sitloop.bin': clip(f_loop, n_loop, 3, ROOT_AWAY),
-         'anm_standup.bin': clip(f_up, n_up, 2, ROOT_AWAY)}
+         'anm_standup.bin': clip(f_up, n_up, 2, ROOT_AWAY, HOLD)}
 for k, v in clips.items(): open(os.path.join(OUT, k), 'wb').write(v); print(k, len(v))
 P, B, F = cig_mesh()
 json.dump(dict(park=list(park), mesh_P=P.tolist(), mesh_band=B, mesh_F=F.tolist(), clips=list(clips),
