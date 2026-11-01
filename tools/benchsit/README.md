@@ -62,3 +62,11 @@ is busy (FADER+0x60), and for 60 frames after the fade-in.
 Shipping notes: EventCondition record field 183/7 is the condition id (EventCondition.txt); condition 58 =
 CONDITION_TRADE_SHIPMENT = event flag 0x3A set by func_801331DC. Event 311 (Common.arc 10, Takakura, 1035
 instructions) is listed for it with field 10/8 = 1 or 11 and 18/8 = 10.
+
+## Bench sit test 10
+Pickup has two paths: in the storage room (map 10) at 5:10 Takakura's cutscene (event 311), elsewhere the trade
+manager's 5:10 job starts event 310 (Common.arc 9, ~12k instructions, the morning trade script) unless the player is
+/ was just on map 10. The trade manager (*0x803491EC, vtable 0x802C1940 at +0x10, update slot 0x10 = 0x80134104,
+skipped when the flag arg has 0x4) keeps its job times/flags at game+0x11B10..0x11B4F and queues each day's jobs
+itself (job 0x11B4B -> func_8013477C -> func_80132F00). In every bench-session dump its times are stuck on the last
+day spent on the farm: its update only runs while wlp2 is loaded. Test 10 calls update(obj, 0) on every bench step.
