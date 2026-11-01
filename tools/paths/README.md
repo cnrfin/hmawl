@@ -12,4 +12,4 @@ waypoints can be added.
   by 285-286 so it doesn't cross the bench.
 
 Source SHA-1 `9b114b25`-uploaded disc file = the copy in RAM; output `PathData.arc` SHA-1 `ac7dbc63`
-(51,692 -> 51,788 bytes). Untested in game.
+(51,692 -> 51,788 bytes). Works in game: a villager (the caveman) was seen crossing the new bridge.
