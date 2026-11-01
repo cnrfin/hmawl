@@ -61,6 +61,7 @@ typedef struct { float x, y, z; } Vec;
 #define VALLEY    1
 #define EVENT     406
 struct { u32 presses, started, rested; s32 map, ev680, ev58c; u32 control; } bench_dbg;   /* bench sit test 2 debug */
+static u32 bench_target;                    /* bench time skip: clock target, 0 = idle */
 #define BENCH_CNT 27                        /* event counter 27: set by the bench script on Yes */
 #define BENCH_EVENT 407                     /* bench: sit until evening / morning */
 #define BENCH_X   137.65f                   /* turned bench by the tree: seat centre (mapobj col box) */
@@ -439,14 +440,37 @@ void pm_frame(void)
             }
         }
     }
-    /* Yes on the bench (the script sets counter 27): the night's rest refills stamina */
-    if (*(s32 *)(g + 0x12194 + BENCH_CNT * 4)) {
-        *(s32 *)(g + 0x12194 + BENCH_CNT * 4) = 0;
-        *(s32 *)(g + 0x11B84) = *(s32 *)(g + 0x11B88);
-        *(unsigned short *)(g + 0x11BB0) = 0;           /* sleepiness, as after the bed: 0 in every rested dump */
-        *(s32 *)(g + 0x11BB8) = 0;           /* (sleepy dump: 14, 17, 140) */
-        *(s32 *)(g + 0x11BD0) = 0;
-        bench_dbg.rested++;
+    /* Yes on the bench: the script sets counter 27 (1 = until 18:00, 2 = until 6:00), fades to black and ends.
+       Then the clock steps 5 game minutes a frame (like the bed's time skip, so timed jobs such as the
+       12:00-12:30 shipping pickup still see their window), pad input held off; at the target: rest
+       (stamina full, sleepiness cleared) and fade back in. */
+    {
+        s32 *req = (s32 *)(g + 0x12194 + BENCH_CNT * 4);
+        u8 *ev = EVMGR;
+        if (*req && !bench_target && ev && *(s32 *)(ev + 0x680) == -1) {
+            u32 c = CLOCK, base = c / T_DAY * T_DAY, h = c % T_DAY;
+            if (*req / 128 == 1 || *req == 1) bench_target = base + 18 * 36000u;
+            else bench_target = h < 6 * 36000u ? base + 6 * 36000u : base + T_DAY + 6 * 36000u;
+            if (bench_target <= c) bench_target = c + 1;
+            *req = 0;
+            bench_dbg.rested++;
+        }
+        if (bench_target) {
+            u32 *clk = *(u32 **)0x80349218, old = *clk, step;
+            u8 *tm = *(u8 **)0x80349194;
+            PAD_PRESS = 0; PAD_HELD = 0;
+            step = bench_target - old > 3000u ? 3000u : bench_target - old;
+            *clk = old + step;
+            if ((u32)tm >= 0x80000000u && (u32)tm < 0x81800000u && *(u32 *)(tm + 0x404) == old) *(u32 *)(tm + 0x404) = *clk;
+            if (*clk >= bench_target) {
+                bench_target = 0;
+                *(s32 *)(g + 0x11B84) = *(s32 *)(g + 0x11B88);   /* stamina full */
+                *(unsigned short *)(g + 0x11BB0) = 0;            /* sleepiness, as in rested dumps */
+                *(s32 *)(g + 0x11BB8) = 0;
+                *(s32 *)(g + 0x11BD0) = 0;
+                if (FADER) { u32 from = 0x000000FF, to = 0x00000000; fade_start(FADER, &from, &to, 0, 0, 0.5f); }
+            }
+        }
     }
     if (day != 7 && !S.forced && flag_get(g + 0x12078, FLAG_MET)) flag_clear(g + 0x12078, FLAG_MET);
     if (day != 7 && !S.forced && flag_get(g + 0x12078, FLAG_FED)) flag_clear(g + 0x12078, FLAG_FED);

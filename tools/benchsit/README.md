@@ -22,3 +22,12 @@ pm.c then refills stamina (game+0x11B84 = max +0x11B88). Common.arc e03a8b1f, de
 ## Bench sit test 3
 Sleepy dump (day 7 9:04, stamina full) vs 4 rested dumps: game+0x11BB0 high u16 14 (low u16 0x121 always),
 +0x11BB8 17, +0x11BD0 140; all 0 when rested. On Yes pm.c also zeroes these (sleepiness).
+
+## Bench sit test 4 (stepped time skip)
+Dumps before/after a nap (day 8 11:32 -> 17:34): uncollected earnings game+0x11A50 0 -> 115; timed jobs at
+game+0x11B10..0x11B30 (+ pending flags 0x11B48..0x11B4D) with the shipping pickup at 12:00 (flag 0x11B4C) and a
+12:30 job both pending before, done after. The pickup only fires inside the 12:00-12:30 window (0x801335DC checks
+start 0x11B28 / end 0x11B30), which a single clock jump skips. Test 4: the script only asks, sets counter 27
+(1 evening / 2 morning), fades out and ends on black; pm.c steps the clock 5 game minutes per frame (+ the copy at
+lbl_80349194+0x404) to 18:00 / next 6:00 with pad input held off, then refills stamina, clears the sleepy values
+and fades back in. Common.arc 60ff57c7, debug.mes 4dd04c6d.

@@ -33,38 +33,27 @@ new_mes = body + bytes(len(ev) - len(body))
 assert mes_entries(new_mes)[EVE] == enc(TEXT[EVE])
 
 V_ANS = 2
-REST = 27                                                    # event counter 27 = 1 on Yes: pm.c refills stamina
+REST = 27                                                    # event counter 27 = 1/2 on Yes: pm.c skips to 18:00 / 6:00
 a = Asm(); L = a.new
 a.sys(0x10); a.sys(0x00)                                     # event start
 def fade(cmd):
     a.num(0); a.raw(64); a.sys(cmd)                          # cmd_0B out / cmd_0C in: black, 0.5 s
     top = L('fade'); a.label(top); a.sys(0x00); a.sys(0x0D); a.jnz(top)
-morning, early, go_eve, done = L('morn'), L('early'), L('eve'), L('done')
-a.sys(0x4A); a.num(6); a.emit('cmp'); a.jlt(early)          # hour < 6  -> morning (today 6:00)
+done = L('done')
+def ask(msg, target):
+    """message with Yes/No; Yes: counter REST = target (1 evening, 2 morning), fade to black, end on black
+    (pm.c steps the clock 10 minutes a frame to the target, then fades back in)"""
+    a.wait_msg(EVENT_FILE, msg, V_ANS)
+    a.load(V_ANS); a.num(1); a.emit('cmp'); a.jnz(done)
+    a.num(REST); a.num(target); a.sys(0x93)
+    fade(0x0B)
+    a.jmp(done)
+early, go_eve = L('early'), L('eve')
+a.sys(0x4A); a.num(6); a.emit('cmp'); a.jlt(early)          # hour < 6  -> morning
 a.sys(0x4A); a.num(18); a.emit('cmp'); a.jlt(go_eve)        # hour < 18 -> evening
-# 18:00-23:59: until tomorrow 6:00 = add (29 - hour) h + (60 - minute) min
-a.wait_msg(EVENT_FILE, MORN, V_ANS)
-a.load(V_ANS); a.num(1); a.emit('cmp'); a.jnz(done)
-a.num(REST); a.num(1); a.sys(0x93)
-fade(0x0B)
-a.num(29); a.sys(0x4A); a.emit('sub'); a.num(60); a.sys(0x4B); a.emit('sub'); a.sys(0x44)
-a.jmp(morning)
-a.label(early)
-a.wait_msg(EVENT_FILE, MORN, V_ANS)
-a.load(V_ANS); a.num(1); a.emit('cmp'); a.jnz(done)
-a.num(REST); a.num(1); a.sys(0x93)
-fade(0x0B)
-a.num(6); a.num(0); a.sys(0x43)                              # today 6:00
-a.jmp(morning)
-a.label(go_eve)
-a.wait_msg(EVENT_FILE, EVE, V_ANS)
-a.load(V_ANS); a.num(1); a.emit('cmp'); a.jnz(done)
-a.num(REST); a.num(1); a.sys(0x93)
-fade(0x0B)
-a.num(18); a.num(0); a.sys(0x43)                             # today 18:00
-a.label(morning)
-for _ in range(30): a.sys(0x00)                             # a moment in the dark
-fade(0x0C)
+ask(MORN, 2)
+a.label(early); ask(MORN, 2)
+a.label(go_eve); ask(EVE, 1)
 a.label(done)
 a.emit('end'); a.emit('end')
 script = a.build()
