@@ -84,3 +84,9 @@ Plan log: every villager plans its day at its wake time (day 1: Takakura 7 at 5:
 bench night, day 2 shows only 10/18/17 at 6:00 (just after the skip) - Takakura's 5:00 plan never ran, so no trade
 jobs were scheduled. His wake check only fires in a short window that the 5-minute steps jump over. Test 12 steps
 1 game minute per frame for 4:50-6:10 (5 minutes elsewhere). Probe log kept.
+
+## Bench sit test 12 result / test 13
+Still no Takakura plan on day 2 with 1-minute steps: his wake-up isn't processed while the player is off the farm.
+The NPC manager (*0x8034916C) holds the villager objects at +4*id (Takakura = +0x1C). func_80060EF8 only reads
+state+8, so test 13 calls it with a stand-in state {0, 0, Takakura} once per day of a bench skip at 5:00-5:10;
+the 1-minute steps, trade_update and ship_check then run the 5:10 pickup. Code ends at 0x80365F88 (arena 0x80366000).

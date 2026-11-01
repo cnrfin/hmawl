@@ -51,6 +51,7 @@ typedef struct { float x, y, z; } Vec;
 #define game_rand     F(0x8017D3E8, s32, (void))
 #define event_start   F(0x8010AAC4, s32, (u8 *, s32, s32, s32))
 #define ship_check    F(0x80136260, void, (u8 *))   /* func_80136260: farm daily checks -> func_801331A4(game+0x11B58) */
+#define day_plan      F(0x80060EF8, void, (u8 *))     /* a villager's daily plan (reads state+8 only) */
 #define trade_update  F(0x80134104, s32, (u8 *, s32))
 #define fade_start    F(0x80189128, void, (u8 *, u32 *, u32 *, s32, s32, float))  /* fader, from, to, hold, 0, seconds */
 #define flag_get      F(0x801129A0, s32, (u8 *, s32))
@@ -63,7 +64,7 @@ typedef struct { float x, y, z; } Vec;
 #define VALLEY    1
 #define EVENT     406
 struct { u32 presses, started, rested; s32 map, ev680, ev58c; u32 control; } bench_dbg;   /* bench sit test 2 debug */
-static u32 bench_target, bench_start, bench_cool;       /* bench time skip: clock target (0 = idle), clock at the start */
+static u32 bench_target, bench_start, bench_cool, bench_taka_day = 0xFFFFFFFFu;       /* bench time skip: clock target (0 = idle), clock at the start */
 #define BENCH_CNT 40                        /* event counter 40: set by the bench script on Yes (0-29 count up daily) */
 #define BENCH_EVENT 407                     /* bench: sit until evening / morning */
 #define BENCH_X   137.65f                   /* turned bench by the tree: seat centre (mapobj col box) */
@@ -471,6 +472,20 @@ void pm_frame(void)
                 step = bench_target - old > lim ? lim : bench_target - old;
             }
             *clk = old + step;
+            {   /* Takakura (villager 7) plans the day's trade jobs (pickup 5:10, payout 12:00) when he wakes at ~5:00,
+                   but not while the player is off the farm. Once per day of the skip, at 5:00+, run his daily plan
+                   (func_80060EF8 only reads state+8 = the villager object; NPC manager *0x8034916C +4 per id) */
+                u32 now = *clk, d = now / T_DAY, tod = now % T_DAY;
+                u8 *npc = *(u8 **)0x8034916C, *tk;
+                if (tod >= 180000u && tod < 186000u && d != bench_taka_day && (u32)npc >= 0x80000000u && (u32)npc < 0x81800000u) {
+                    tk = *(u8 **)(npc + 4 * 7);
+                    bench_taka_day = d;
+                    if ((u32)tk >= 0x80000000u && (u32)tk < 0x81800000u && *(s32 *)(tk + 0xBC) == 7) {
+                        u8 *st[3]; st[0] = 0; st[1] = 0; st[2] = tk;
+                        day_plan((u8 *)st);
+                    }
+                }
+            }
             ship_check(*(u8 **)0x803491CC);                  /* farm-side timed checks (shipping pickup 5:10-5:40, payout 12:00-12:30); only wlp2 (farm/house) calls this */
             {   /* the trade manager (*0x803491EC, vtable 0x802C1940 at +0x10): its update (slot 0x10, 0x80134104) runs the
                    day's timed trade jobs and queues the next day's; it only runs on the farm, so its times froze on the bench */
