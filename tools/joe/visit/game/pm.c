@@ -213,7 +213,11 @@ static void setup_model(void)
     S.orig_list = SET71_LIST;
     if (S.who) {                              /* the goddess: motion n = Celia's animation n */
         for (i = 0; i < GD_ANIMS; i++) {
-            gd_mot[i][0] = 0x8E000400u | (u32)i; gd_mot[i][1] = 0x07FBFFFFu; gd_mot[i][2] = 0;
+            gd_mot[i][0] = 0x8E000400u | (u32)i; gd_mot[i][2] = 0;
+            /* word 1 bits 6-10 = cross-fade frames into this motion (31 = the default 10, func_8017DB28).
+               Joe's sitting loop (7) starts with no fade: it begins right as he turns 180 degrees, and a
+               fade from the sit down's pose under the new facing looked like a second sit down. */
+            gd_mot[i][1] = i == 7 ? 0x07FBF83Fu : 0x07FBFFFFu;
             gd_mot[i][3] = 0xFFFFFFFFu; gd_mot[i][4] = 0xFFFFFFFFu; gd_mot[i][5] = 0;
             gd_list[i] = gd_mot[i];
         }
@@ -407,14 +411,9 @@ s32 joe_visit_day(u32 day);
 static s32 joe_forced, joe_here;
 static void joe_motion(s32 m)               /* start a clip once (sit down / stand up must not restart) */
 {
-    s32 flip = S.motion == JM_SITDOWN && m == JM_SIT;
     if (S.motion == m) return;
     S.motion = m;
     actor_motion(S.actor, m);
-    /* sit down -> sitting turns him 180 degrees: the game cross-fades clips, and fading from the sit down's
-       last pose under the new facing showed him sitting down a second time. Starting the clip again in
-       the same frame makes the fade run from the sitting clip into itself. */
-    if (flip) actor_motion(S.actor, m);
 }
 static void joe_place(float s)
 {

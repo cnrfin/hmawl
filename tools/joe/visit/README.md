@@ -25,3 +25,11 @@ The game cross-fades clips (in local space). Sit down -> sitting flips his facin
 started from the sit down's last pose under the new facing and looked like a second sit down. `joe_motion`
 starts clip 7 twice in that frame, so the fade runs from clip 7 into itself. pm.bin SHA-1 cd29a76b
 (ends 0x80365F94). Stand up (no turn) was already fixed by test 7's held last pose.
+
+## Test 3: no cross-fade into the sitting loop
+Test 2's double start didn't help (the fade source is kept). The fade length is in the motion entry:
+func_8017DB28 reads word 1 bits 6-10 as cross-fade frames (31 = default 10) for func_801A6878. Joe's entry 7
+(sitting loop) now has 0 (word 1 0x07FBF83F); the others keep the default. Double start removed.
+pm.bin SHA-1 c54eae7b (ends 0x80365F90).
+(actor_motion passes f1 through unset to func_8017D74C, which stores it as the playback-rate factor:
+worth checking if a clip ever plays at the wrong speed.)
