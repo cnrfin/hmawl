@@ -160,21 +160,18 @@ pm_want_stub:
 1:  stwu  r1, -0x30(r1)             # original first instruction
     b     want_hook_return          # 0x80148A50
 
-# Weighted pick: 0x80147F60 (func_80147F60(obj) -> index, was stwu r1,-0x20(r1)). Runs it, then
-# pick_log(obj, result) records Van's picks (van test 3 probe); returns the result unchanged.
+# Villager daily plan: 0x80060EF8 (func_80060EF8(state), was stwu r1,-0x140(r1)). plan_log(state) records who
+# planned and when (bench sit test 11 probe: does Takakura, villager 7, plan the trade jobs after a bench skip).
     .globl pm_van_stub
 pm_van_stub:
     stwu  r1, -0x20(r1)
     mflr  r0
     stw   r0, 0x24(r1)
     stw   r3, 0x8(r1)
-    bl    1f
-    mr    r4, r3
+    bl    plan_log
     lwz   r3, 0x8(r1)
-    bl    pick_log
     lwz   r0, 0x24(r1)
     mtlr  r0
     addi  r1, r1, 0x20
-    blr
-1:  stwu  r1, -0x20(r1)             # original first instruction
-    b     van_hook_return           # 0x80147F64
+    stwu  r1, -0x140(r1)            # original first instruction
+    b     van_hook_return           # 0x80060EFC

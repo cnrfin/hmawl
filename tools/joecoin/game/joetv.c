@@ -269,3 +269,22 @@ void van_frame(u8 *g)
         last_day = day; last_plan = r[0x24];
     }
 }
+
+/* bench sit test 11 probe: every villager daily plan (func_80060EF8) is logged:
+   plan_log_buf = {magic 'PLAN', n, 64 rows of (day, tenths of the day, villager id, Takakura only: shipping
+   containers game+0x11BC / +0x119C non-empty (func_80053234), job flags game+0x11B48..0x11B4F before planning)} */
+#define ship_has F(0x80053234, s32, (u8 *))
+struct plan_row { u32 day, tod; short id; u8 c1, c2; u8 jobs[8]; };
+struct { u32 magic, n; struct plan_row row[64]; } plan_log_buf;
+void plan_log(u8 *st)
+{
+    u8 *g = *(u8 **)0x803491CC, *v = *(u8 **)(st + 8);
+    struct plan_row *r = &plan_log_buf.row[plan_log_buf.n & 63];
+    s32 k;
+    r->day = CLOCK / T_DAY; r->tod = CLOCK % T_DAY;
+    r->id = v ? *(s32 *)(v + 0xBC) : -1;
+    r->c1 = r->c2 = 0xEE;
+    if (r->id == 7) { r->c1 = ship_has(g + 0x11BC) & 0xFF; r->c2 = ship_has(g + 0x119C) & 0xFF; }
+    for (k = 0; k < 8; k++) r->jobs[k] = g[0x11B48 + k];
+    plan_log_buf.magic = 0x504C414E; plan_log_buf.n++;
+}

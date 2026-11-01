@@ -70,3 +70,11 @@ manager's 5:10 job starts event 310 (Common.arc 9, ~12k instructions, the mornin
 skipped when the flag arg has 0x4) keeps its job times/flags at game+0x11B10..0x11B4F and queues each day's jobs
 itself (job 0x11B4B -> func_8013477C -> func_80132F00). In every bench-session dump its times are stuck on the last
 day spent on the farm: its update only runs while wlp2 is loaded. Test 10 calls update(obj, 0) on every bench step.
+
+## Bench sit test 10 result / test 11 (probe)
+Test 10 dump (day 2 6:05 after a bench night): the trade job table (object at game+0x11B00, vtable 0x802C1860;
+times +0x10..+0x48, flags +0x48..) holds only day 1's 5:10/5:40 entries, the rest -1: nothing was scheduled.
+The schedulers (job table methods 0x80133D54 / DA4 / DB8 / E08: set time pairs and job flags) are only called
+from the villager daily plan func_80060EF8, in the branch for villager 7 = Takakura (0x80061168..0x80061298),
+after checking the shipping containers game+0x11BC / +0x119C (func_80053234). Test 11 logs every daily plan
+(hook 0x80060EF8 -> pm_van_stub -> plan_log, buffer plan_log_buf at 0x80365990).
