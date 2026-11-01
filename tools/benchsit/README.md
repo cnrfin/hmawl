@@ -49,3 +49,8 @@ Bed run: milk picked up at 5:00 day 2, paid by 12:30. The checks that flag the p
 game+0x11B38..0x11B40 = 5:10-5:40, event flag 0x3A) and the payout (func_801335DC: 12:00-12:30, flags 0x3B/0x3C)
 run from func_80136260 -> func_801331A4(game+0x11B58), which only wlp2 (farm/house) calls - on the valley the
 bench skip passes the windows with nobody checking. Test 7 calls func_80136260 on every step of the bench skip.
+
+## Bench sit test 8
+Tired dump with test 6 (now day 5 18:03): last woke/bed set by the sit (5/18:00, 5/9:04) but game+0x11CB4 =
+day 4 19:00 (passed) and +0x11CAC = day 6 15:00. After a bed sleep (woke 5/1:39) they are 5/17:39 (+16 h) and
+7/13:39 (+60 h): "sleepy from" and a later limit. Test 8 sets them the same at the end of a sit.

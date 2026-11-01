@@ -473,6 +473,8 @@ void pm_frame(void)
                 *(s32 *)(g + 0x11BD0) = 0;
                 *(u32 *)(g + 0x11CA4) = bench_start;            /* last time in bed (the sit's start), as the bed sets it */
                 *(u32 *)(g + 0x11C9C) = *clk;                   /* last time woken up: now - tiredness counts from here */
+                *(u32 *)(g + 0x11CB4) = *clk + 16 * 36000u;     /* sleepy from: woke + 16 h (as the bed sets it) */
+                *(u32 *)(g + 0x11CAC) = *clk + 60 * 36000u;     /* the later limit: woke + 60 h (as the bed sets it) */
                 if (FADER) { u32 from = 0x000000FF, to = 0x00000000; fade_start(FADER, &from, &to, 0, 0, 0.5f); }
             }
         }
