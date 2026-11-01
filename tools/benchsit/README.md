@@ -37,3 +37,9 @@ Test 4: shipping paid, but loading a 5:00 save ran the clock to 6:00 - event cou
 (all 1 in the dump), so counter 27 turned "on" at each day change. Test 5 uses counter 40 (no Chapter/Common
 script touches it) and pm.c only acts on the values 7771 (evening) / 7772 (morning). Tiredness: still not
 found (the three cleared values are already 0 in the tired session). Common.arc 700e4ae4, pm.bin aa6b8002.
+
+## Bench sit test 6
+Bed dumps (day 4 18:53 -> day 5 1:44): game+0x11C9C (last woke up) day 3 21:00 -> day 5 1:38, game+0x11CA4
+(last went to bed) day 1 5:20 -> day 4 18:35 (the session had only bench sits since the start). Test 6 sets
+these at the end of a sit: +0x11CA4 = the sit's start, +0x11C9C = now. Shipping: the pickup is the 12:00-12:30
+job (not 5:00); days 1-3 had no pickup in the user's run (to check against vanilla).

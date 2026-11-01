@@ -61,7 +61,7 @@ typedef struct { float x, y, z; } Vec;
 #define VALLEY    1
 #define EVENT     406
 struct { u32 presses, started, rested; s32 map, ev680, ev58c; u32 control; } bench_dbg;   /* bench sit test 2 debug */
-static u32 bench_target;                    /* bench time skip: clock target, 0 = idle */
+static u32 bench_target, bench_start;       /* bench time skip: clock target (0 = idle), clock at the start */
 #define BENCH_CNT 40                        /* event counter 40: set by the bench script on Yes (0-29 count up daily) */
 #define BENCH_EVENT 407                     /* bench: sit until evening / morning */
 #define BENCH_X   137.65f                   /* turned bench by the tree: seat centre (mapobj col box) */
@@ -452,6 +452,7 @@ void pm_frame(void)
             if (want == 1) bench_target = base + 18 * 36000u;
             else bench_target = h < 6 * 36000u ? base + 6 * 36000u : base + T_DAY + 6 * 36000u;
             if (bench_target <= c) bench_target = c + 1;
+            bench_start = c;
             *req = 0;
             bench_dbg.rested++;
         }
@@ -468,6 +469,8 @@ void pm_frame(void)
                 *(unsigned short *)(g + 0x11BB0) = 0;            /* sleepiness, as in rested dumps */
                 *(s32 *)(g + 0x11BB8) = 0;
                 *(s32 *)(g + 0x11BD0) = 0;
+                *(u32 *)(g + 0x11CA4) = bench_start;            /* last time in bed (the sit's start), as the bed sets it */
+                *(u32 *)(g + 0x11C9C) = *clk;                   /* last time woken up: now - tiredness counts from here */
                 if (FADER) { u32 from = 0x000000FF, to = 0x00000000; fade_start(FADER, &from, &to, 0, 0, 0.5f); }
             }
         }
