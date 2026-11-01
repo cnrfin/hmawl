@@ -443,7 +443,7 @@ void pm_frame(void)
     if (*(s32 *)(g + 0x12194 + BENCH_CNT * 4)) {
         *(s32 *)(g + 0x12194 + BENCH_CNT * 4) = 0;
         *(s32 *)(g + 0x11B84) = *(s32 *)(g + 0x11B88);
-        *(u16 *)(g + 0x11BB0) = 0;           /* sleepiness, as after the bed: 0 in every rested dump */
+        *(unsigned short *)(g + 0x11BB0) = 0;           /* sleepiness, as after the bed: 0 in every rested dump */
         *(s32 *)(g + 0x11BB8) = 0;           /* (sleepy dump: 14, 17, 140) */
         *(s32 *)(g + 0x11BD0) = 0;
         bench_dbg.rested++;
