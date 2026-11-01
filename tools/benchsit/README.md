@@ -54,3 +54,11 @@ bench skip passes the windows with nobody checking. Test 7 calls func_80136260 o
 Tired dump with test 6 (now day 5 18:03): last woke/bed set by the sit (5/18:00, 5/9:04) but game+0x11CB4 =
 day 4 19:00 (passed) and +0x11CAC = day 6 15:00. After a bed sleep (woke 5/1:39) they are 5/17:39 (+16 h) and
 7/13:39 (+60 h): "sleepy from" and a later limit. Test 8 sets them the same at the end of a sit.
+
+## Bench sit test 9
+Test 8: no more sleepiness. Still: the pickup isn't done properly, and spamming A could reopen a prompt right
+after a sit. The A trigger is now blocked during a skip, while counter 40 still holds a request, while the fader
+is busy (FADER+0x60), and for 60 frames after the fade-in.
+Shipping notes: EventCondition record field 183/7 is the condition id (EventCondition.txt); condition 58 =
+CONDITION_TRADE_SHIPMENT = event flag 0x3A set by func_801331DC. Event 311 (Common.arc 10, Takakura, 1035
+instructions) is listed for it with field 10/8 = 1 or 11 and 18/8 = 10.

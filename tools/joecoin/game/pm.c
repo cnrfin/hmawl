@@ -62,7 +62,7 @@ typedef struct { float x, y, z; } Vec;
 #define VALLEY    1
 #define EVENT     406
 struct { u32 presses, started, rested; s32 map, ev680, ev58c; u32 control; } bench_dbg;   /* bench sit test 2 debug */
-static u32 bench_target, bench_start;       /* bench time skip: clock target (0 = idle), clock at the start */
+static u32 bench_target, bench_start, bench_cool;       /* bench time skip: clock target (0 = idle), clock at the start */
 #define BENCH_CNT 40                        /* event counter 40: set by the bench script on Yes (0-29 count up daily) */
 #define BENCH_EVENT 407                     /* bench: sit until evening / morning */
 #define BENCH_X   137.65f                   /* turned bench by the tree: seat centre (mapobj col box) */
@@ -427,7 +427,10 @@ void pm_frame(void)
     /* Bench by the tree (valley): A within 1.6 of the seat, facing it, no event running -> event 407
        ("Sit until the evening?" / "Sit until the morning?", Common.arc entry 107, debug.mes 9/10).
        The player's own map (game+0x2A290) is used, not the field check: after the event the latter can differ. */
-    if ((PAD_PRESS & 0x100) && !(PAD_HELD & 0x10) && *(s32 *)(g + 0x2A290) == 1 && !S.talking) {
+    if (bench_cool) bench_cool--;
+    if ((PAD_PRESS & 0x100) && !(PAD_HELD & 0x10) && *(s32 *)(g + 0x2A290) == 1 && !S.talking
+        && !bench_target && !bench_cool && !*(s32 *)(g + 0x12194 + BENCH_CNT * 4)
+        && !(FADER && *(u8 *)(FADER + 0x60))) {   /* not during a skip, a pending request, a fade, or just after */
         float *p = (float *)(g + 0x29C78), *d = (float *)(g + 0x29F84);
         float dx = BENCH_X - p[0], dz = BENCH_Z - p[2], d2 = dx * dx + dz * dz;
         if (d2 < 1.6f * 1.6f && d2 > 0.0001f && (dx * d[0] + dz * d[2]) * rsqrt(d2) > 0.5f) {
@@ -476,6 +479,7 @@ void pm_frame(void)
                 *(u32 *)(g + 0x11CB4) = *clk + 16 * 36000u;     /* sleepy from: woke + 16 h (as the bed sets it) */
                 *(u32 *)(g + 0x11CAC) = *clk + 60 * 36000u;     /* the later limit: woke + 60 h (as the bed sets it) */
                 if (FADER) { u32 from = 0x000000FF, to = 0x00000000; fade_start(FADER, &from, &to, 0, 0, 0.5f); }
+                bench_cool = 60;                                 /* ~1 s after the fade-in: no new prompt */
             }
         }
     }
