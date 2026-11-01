@@ -86,7 +86,16 @@ for key,nodeL,nodeR,tex in (('gloves',18,39,'emoti'),('shoes',8,48,'shoes')):
     P,Q,F,MI=d[key][:4] if len(d[key])==4 else d[key]
     tri=P[F]; side=np.sign(tri.mean(1)[:,0])
     for sd,nd in ((1,nodeL),(-1,nodeR)):
-        m=side==sd; FF=F[m]; PP=P[FF].reshape(-1,3); QQ=Q[FF].reshape(-1,2); QQ=np.stack([QQ[:,0],1-QQ[:,1]],1)
+        m=side==sd; FF=F[m].copy()
+        # consistent outward winding (the decimated Blender meshes have flipped parts -> holes / black in game)
+        tm=trimesh.Trimesh(P,FF,process=False); tm.merge_vertices(); tm.fix_normals()
+        tri=P[FF]; n_=np.cross(tri[:,1]-tri[:,0],tri[:,2]-tri[:,0]); n_/=np.maximum(np.linalg.norm(n_,axis=1)[:,None],1e-12)
+        flip=(n_*tm.face_normals).sum(1)<0
+        cen=tri.reshape(-1,3).mean(0); vol_out=((tri.mean(1)-cen)*tm.face_normals).sum(1).mean()>0
+        if not vol_out: flip=~flip
+        FF[flip]=FF[flip][:,::-1]
+        print(key,sd,'flipped',int(flip.sum()),'of',len(FF))
+        PP=P[FF].reshape(-1,3); QQ=Q[FF].reshape(-1,2); QQ=np.stack([QQ[:,0],1-QQ[:,1]],1)
         pieces.append((f'{key}{"L" if sd>0 else "R"}',G(PP),QQ,np.arange(len(PP)).reshape(-1,3),tex,nd))
 # textures -> body atlas (gloves crop + shoes), head atlas (skin)
 emo=Image.open(E+'tex_EmotiguyDefault.png').convert('RGBA'); sho=Image.open(E+'tex_ShoesTex.png').convert('RGBA')
@@ -123,7 +132,7 @@ for p in pieces:
         uix.append(ukey[uk])
     for a,b,c in F:
         if len({idx[a],idx[b],idx[c]})<3: continue
-        tris[mat].append(((idx[a],idx[c],idx[b]),(uix[a],uix[c],uix[b])))   # game front face = clockwise
+        tris[mat].append(((idx[a],idx[b],idx[c]),(uix[a],uix[b],uix[c])))   # same winding as the vanilla models (checked against Muffy)
 P=np.array([v[0] for v in verts]); B=np.array([v[1] for v in verts]); N=np.array(vn)
 order=[];groups=[];slot=0
 for b in sorted(set(B)):
@@ -164,7 +173,7 @@ def build_gpl():
     struct.pack_into('>IHBBII',m,uvo,uvd,len(uvs),0x3E,2,tail,0); struct.pack_into('>5I',m,0,0x1C,col,uvo,nro,mo); struct.pack_into('>II',m,0x14,0x01FF0000,0)
     return struct.pack('>7I',0x005BBC61,0,0,1,0x14,0x1C,len(m))+bytes(m)
 def frames_tpl(fr,n):
-    ims=[fr.get(i,Image.new('RGBA',(1,1),(0,0,0,0))) for i in range(n)]
+    ims=[fr.get(i,fr[0]) for i in range(n)]          # every slot filled: unknown expressions show the normal face
     blobs=[];ref=[]
     for im in ims:
         bb=cmpr(im); k=next((j for j,(b2,s2) in enumerate(blobs) if b2==bb and s2==im.size),None)
