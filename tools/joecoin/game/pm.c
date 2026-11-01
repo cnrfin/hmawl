@@ -60,6 +60,9 @@ typedef struct { float x, y, z; } Vec;
 #define ANIMSET   71
 #define VALLEY    1
 #define EVENT     406
+#define BENCH_EVENT 407                     /* bench: sit until evening / morning */
+#define BENCH_X   137.65f                   /* turned bench by the tree: seat centre (mapobj col box) */
+#define BENCH_Z   176.60f
 #define FLAG_MET  61             /* set by event 406 when you answer him (milk chance used) */
 #define FLAG_FED  62             /* set by event 406 when he got the milk: later talks say thanks */
 #define MOT_IDLE  0
@@ -416,6 +419,16 @@ void pm_frame(void)
             if (copy) *copy = *clk;
         }
         PAD_PRESS &= ~0x200u;
+    }
+    /* Bench by the tree (valley): A within 1.6 of the seat, facing it, player free -> event 407
+       ("Sit until the evening?" / "Sit until the morning?", Common.arc entry 107, debug.mes 9/10) */
+    if (map == 1 && (PAD_PRESS & 0x100) && !(PAD_HELD & 0x10) && CONTROL == 1 && !S.talking) {
+        float *p = (float *)(g + 0x29C78), *d = (float *)(g + 0x29F84);
+        float dx = BENCH_X - p[0], dz = BENCH_Z - p[2], d2 = dx * dx + dz * dz;
+        if (d2 < 1.6f * 1.6f && d2 > 0.0001f && (dx * d[0] + dz * d[2]) * rsqrt(d2) > 0.5f) {
+            PAD_PRESS &= ~0x100u; PAD_HELD &= ~0x100u;   /* the player does not act on this A */
+            event_start(EVMGR, BENCH_EVENT, 0, 0);
+        }
     }
     if (day != 7 && !S.forced && flag_get(g + 0x12078, FLAG_MET)) flag_clear(g + 0x12078, FLAG_MET);
     if (day != 7 && !S.forced && flag_get(g + 0x12078, FLAG_FED)) flag_clear(g + 0x12078, FLAG_FED);
