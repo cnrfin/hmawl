@@ -33,6 +33,7 @@ new_mes = body + bytes(len(ev) - len(body))
 assert mes_entries(new_mes)[EVE] == enc(TEXT[EVE])
 
 V_ANS = 2
+REST = 27                                                    # event counter 27 = 1 on Yes: pm.c refills stamina
 a = Asm(); L = a.new
 a.sys(0x10); a.sys(0x00)                                     # event start
 def fade(cmd):
@@ -44,18 +45,21 @@ a.sys(0x4A); a.num(18); a.emit('cmp'); a.jlt(go_eve)        # hour < 18 -> eveni
 # 18:00-23:59: until tomorrow 6:00 = add (29 - hour) h + (60 - minute) min
 a.wait_msg(EVENT_FILE, MORN, V_ANS)
 a.load(V_ANS); a.num(1); a.emit('cmp'); a.jnz(done)
+a.num(REST); a.num(1); a.sys(0x93)
 fade(0x0B)
 a.num(29); a.sys(0x4A); a.emit('sub'); a.num(60); a.sys(0x4B); a.emit('sub'); a.sys(0x44)
 a.jmp(morning)
 a.label(early)
 a.wait_msg(EVENT_FILE, MORN, V_ANS)
 a.load(V_ANS); a.num(1); a.emit('cmp'); a.jnz(done)
+a.num(REST); a.num(1); a.sys(0x93)
 fade(0x0B)
 a.num(6); a.num(0); a.sys(0x43)                              # today 6:00
 a.jmp(morning)
 a.label(go_eve)
 a.wait_msg(EVENT_FILE, EVE, V_ANS)
 a.load(V_ANS); a.num(1); a.emit('cmp'); a.jnz(done)
+a.num(REST); a.num(1); a.sys(0x93)
 fade(0x0B)
 a.num(18); a.num(0); a.sys(0x43)                             # today 18:00
 a.label(morning)

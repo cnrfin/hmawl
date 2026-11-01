@@ -60,6 +60,8 @@ typedef struct { float x, y, z; } Vec;
 #define ANIMSET   71
 #define VALLEY    1
 #define EVENT     406
+struct { u32 presses, started, rested; s32 map, ev680, ev58c; u32 control; } bench_dbg;   /* bench sit test 2 debug */
+#define BENCH_CNT 27                        /* event counter 27: set by the bench script on Yes */
 #define BENCH_EVENT 407                     /* bench: sit until evening / morning */
 #define BENCH_X   137.65f                   /* turned bench by the tree: seat centre (mapobj col box) */
 #define BENCH_Z   176.60f
@@ -420,15 +422,28 @@ void pm_frame(void)
         }
         PAD_PRESS &= ~0x200u;
     }
-    /* Bench by the tree (valley): A within 1.6 of the seat, facing it, player free -> event 407
-       ("Sit until the evening?" / "Sit until the morning?", Common.arc entry 107, debug.mes 9/10) */
-    if (map == 1 && (PAD_PRESS & 0x100) && !(PAD_HELD & 0x10) && CONTROL == 1 && !S.talking) {
+    /* Bench by the tree (valley): A within 1.6 of the seat, facing it, no event running -> event 407
+       ("Sit until the evening?" / "Sit until the morning?", Common.arc entry 107, debug.mes 9/10).
+       The player's own map (game+0x2A290) is used, not the field check: after the event the latter can differ. */
+    if ((PAD_PRESS & 0x100) && !(PAD_HELD & 0x10) && *(s32 *)(g + 0x2A290) == 1 && !S.talking) {
         float *p = (float *)(g + 0x29C78), *d = (float *)(g + 0x29F84);
         float dx = BENCH_X - p[0], dz = BENCH_Z - p[2], d2 = dx * dx + dz * dz;
         if (d2 < 1.6f * 1.6f && d2 > 0.0001f && (dx * d[0] + dz * d[2]) * rsqrt(d2) > 0.5f) {
-            PAD_PRESS &= ~0x100u; PAD_HELD &= ~0x100u;   /* the player does not act on this A */
-            event_start(EVMGR, BENCH_EVENT, 0, 0);
+            u8 *ev = EVMGR;
+            bench_dbg.presses++; bench_dbg.map = map; bench_dbg.control = CONTROL;
+            bench_dbg.ev680 = ev ? *(s32 *)(ev + 0x680) : -2; bench_dbg.ev58c = ev ? *(s32 *)(ev + 0x58C) : -2;
+            if (ev && *(s32 *)(ev + 0x680) == -1 && !*(s32 *)(ev + 0x58C) && CONTROL != 3) {
+                PAD_PRESS &= ~0x100u; PAD_HELD &= ~0x100u;   /* the player does not act on this A */
+                *(s32 *)(g + 0x12194 + BENCH_CNT * 4) = 0;
+                bench_dbg.started += event_start(ev, BENCH_EVENT, 0, 0) & 0xFF ? 1 : 0;
+            }
         }
+    }
+    /* Yes on the bench (the script sets counter 27): the night's rest refills stamina */
+    if (*(s32 *)(g + 0x12194 + BENCH_CNT * 4)) {
+        *(s32 *)(g + 0x12194 + BENCH_CNT * 4) = 0;
+        *(s32 *)(g + 0x11B84) = *(s32 *)(g + 0x11B88);
+        bench_dbg.rested++;
     }
     if (day != 7 && !S.forced && flag_get(g + 0x12078, FLAG_MET)) flag_clear(g + 0x12078, FLAG_MET);
     if (day != 7 && !S.forced && flag_get(g + 0x12078, FLAG_FED)) flag_clear(g + 0x12078, FLAG_FED);

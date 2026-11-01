@@ -10,3 +10,11 @@
 - pm.c: on the valley, A within 1.6 of the turned bench's seat (137.65, 176.60, from its collision box) while
   facing it (cos > 0.5), player free, not Z -> event_start(EVMGR, 407, 0, 0).
 - Untested: whether jumping past midnight this way runs the overnight update like the bed does.
+
+## Bench sit test 1 result / test 2
+Works once: time, crops, logs and villager positions are right after the skip. But afterwards A at the bench
+gave the vanilla "Newly painted... Not really..." until a scene change, and repeated sits ran the stamina out
+(the player passed out outside). Test 2: the trigger uses the player's map (game+0x2A290 == 1) and "no event
+running" (event manager +0x680 == -1, +0x58C == 0, CONTROL != 3) instead of the field check / CONTROL == 1;
+bench_dbg (pm.c) records presses/started/rested and the checked values. On Yes the script sets event counter 27;
+pm.c then refills stamina (game+0x11B84 = max +0x11B88). Common.arc e03a8b1f, debug.mes 4dd04c6d (same).
