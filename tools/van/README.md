@@ -26,3 +26,14 @@ has one entry (type 6) and a weight table at 0x802DD4E4: 25 25 50 25 45 30 100 0
 weighted pick func_80147F60 (callers 0x80067B4C, 0x80068D40).
 Test 3 drops the action hook and logs Van's weighted picks (pm_van_stub at 0x80147F60 -> pick_log,
 buffer van_log: 'VANL', n, 64 x {day, tod, weight offset, count, result}).
+
+## Van test 3 result / test 4 (fix)
+The probe logged nothing: Van's day isn't a weighted pick. Run 3 had him on days 1, 2, 3, 8 (not the 7th).
+Comparing present dumps (days 5, 6) with away dumps (days 2, 10): the stall Van is villager **0x24**
+(record 32, object with +0xBC = 36), not 0x23 (record 31, never plans). Record 0x24 +0x24 (daily plan,
+func_80078228) = 1 on present days, 4 on away days; present position = path spot 0x0000000A (141.2, 106.9).
+Day table row 33 (id 36 via lbl_802551D8) = 08 37 3C 23 50 00 03 7B: mask 0x37B = every day except the 3rd
+and 8th. In the daily planner (0x80060EF8): mask bit clear -> option 2 (works the stall); set -> option 4
+(away), plus option 1 (stall anyway) when rand(1..100) <= byte 4 (80) and rand(50..100) <= record +7.
+Test 4 (make_pm_dol.py data patch, word 0x802952D4): 0x5000037B -> 0x000003BB = chance 0, mask clear only on
+the 3rd (bit 2) and 7th (bit 6). Probe hook removed (its code stays in pm.bin, unhooked).
