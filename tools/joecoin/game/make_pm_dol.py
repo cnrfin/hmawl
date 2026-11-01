@@ -57,6 +57,7 @@ PATCHES = [  # (RAM address, original word, new word, why)
     (0x8028E8F0, 0x0DFF11AB, 0x08001200, '...'),
     (HOOK7, 0x80610020, None, 'villager item pick (func_8011811C end) -> pm_nosell_stub: never the Cursed Axe'),
     (HOOK8, 0x9421FFE0, None, 'TV channel 3 caption (func_8008E298) -> pm_tv_stub: $JOE Coin Daily'),
+    (0x8028C74C, 0x00020000, 0x00000000, '$JOE coin (item 0x442): price 0 (was 2; ships for 0 G, shops/Van see no value)'),
     (0x80109D24, 0x4BF08245, 0x4BF08209, 'cmd_91 item model: symbol (rucksack) model for every item, centred spin'),
     (0x800038E8, 0x38600000, 'axe', 'baked Cursed Axe code, A path 1 (li r3,0) -> bl pm_axe_stub: log hits'),
     (0x80003900, 0x38600000, 'axe', 'baked Cursed Axe code, A path 2 (li r3,0) -> bl pm_axe_stub: log hits'),

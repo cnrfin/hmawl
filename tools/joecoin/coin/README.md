@@ -22,3 +22,9 @@ dig scene (wlp2 lbl_00001D20, chapter from func_8000FEE8(clock), 0-5) gives each
 weight / sum. `joe_dig_frame` (joetv.c, called from pm_frame) rewrites the weights every frame: others x100,
 the coin the weight for exactly 10 / 5 / 2.5 / 1.25 / 0.625 / 0.3125 % of dig-site finds in chapters 1-6.
 pm.bin a9929cdd (23,532 B).
+
+## Coin test 4: price 0
+Item table +0xC = price: shops charge price x 10, the shipping bin pays price x 5 (func_80055454 sums
+price*5*count over 0x211 items); Van's code (func_80134E38) checks price*10 == 0. make_pm_dol.py sets the
+coin's price word 0x8028C74C 0x00020000 -> 0 so only Joe (TV price) pays for it. Untested: whether the bin
+still takes it (for 0 G) and whether Van refuses it. pm.bin unchanged (a9929cdd).
