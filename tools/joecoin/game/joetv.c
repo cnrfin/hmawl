@@ -116,7 +116,6 @@ static void putn(s32 n)
 #define TPL_N      21
 #define PIC_BYTES  (192 * 144 / 2)
 static u8 *tpl;
-static s32 shown = -1;
 __attribute__((noinline)) static u8 *pic(u8 *t, s32 i)
 {
     u8 *h = *(u8 **)(t + 12 + 8 * i);
@@ -132,12 +131,12 @@ static void show_picture(s32 k)
 {
     static const u8 dst[4] = { 1, 2, 3, 6 };
     if (!tpl || !is_tv_tpl(tpl)) {                  /* the bound file: magic -> 0xFFFFFFFF, offsets -> pointers */
-        tpl = 0; shown = -1;
+        tpl = 0;
         for (u8 *p = (u8 *)0x80364000; p < (u8 *)0x81800000; p += 32)
             if (is_tv_tpl(p)) { tpl = p; break; }
         if (!tpl) return;
     }
-    if (shown == k) return;
+    /* copy every time: turning the TV off and on reloads the original pictures, often at the same address */
     u8 *src = pic(tpl, 14 + k);
     for (s32 j = 0; j < 4; j++) {
         u8 *d = pic(tpl, dst[j]); u32 *a = (u32 *)d, *b = (u32 *)src;
@@ -145,7 +144,6 @@ static void show_picture(s32 k)
         DCFlushRange(d, PIC_BYTES);
     }
     GXInvalidateTexAll();
-    shown = k;
 }
 
 enum { P_BACK, P_JOEVER, P_LIL, P_HODL, P_CRAB, P_WINTER, P_TOWN };
