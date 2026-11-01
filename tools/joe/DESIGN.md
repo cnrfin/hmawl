@@ -17,15 +17,21 @@
 - 18:00 stands up, leaves east along the south road.
 
 ## Trading and talk
-- Trades $JOE only while sitting at the bench; while walking he only talks.
-- Lines (draft):
-  - Intro: "Hey, I'm Joe. Ever heard of the Ethereum blockchain? You can find some crazy stuff on there"
-  - Walking: "Come meet me by the bench by the bridge if you wanna trade some memecoins"
+- Walking (no trading):
+  - First meeting: "Hey, I'm Joe. Ever heard of the Ethereum blockchain? You can find some crazy stuff on there"
+  - Later: "Come meet me by the bench by the bridge if you wanna trade some memecoins"
   - At the dig site: "Y'know, I've heard people mining $JOE coin around here, that's why I came to check it out"
-  - Fall: talks about crypto winter.
+  - Fall: "Look kid, crypto winter is coming and bears will be in full force. I won't be around until spring,
+    so think about what you wanna do with your $JOE"
+- At the bench: "I'm selling $JOE for ** today." Menu Buy / Sell / Leave (no gift option, never mentioned).
+  - Buy and Sell use a number picker for the quantity, like Van's shop ("How many?", console.mes 94/25).
+  - Sell: angry face "What!? You're selling your $JOE?", then neutral "Hm, ok, I'll buy your $JOE bags
+    for **. How does that sound?"
+  - He only quotes prices; the TV report gives the % change.
+- Gifts: give him $JOE while he walks around the valley (secret).
 
 ## Friendship
-- Joe accepts only $JOE coin as a gift; one gift per visit.
+- Joe accepts only $JOE coin as a gift (while walking); one gift per visit; never hinted at.
 - Full friendship after 10 $JOE gifts.
 - Full friendship doubles the rate of finding $JOE at the dig site.
 
