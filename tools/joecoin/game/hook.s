@@ -160,23 +160,21 @@ pm_want_stub:
 1:  stwu  r1, -0x30(r1)             # original first instruction
     b     want_hook_return          # 0x80148A50
 
-# Villager action factory: 0x80070AF4 (func_80070AF4(type, slot, villager, x), was stwu r1,-0xc0(r1)).
-# van_action(type, villager) may turn the action into 0 (none): Van only on the 3rd and 7th.
+# Weighted pick: 0x80147F60 (func_80147F60(obj) -> index, was stwu r1,-0x20(r1)). Runs it, then
+# pick_log(obj, result) records Van's picks (van test 3 probe); returns the result unchanged.
     .globl pm_van_stub
 pm_van_stub:
     stwu  r1, -0x20(r1)
     mflr  r0
     stw   r0, 0x24(r1)
-    stw   r4, 0x8(r1)
-    stw   r5, 0xc(r1)
-    stw   r6, 0x10(r1)
-    mr    r4, r5
-    bl    van_action
-    lwz   r4, 0x8(r1)
-    lwz   r5, 0xc(r1)
-    lwz   r6, 0x10(r1)
+    stw   r3, 0x8(r1)
+    bl    1f
+    mr    r4, r3
+    lwz   r3, 0x8(r1)
+    bl    pick_log
     lwz   r0, 0x24(r1)
     mtlr  r0
     addi  r1, r1, 0x20
-    stwu  r1, -0xc0(r1)             # original first instruction
-    b     van_hook_return           # 0x80070AF8
+    blr
+1:  stwu  r1, -0x20(r1)             # original first instruction
+    b     van_hook_return           # 0x80147F64

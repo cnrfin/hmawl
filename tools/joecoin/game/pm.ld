@@ -10,7 +10,7 @@ exit_frames = 0x8003319C;
 nosell_return = 0x80118870;
 talk_hook_return = 0x80117B14;
 want_hook_return = 0x80148A50;
-van_hook_return = 0x80070AF8;
+van_hook_return = 0x80147F64;
 SECTIONS {
   . = 0x8035EFA0;
   .pm : { *(.text.hook) *(.text*) *(.rodata*) *(.sdata*) *(.data*) *(.sbss*) *(.bss*) }

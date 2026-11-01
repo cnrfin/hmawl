@@ -250,14 +250,19 @@ s32 joe_talk_post(s32 who, s32 rec, s32 *grp, s32 *msg, s32 ret)
     return ret;
 }
 
-/* Van (villager 0x23) comes only on the 3rd and 7th of each season (and Year 1 Spring 1, his intro).
-   Called from pm_van_stub at the start of the villager action factory func_80070AF4(type, slot, villager, x):
-   on other days every action he would get becomes action 0 (none), as on the days vanilla keeps him away. */
-s32 van_action(s32 type, u8 *v)
+/* Van probe (van test 3): pm_pick_stub wraps the weighted pick func_80147F60(obj) (obj+4 count, obj+8 weights).
+   Picks from Van's schedule weights (0x802DD4E4..0x802DD4EF: 25 25 50 25 45 30 100 0 0 20 80 0) are logged:
+   van_log = {magic 'VANL', n, then 64 rows of (day, tenths of the day, weight offset, count, result)}. */
+struct van_row { u32 day, tod; u8 off, cnt, res, pad; };
+struct { u32 magic, n; struct van_row row[64]; } van_log;
+s32 pick_log(u8 *obj, s32 res)
 {
-    if (type && (u32)v >= 0x80000000u && (u32)v < 0x81800000u && *(s32 *)(v + 0xBC) == 0x23) {
-        u32 d = CLOCK / T_DAY, dos = d % 10;
-        if (d != 0 && dos != 2 && dos != 6) return 0;
+    u32 w = *(u32 *)(obj + 8);
+    if (w >= 0x802DD4E4u && w < 0x802DD4F0u) {
+        struct van_row *r = &van_log.row[van_log.n & 63];
+        r->day = CLOCK / T_DAY; r->tod = CLOCK % T_DAY;
+        r->off = w - 0x802DD4E4u; r->cnt = *(u32 *)(obj + 4); r->res = res;
+        van_log.magic = 0x56414E4C; van_log.n++;
     }
-    return type;
+    return res;
 }

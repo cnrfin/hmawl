@@ -17,3 +17,12 @@ day 6 action 0x10 (class 802A99E4), day 2 action 0 (none, class 802A92C0). His r
 villager object (except position) are the same.
 Test 2: hook at 0x80070AF4 -> pm_van_stub (+0x1B8) -> van_action (joetv.c): for villager 0x23 every action
 becomes 0 unless it is the 3rd or 7th of the season (or day 0, the intro).
+
+## Van test 2 result / test 3 (probe)
+Day 5 dump with test 2: action 0 (hook worked) but Van still at his stall. The only state that differs
+between away and present days is his position: path spot 0x000C0001 (281.9, 128.1: away, hidden) vs
+0x000C0002 (280.0, 122.6: at the stall). His schedule (lbl_80295340 row 32: villager -> 0x28-byte row)
+has one entry (type 6) and a weight table at 0x802DD4E4: 25 25 50 25 45 30 100 0 0 20 80 0, used by the
+weighted pick func_80147F60 (callers 0x80067B4C, 0x80068D40).
+Test 3 drops the action hook and logs Van's weighted picks (pm_van_stub at 0x80147F60 -> pick_log,
+buffer van_log: 'VANL', n, 64 x {day, tod, weight offset, count, result}).

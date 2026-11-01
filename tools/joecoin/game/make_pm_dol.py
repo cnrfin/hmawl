@@ -37,7 +37,7 @@ HOOK9 = 0x80117B10
 HOOK9_OFF = 0x150                                     # pm_talk_stub in pm.bin (after pm_tv_stub)
 HOOK10 = 0x80148A4C
 HOOK10_OFF = 0x1A0                                    # pm_want_stub in pm.bin (after pm_talk_stub)
-HOOK11 = 0x80070AF4
+HOOK11 = 0x80147F60
 HOOK11_OFF = 0x1B8                                    # pm_van_stub in pm.bin (after pm_want_stub)
 PATCHES = [  # (RAM address, original word, new word, why)
     (0x801B0EE4, 0x80630030, 0x3C608036, 'OSInit: arena low = 0x80366000 (was BootInfo->arenaLo or __ArenaLo) ...'),
@@ -65,7 +65,7 @@ PATCHES = [  # (RAM address, original word, new word, why)
     (HOOK8, 0x9421FFE0, None, 'TV channel 3 caption (func_8008E298) -> pm_tv_stub: $JOE Coin Daily'),
     (HOOK9, 0x9421FFC0, None, 'villager talk line (func_80117B10) -> pm_talk_stub: villagers hate the $JOE coin'),
     (HOOK10, 0x9421FFD0, None, 'villager liked/wanted-item lists (func_80148A4C) -> pm_want_stub: never the $JOE coin'),
-    (HOOK11, 0x9421FF40, None, 'villager action factory (func_80070AF4) -> pm_van_stub: Van only on the 3rd and 7th'),
+    (HOOK11, 0x9421FFE0, None, 'weighted pick (func_80147F60) -> pm_van_stub: log Van\'s picks (probe)'),
     (0x8028C74C, 0x00020000, 0x00000000, '$JOE coin (item 0x442): price 0 (was 2; ships for 0 G, shops/Van see no value)'),
     (0x80109D24, 0x4BF08245, 0x4BF08209, 'cmd_91 item model: symbol (rucksack) model for every item, centred spin'),
     (0x800038E8, 0x38600000, 'axe', 'baked Cursed Axe code, A path 1 (li r3,0) -> bl pm_axe_stub: log hits'),
