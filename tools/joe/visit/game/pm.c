@@ -231,8 +231,10 @@ static void setup_model(void)
     S.loaded = 1;
 }
 
+static void joe_expr_patch(s32 on);
 static void restore_names(void)
 {
+    joe_expr_patch(0);                       /* character 37's expression tables back */
     if (S.orig_list) SET71_LIST = S.orig_list;
     MODEL74_NAME = S.orig_model; SET71_NAME = S.orig_anims;
     MODEL74_SIZE[0] = S.orig_size[0]; MODEL74_SIZE[1] = S.orig_size[1]; MODEL74_SIZE[2] = S.orig_size[2];
@@ -521,22 +523,39 @@ static s32 jcnt(u8 *g, s32 i)
     if (v >= 128 && !(v & 127)) v >>= 7;   /* script numbers come x128 */
     return v;
 }
+/* The game picks a face through the character's expression table (func_8002F748: 0x8029F818 + 0x18 x
+   character + 4 x season -> (eye, mouth) pairs, func_8002F3E8 applies one; the game calls it itself, e.g.
+   in events). Writing the face directly fought those calls, so character 37's six table pointers now point
+   at Joe's table while he is loaded (restored after), every expression in it = the face we want. */
+#define EXPR_TABS  ((u32 **)0x8029F818)
+#define face_set   F(0x8002F3E8, void, (u8 *, s32))
+static u32 joe_expr[11][2];
+static u32 *orig_expr[6];
+static s32 expr_patched;
+struct { u32 magic; s32 line_raw, line, page, timer, motion, face_eye, face_mouth, want_eye, want_mouth, frames, pocket, in_event; u8 *slot; } joe_dbg;
+static void joe_expr_patch(s32 on)
+{
+    s32 k;
+    if (on == expr_patched) return;
+    for (k = 0; k < 6; k++) {
+        if (on) { orig_expr[k] = EXPR_TABS[CHAR_ID * 6 + k]; EXPR_TABS[CHAR_ID * 6 + k] = &joe_expr[0][0]; }
+        else EXPR_TABS[CHAR_ID * 6 + k] = orig_expr[k];
+    }
+    expr_patched = on;
+}
 static void joe_face(s32 eye, s32 mouth)
 {
-    u8 *slot, *f;
+    u8 *slot;
+    s32 k;
     if (!S.actor) return;
     slot = *(u8 **)(S.actor + 0xD4);
+    joe_dbg.slot = slot;
     if ((u32)slot < 0x80000000u || (u32)slot >= 0x81800000u) return;
-    f = slot + 0x124;
-    if (*(s32 *)(f + 8) >= 0) return;     /* a motion's own face animation is playing */
-    if (*(s32 *)f != eye) {
-        *(s32 *)f = eye;
-        if (eye >= 58) tam_play(f + 0x14, *(void **)0x803490F0, eye - 58, 0);
-    }
-    if (*(s32 *)(f + 4) != mouth) {
-        *(s32 *)(f + 4) = mouth;
-        if (mouth >= 36) tam_play(f + 0x24, *(void **)0x803490F4, mouth - 36, 0);
-    }
+    joe_expr_patch(1);
+    for (k = 0; k < 11; k++) { joe_expr[k][0] = (u32)eye; joe_expr[k][1] = (u32)mouth; }
+    face_set(slot + 0x124, 0);             /* applies only what changed (restarts the blink / flap there) */
+    joe_dbg.face_eye = *(s32 *)(slot + 0x124); joe_dbg.face_mouth = *(s32 *)(slot + 0x128);
+    joe_dbg.want_eye = eye; joe_dbg.want_mouth = mouth;
 }
 /* every frame Joe is out; in_event: our talk (1) or trade (2) event is running */
 static void joe_talk_frame(u8 *g, s32 in_event)
@@ -560,6 +579,9 @@ static void joe_talk_frame(u8 *g, s32 in_event)
     } else if (in_event == 1) joe_motion(talking ? JM_TALK : JM_IDLE);
     else if (in_event == 2) joe_motion(talking ? JM_SITTALK : JM_SIT2);
     joe_face(joe_faces[jt.face][0], joe_faces[jt.face][talking ? 2 : 1]);
+    joe_dbg.magic = 0x4A4F4544u; joe_dbg.line_raw = in_event ? *(s32 *)(g + 0x12194 + JC_LINE * 4) : -1;
+    joe_dbg.line = jt.line; joe_dbg.page = jt.page; joe_dbg.timer = jt.timer; joe_dbg.motion = S.motion;
+    joe_dbg.frames++; joe_dbg.pocket = jt.pocket; joe_dbg.in_event = in_event;
 }
 static s32 joe_frame(u8 *g, s32 map, u32 t)
 {

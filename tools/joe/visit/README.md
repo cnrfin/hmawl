@@ -156,3 +156,12 @@ Same mouth art. The mouth frames were CMPR (2 colours per 4x4 block, 1-bit alpha
 mix turned into blocky specks and jagged outlines. Now (`JOE_SOFTMOUTH=1`, frames.py `soft`): the hard mask
 blurred at full size and area-averaged down (smooth edge, creases kept), stored as RGB5A3. gd_0.arc grows
 278 -> 387 KB (mouth tpl 38 -> 147 KB). build/test9 gd_0.arc (gd_0.anm.arc as test 13).
+
+## Test 15: face through the expression table, debug block, face 90 %
+Test 14 showed no face or talk animation. The face writes went straight into the slot's face (+0x124);
+the game's own expression calls (func_8002F3E8 via the character's table) can override that. Now
+character 37's six expression-table pointers (0x8029F818 + 0x18 x 37) point at Joe's table while he is
+loaded (restored in restore_names); every entry = the wanted (eye, mouth) and pm.c calls func_8002F3E8(face, 0)
+each frame. Debug block `joe_dbg` at 0x803660F8 (magic 'JOED'): raw counter 49, line, page, timer, motion,
+face eye/mouth now, wanted eye/mouth, frames, pocket, in_event, slot. Face 90 % (`JOE_FACE=0.9`), soft mouth.
+build/test10 gd_0.arc a18dc9b5; pm.bin 25407471.
