@@ -51,6 +51,7 @@ a.sys(0x10)                                                  # event start
 for base, cmd in ((20, 0x14), (23, 0x15)):                   # first-person camera: counters 20-25 = eye / target x128 (pm.c)
     for k in range(3): a.num(base + k); a.sys(0x95); a.num(128); a.emit('div')
     a.sys(cmd)
+a.num(0); a.num(0); a.sys(0x5A)                              # cmd_5A(0, 0): hide the player (first person, as cmd_A0 does)
 a.num(1); a.sys(0xDD); a.sys(0x00)                           # cmd_DD(1): the money window (as the shops)
 done = L('done')
 def say(m):  a.wait_msg(FILE, m)
@@ -90,6 +91,7 @@ a.label(bye); say(19)
 a.label(done)
 setc(REQ, 0)
 a.num(0); a.sys(0xDD)                                         # money window off
+a.num(0); a.num(1); a.sys(0x5A)                              # player shown again
 a.emit('end'); a.emit('end')
 script = a.build()
 ins, ch = parse(script); assert len(ins) == len(a.ins)

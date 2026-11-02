@@ -421,15 +421,19 @@ s32 joe_price_today(void);
 #define sfx_play   F(0x8012A52C, s32, (u8 *, s32, s32))
 #define SE_CASH    0xCD                    /* the gold-change chime (script cmd_C1 plays it) */
 /* first-person talk camera for the trade (the script reads counters 20-25 x128: eye, target; as the
-   Postman's): eye at the player's head, a little toward Joe, aimed at his face on the bench */
+   Postman's): eye on the player's side of Joe at a fixed distance, aimed at his face on the bench */
+#define JCAM_D     2.6f                    /* trade camera: eye this far from Joe, toward the player */
+#define JCAM_EYE_Y 1.35f                   /*   eye height above the ground (his face is ~0.95 up) */
 static void joe_cam(u8 *g)
 {
     s32 *c = (s32 *)(g + 0x12194 + 20 * 4);
     float *p = (float *)(g + 0x29C78), tx = BENCH_X, tz = BENCH_Z, ty = S.pos.y + 0.95f;
-    float dx = tx - p[0], dz = tz - p[2], l2 = dx * dx + dz * dz, inv = l2 > 0.0001f ? rsqrt(l2) : 0;
-    c[0] = (s32)((p[0] + dx * inv * 0.2f) * 128.0f);
-    c[1] = (s32)((p[1] + 1.4f) * 128.0f);
-    c[2] = (s32)((p[2] + dz * inv * 0.2f) * 128.0f);
+    float dx = p[0] - tx, dz = p[2] - tz, l2 = dx * dx + dz * dz, inv;
+    if (l2 < 0.0001f) { dx = 1; dz = 0; l2 = 1; }       /* fallback: in front of the bench (+x) */
+    inv = rsqrt(l2);
+    c[0] = (s32)((tx + dx * inv * JCAM_D) * 128.0f);    /* from Joe toward the player, a fixed distance */
+    c[1] = (s32)((S.pos.y + JCAM_EYE_Y) * 128.0f);
+    c[2] = (s32)((tz + dz * inv * JCAM_D) * 128.0f);
     c[3] = (s32)(tx * 128.0f); c[4] = (s32)(ty * 128.0f); c[5] = (s32)(tz * 128.0f);
 }
 /* the trade event asks through counter 41: 1 buy / 4 sell (count in 42); answer 2 bought, 3 short of gold, 5 sold */

@@ -76,3 +76,8 @@ cmd_A0(37) also moves character 37 to its slot point and turns it to the player 
 Joe stood up, behind the bench). Dropped: pm.c writes counters 20-25 (eye at the player's head 1.4 up,
 0.2 toward Joe; target Joe's face, bench centre 0.95 up) and the script feeds them to cmd_14/cmd_15, as the
 Postman's talk does. Re-sit check and slot writes removed. Common.arc 8d2db2a8, pm.bin b2b5effb.
+
+## Test 8: camera distance, player hidden
+Test 7 (eye at the player's head) was far too close: the player stands right by the bench. The eye is now
+2.6 from Joe toward the player, 1.35 up, aimed at his face (0.95 up); cmd_5A(0, 0) hides the player during
+the trade (cmd_A0 did that), cmd_5A(0, 1) shows him again. Common.arc e3022926, pm.bin 5ded727e.
