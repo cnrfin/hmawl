@@ -47,6 +47,10 @@ HOOK14 = 0x8017B888                                   # camera look-at (func_801
 HOOK14_OFF = 0x21C                                    # pm_tilt_stub in pm.bin (after pm_zt_stub)
 HOOK15 = 0x8017B8F4                                   # the same in func_8017B89C
 HOOK15_OFF = 0x22C                                    # pm_tilt2_stub
+MOT_SITES = (0x80042D44, 0x80042D98, 0x80042DD0)      # free-roam motion picks (bl func_8007C100) -> pm_mot_stub
+MOT_OFF = 0x23C                                       # pm_mot_stub (b zt_motion)
+HOOK16 = 0x80030A3C                                   # func_8003083C after the stick sets the facing
+HOOK16_OFF = 0x240                                    # pm_face_stub
 PREV = {0x80113894: (0x4824B8F1,), 0x80060EF8: (0x482FE260,), 0x801B0EE4: (0x3C608036,), 0x801B0EE8: (0x38636000,), 0x801B0F2C: (0x38636000,)}   # earlier builds' words (update mode)
 PATCHES = [  # (RAM address, original word, new word, why)
     (0x801B0EE4, 0x80630030, 0x3C608037, 'OSInit: arena low = 0x8036A000 (was BootInfo->arenaLo or __ArenaLo) ...'),
@@ -80,6 +84,10 @@ PATCHES = [  # (RAM address, original word, new word, why)
     (HOOK13, 0x806DA80C, None, 'player update after the state handler -> pm_zt_stub: face the Z-target'),
     (HOOK14, 0x80010034, None, 'camera look-at (func_8017B834) -> pm_tilt_stub: Z-target tilt up'),
     (HOOK15, 0x80010034, None, 'camera look-at (func_8017B89C) -> pm_tilt2_stub: Z-target tilt up'),
+    (0x80042D44, 0x480393BD, 'blhook', 'free-roam idle motion pick -> pm_mot_stub (Z-target strafe / walk-back clips)'),
+    (0x80042D98, 0x48039369, 'blhook', 'free-roam walk motion pick -> pm_mot_stub'),
+    (0x80042DD0, 0x48039331, 'blhook', 'free-roam run motion pick -> pm_mot_stub'),
+    (HOOK16, 0x48000020, None, 'stick facing set (func_8003083C) -> pm_face_stub: face the Z-target while moving'),
     (0x802952D4, 0x5000037B, 0x000003BB, 'day table row 33 = Van (villager 0x24): chance of an extra visit 80 -> 0, day mask 0x37B -> 0x3BB (comes on the 3rd and 7th only)'),
     (0x8028C74C, 0x00020000, 0x00000000, '$JOE coin (item 0x442): price 0 (was 2; ships for 0 G, shops/Van see no value)'),
     (0x80109D24, 0x4BF08245, 0x4BF08209, 'cmd_91 item model: symbol (rucksack) model for every item, centred spin'),
@@ -117,7 +125,8 @@ def main():
     if CODE_ADDR + len(code) > ARENA_LO: die('code does not fit below the new arena start')
     entry = CODE_ADDR                                   # pm_hook is the first thing in pm.bin
     if be32(code, HOOK2_OFF) != 0x9421FFE0: die('pm.bin does not have pm_hook2 at +0x14')
-    targets = {HOOK: entry, HOOK2: entry + HOOK2_OFF, HOOK3: entry + HOOK3_OFF, HOOK4: entry + HOOK4_OFF, HOOK5: entry + HOOK5_OFF, HOOK6: entry + HOOK6_OFF, HOOK7: entry + HOOK7_OFF, HOOK8: entry + HOOK8_OFF, HOOK9: entry + HOOK9_OFF, HOOK10: entry + HOOK10_OFF, HOOK11: entry + HOOK11_OFF, HOOK12: entry + HOOK12_OFF, HOOK13: entry + HOOK13_OFF, HOOK14: entry + HOOK14_OFF, HOOK15: entry + HOOK15_OFF}
+    targets = {HOOK: entry, HOOK2: entry + HOOK2_OFF, HOOK3: entry + HOOK3_OFF, HOOK4: entry + HOOK4_OFF, HOOK5: entry + HOOK5_OFF, HOOK6: entry + HOOK6_OFF, HOOK7: entry + HOOK7_OFF, HOOK8: entry + HOOK8_OFF, HOOK9: entry + HOOK9_OFF, HOOK10: entry + HOOK10_OFF, HOOK11: entry + HOOK11_OFF, HOOK12: entry + HOOK12_OFF, HOOK13: entry + HOOK13_OFF, HOOK14: entry + HOOK14_OFF, HOOK15: entry + HOOK15_OFF, HOOK16: entry + HOOK16_OFF}
+    for a_ in MOT_SITES: targets[a_] = entry + MOT_OFF
     if be32(code, HOOK3_OFF) >> 16 != 0x3D80: die('pm.bin does not have pm_player_stub at +0x58')
     if be32(code, HOOK4_OFF) != 0x9421FFF0: die('pm.bin does not have pm_label_stub at +0x68')
     if be32(code, HOOK5_OFF) != 0x9421FFD0: die('pm.bin does not have pm_sfx_stub at +0x98')
@@ -129,6 +138,7 @@ def main():
     if be32(code, HOOK11_OFF) != 0x9421FFE0: die('pm.bin does not have pm_van_stub at +0x1B8')
     if be32(code, HOOK12_OFF) != 0x2C050015: die('pm.bin does not have pm_msg_stub at +0x1E4')
     if be32(code, HOOK13_OFF) != 0x9421FFF0: die('pm.bin does not have pm_zt_stub at +0x1F4')
+    if be32(code, MOT_OFF) >> 26 != 18 or be32(code, HOOK16_OFF) != 0x7F23CB78: die('pm.bin does not have pm_mot_stub / pm_face_stub at +0x23C / +0x240')
     if be32(code, HOOK14_OFF) != 0x7FE3FB78 or be32(code, HOOK15_OFF) != 0x7FE3FB78: die('pm.bin does not have pm_tilt_stub / pm_tilt2_stub at +0x21C / +0x22C')
     if be32(code, AXE_STUB_OFF) >> 26 != 18: die('pm.bin does not have pm_axe_stub at +0x54')
     with open(src, 'rb') as f:

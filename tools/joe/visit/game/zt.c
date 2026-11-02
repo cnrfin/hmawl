@@ -31,7 +31,7 @@ typedef short s16;
 
 s32 pm_joe_pos(float *p);                               /* pm.c: Joe's position if he is out on this map */
 
-static struct { s32 target; float tx, ty, tz; float r; s32 alpha; float *apos[0x27]; u32 seen[0x27], now; } Z;
+static struct { s32 target; float tx, ty, tz; float r; s32 alpha; float *apos[0x27]; u32 seen[0x27], now; float fx, fz, mx, mz; u32 movf; s32 fvalid; } Z;
 #define ZT_PRESENT 30                                   /* frames a character counts as out after its flag was last seen */
 #define ACTMGR     (*(u8 **)0x8034923C)
 #define CAM        (*(u8 **)0x8034922C)                 /* field camera: +0x1C yaw; it looks along (-sin, -cos) */
@@ -148,8 +148,8 @@ static void zlog(s32 kind, s32 a, s32 b)
     zt_log.e[i].clock = *(u32 *)*(u8 **)0x80349218; zt_log.e[i].call = zt_log.calls;
     zt_log.e[i].kind = (s16)kind; zt_log.e[i].a = (s16)a; zt_log.e[i].b = (s16)b;
 }
-static void release(void) { if (Z.target) zlog(7, Z.target, 0); Z.target = 0; }
-static void let_go_why(s32 why) { if (Z.target) { zlog(why, Z.target, 0); sfx_play(*(u8 **)0x803491E4, SE_FREE, 0); } Z.target = 0; }
+static void release(void) { if (Z.target) zlog(7, Z.target, 0); Z.target = 0; Z.fvalid = 0; }
+static void let_go_why(s32 why) { if (Z.target) { zlog(why, Z.target, 0); sfx_play(*(u8 **)0x803491E4, SE_FREE, 0); } Z.target = 0; Z.fvalid = 0; }
 static void reticle(u8 *g);
 
 /* ---- the reticle: 4 HUD quads (opguide.agc element 7, AGC_RET_Q) around the target's projected chest.
@@ -306,10 +306,12 @@ void zt_post(u8 *pl)
     dx = Z.tx - pos[0]; dz = Z.tz - pos[2]; d2 = dx * dx + dz * dz;
     if (d2 < 0.01f) return;
     inv = rsq(d2); dx *= inv; dz *= inv;
-    fx = face[0] + (dx - face[0]) * ZT_TURN; fz = face[2] + (dz - face[2]) * ZT_TURN;
+    if (!Z.fvalid) { Z.fx = face[0]; Z.fz = face[2]; Z.fvalid = 1; }   /* start from where he faces */
+    fx = Z.fx + (dx - Z.fx) * ZT_TURN; fz = Z.fz + (dz - Z.fz) * ZT_TURN;
     d2 = fx * fx + fz * fz;
     if (d2 < 0.0001f) { fx = dx; fz = dz; d2 = 1; }          /* exactly opposite: go straight there */
-    inv = rsq(d2); face[0] = fx * inv; face[1] = 0; face[2] = fz * inv;
+    inv = rsq(d2); Z.fx = fx * inv; Z.fz = fz * inv;
+    face[0] = Z.fx; face[1] = 0; face[2] = Z.fz;
     if (cam_ok) {
         yaw = (float *)(c + 0x1C);
         want = zatan2(-dx, -dz);
@@ -336,4 +338,43 @@ void zt_tilt(u8 *c)
         M[4 + i] = k * r1 + s * r2;
         M[8 + i] = -s * r1 + k * r2;
     }
+}
+
+/* ---- moving while locked on (HOOK16 facing, the three motion picks).
+   zt_face: func_8003083C has just pointed the facing along the stick (camera-relative) = where he walks;
+   keep that as the move direction, then turn him back to our facing toward the target (the model uses the
+   facing later in the frame; the step itself comes from the stick and the camera yaw). */
+void zt_face(u8 *pl)
+{
+    float *face = (float *)(pl + PL_FACE);
+    Z.mx = face[0]; Z.mz = face[2]; Z.movf = Z.now;
+    if (!Z.target || !Z.fvalid || *(s32 *)(pl + PL_STATE) != 1) return;
+    face[0] = Z.fx; face[1] = 0; face[2] = Z.fz;
+}
+/* zt_motion: the free-roaming state picks idle / walk / run every frame with func_8007C100(slot, variant 0 / 3 /
+   2, group 0x35, item, item, 4, rate). Locked on and moving: the stick direction against the facing picks
+   forward (keep the game's walk / run), back, or a side (left = his +x). The motion player takes a motion entry
+   pointer (func_8017D660 keeps it while it is the same one): entries copied from the game's own (its blend
+   and flags), pointing at boy_0.anm.arc clips 126 (strafe left), 127 (strafe right), 128 (walk back). */
+#define mot_pick   F(0x8007C100, void, (u8 *, s32, s32, s32, s32, s32, float))
+#define mot_entry  F(0x800288E8, u32 *, (u32 *, s32, s32, s32, s32, s32, s32))
+#define mot_play   F(0x8007C894, void, (u8 *, u32 *, float))
+#define CLIP_LEFT  126
+#define CLIP_RIGHT 127
+#define CLIP_BACK  128
+static u32 zt_ent[3][6];
+void zt_motion(u8 *slot, s32 var, s32 grp, s32 i1, s32 i2, s32 e, float rate)
+{
+    u32 buf[4], *src;
+    s32 k, which;
+    float dot, crs;
+    if (!Z.target || !Z.fvalid || var == 0 || Z.now - Z.movf > 1) { mot_pick(slot, var, grp, i1, i2, e, rate); return; }
+    dot = Z.mx * Z.fx + Z.mz * Z.fz; crs = Z.fx * Z.mz - Z.fz * Z.mx;
+    if (dot > 0.70710678f) { mot_pick(slot, var, grp, i1, i2, e, rate); return; }   /* forward: the game's own */
+    which = dot < -0.70710678f ? 2 : crs < 0 ? 0 : 1;
+    src = mot_entry(buf, var, grp, i1, i2, e, 0);           /* the entry the game would play */
+    if ((u32)src < 0x80000000u || (u32)src >= 0x81800000u) { mot_pick(slot, var, grp, i1, i2, e, rate); return; }
+    for (k = 0; k < 6; k++) zt_ent[which][k] = src[k];
+    zt_ent[which][0] = (src[0] & ~0x3FFu) | (u32)(which == 0 ? CLIP_LEFT : which == 1 ? CLIP_RIGHT : CLIP_BACK);
+    mot_play(slot, zt_ent[which], rate);
 }

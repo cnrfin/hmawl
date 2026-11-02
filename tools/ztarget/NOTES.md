@@ -198,3 +198,22 @@ pm.bin 685a508e; zt_log 0x80367E24, zt_dbg 0x80368030.
 to --gain, so the first versions (0.89) played louder than the wood hit. Now gains 0.196 / 0.146: loudest 100 ms
 at -25 / -26 dBFS vs the wood hit's -17. Bank 5b73a9b6 / 9ed747af. (Velocity changes nothing in these
 presets: no velocity-to-filter in the bank.)
+
+## Test 12: strafe / walk-back clips, facing while moving
+- Player animation set 0 (boy_0.anm.arc, list 0x8029BECC, 200 motions). The free-roam update picks idle /
+  walk / run with func_8007C100(slot, variant 0/3/2, group 0x35, held item +0x144/+0x148, 4, rate):
+  func_800288E8 turns that into a motion ENTRY pointer, func_8007C894(slot, entry, rate) plays it
+  (func_8017D660 keeps it while the pointer is the same). So no list change: zt_motion (the three bl
+  sites -> pm_mot_stub +0x23C, 'blhook') copies the entry the game would play, points word 0's anim (low
+  10 bits) at clip 126/127/128, and plays that.
+- Facing: func_8003083C sets the facing from the stick (camera yaw + stick angle) and the model uses it
+  later in the same frame, so test 1-11's after-update facing only showed when standing. HOOK16 at
+  0x80030A3C (pm_face_stub +0x240) records that as the move direction and puts our facing back.
+  Movement itself comes from the stick vector, not the facing.
+- Direction: move . facing > cos 45 = forward (the game's walk / run), < -cos 45 = back, else the side
+  (cross < 0 = his left, +x).
+- Clips (anim/make_clips.py from strafe.py, encoded with joe_anm.rebuild on clip 1's header, read back
+  and checked): 126 strafe left, 127 strafe right, 128 walk back, 21 frames like his walk.
+  anim/add_player_clips.py appends them to boy_0.anm.arc in a mainchapterN.arc.clz (+52 KB unpacked;
+  idempotent; mainchapter1 checked).
+- pm.bin 346b1401 (code ends 0x80368588).

@@ -216,3 +216,17 @@ pm_tilt2_stub:
     bl    zt_tilt
     lwz   r0, 0x34(r1)
     b     tilt_return2              # 0x8017B8F8
+
+# Z targeting moves: the free-roaming state's three motion picks (idle / walk / run: bl func_8007C100 at
+# 0x80042D44 / D98 / DD0) come here instead; zt_motion has func_8007C100's arguments (slot, r4-r8, f1 rate)
+# and plays the strafe / walk-back clips while locked on, else calls func_8007C100 itself.
+    .globl pm_mot_stub
+pm_mot_stub:
+    b     zt_motion
+# Z targeting facing: func_8003083C has just set the player's facing from the stick (+0x58, r25 = player),
+# before the model uses it this frame; zt_face keeps him turned to the target while locked on.
+    .globl pm_face_stub
+pm_face_stub:
+    mr    r3, r25
+    bl    zt_face
+    b     face_return               # 0x80030A5C (the replaced instruction was b 0x80030A5C)
