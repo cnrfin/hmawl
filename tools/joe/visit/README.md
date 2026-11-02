@@ -93,3 +93,15 @@ the trade (cmd_A0 did that), cmd_5A(0, 1) shows him again. Common.arc e3022926, 
   hands (cmd_56). Counter 45 = met. Other held items: just his normal line.
 - joetv.c: full friendship (counter 46 >= 10) doubles the dig site's $JOE share.
 - pm.bin b9968e36 (ends 0x80366834).
+
+## Test 10: Joe's name and heart in the window, new lines
+- `build_joe_mes.py`: Joe's lines appended to mukumuku.mes (entries 38+, Mukumuku's 38 kept) and
+  people.mes 35 "Mukumuku" -> "Joe". cmd_04(file, msg, speaker): speaker != -1 maps the file to a character
+  (table 0x80251A38: file 0x15 mukumuku.mes -> character 0x23) and shows that character's name
+  (people.mes[character]) and heart. Both events now use cmd_04(0x15, line, 0).
+- Lines: gift "Woah, a $JOE for me? My yigga!" (every gift; still counted quietly for the dig bonus),
+  second gift the same visit "You keep a hold of that for now my yigga. $JOE finna boutta.", fall "Hey,
+  my yigga. Crypto winter is coming, so I won't be around until spring. So figure out what you wanna do
+  with your $JOE before then."
+- data/: Common.arc d0f89ea4, mukumuku.mes 5dfdab5d, people.mes 22b9572a (debug.mes as test 9). pm.bin c721c54c.
+- The heart shows character 0x23's friendship (not yet tied to the gifts).

@@ -562,7 +562,7 @@ static s32 joe_frame(u8 *g, s32 map, u32 t)
             PAD_PRESS &= ~0x100u; PAD_HELD &= ~0x100u;
             if (HELD_ITEM == JOE_ITEM) {
                 if (JCNT(47) == day1) kind = 7;
-                else { JCNT(47) = day1; if (JCNT(46) < 10) JCNT(46)++; kind = JCNT(46) == 10 ? 6 : 5; }
+                else { JCNT(47) = day1; if (JCNT(46) < 10) JCNT(46)++; kind = 5; }   /* counted quietly (10 = full friendship) */
             } else if (!JCNT(45)) { JCNT(45) = 1; kind = 1; }
             else if (season == 2) kind = 4;
             else if (tod >= J_DIG && tod < J_DIGEND) kind = 3;

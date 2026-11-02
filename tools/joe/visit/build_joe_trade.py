@@ -54,9 +54,19 @@ for base, cmd in ((20, 0x14), (23, 0x15)):                   # first-person came
 a.num(0); a.num(0); a.sys(0x5A)                              # cmd_5A(0, 0): hide the player (first person, as cmd_A0 does)
 a.num(1); a.sys(0xDD); a.sys(0x00)                           # cmd_DD(1): the money window (as the shops)
 done = L('done')
-def say(m):  a.wait_msg(FILE, m)
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from build_joe_mes import FILE as MFILE, LINES
+MSG = {11: 'sell_intro', 12: 'buy_q', 13: 'poor', 14: 'bought', 15: 'sell_q', 16: 'what', 17: 'offer', 18: 'none', 19: 'later', 20: 'sold'}   # old debug.mes slot -> Joe's line in mukumuku.mes
+def wait_msg(m, var=None):
+    """cmd_04(mukumuku.mes, line, speaker 0): with a speaker the window shows Joe's name and heart"""
+    top = a.new('msg'); a.label(top); a.sys(0x00)
+    if var is not None: a.addr(var)
+    a.num(MFILE); a.num(LINES[MSG[m]]); a.num(0); a.sys(0x04)
+    if var is not None: a.emit('assign')
+    a.num(0); a.emit('cmp'); a.jz(top)
+def say(m): wait_msg(m)
 def ask(m, no):                                              # yes/no: answer 0 = yes; anything else -> no
-    a.wait_msg(FILE, m, V_ANS); a.load(V_ANS); a.num(1); a.emit('cmp'); a.jnz(no)
+    wait_msg(m, V_ANS); a.load(V_ANS); a.num(1); a.emit('cmp'); a.jnz(no)
 def setc(c, v): a.num(c); a.num(v); a.sys(0x93)
 def setc_var(c, var): a.num(c); a.load(var); a.sys(0x93)
 def getc(c): a.num(c); a.sys(0x95)

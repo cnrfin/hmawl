@@ -46,7 +46,17 @@ for base, cmd in ((20, 0x14), (23, 0x15)):                   # camera from count
     a.sys(cmd)
 a.num(0); a.num(0); a.sys(0x5A); a.sys(0x00)                 # player hidden (first person)
 done = L('done')
-def say(m): a.wait_msg(FILE, m)
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from build_joe_mes import FILE as MFILE, LINES
+MSG = {21: 'intro', 22: 'hint', 23: 'dig', 24: 'winter', 25: 'gift', 26: 'gift', 27: 'gift_again'}   # old debug.mes slot -> Joe's line in mukumuku.mes
+def wait_msg(m, var=None):
+    """cmd_04(mukumuku.mes, line, speaker 0): with a speaker the window shows Joe's name and heart"""
+    top = a.new('msg'); a.label(top); a.sys(0x00)
+    if var is not None: a.addr(var)
+    a.num(MFILE); a.num(LINES[MSG[m]]); a.num(0); a.sys(0x04)
+    if var is not None: a.emit('assign')
+    a.num(0); a.emit('cmp'); a.jz(top)
+def say(m): wait_msg(m)
 def kind_is(k, target): a.num(KIND); a.sys(0x95); a.num(k); a.emit('cmp'); a.jz(target)
 labels = {k: L('k%d' % k) for k in range(1, 8)}
 for k in range(1, 8): kind_is(k, labels[k])
