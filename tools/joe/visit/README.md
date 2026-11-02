@@ -113,3 +113,8 @@ mode 0 (window without name plate; the speaker is ignored). Villager talk uses m
 pm_msg_stub (pm.bin +0x1E4): file 0x15 (Joe's lines in mukumuku.mes) opens in mode 1, everything else as
 before. make_pm_dol.py: new 'blhook' patch type. Checked on the mock disc (update mode). pm.bin ab37596e,
 make_pm_dol.py 17653839.
+
+## Test 11b: Joe's hearts
+pm.c joe_hearts: before a talk or trade, character 0x23's villager record (func_8000DC24) +0xF =
+40 + 6 x gifts (cap 100), so the name-plate hearts (v03 hearts v7) follow his $JOE gifts: 0 gifts 1 grey,
+2 green, 4 blue, 6 red, 8 2 red, 10 3 red. pm.bin c019bebd (pm_msg_stub still at +0x1E4).

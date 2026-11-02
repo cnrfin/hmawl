@@ -411,6 +411,16 @@ s32 joe_visit_day(u32 day);
 static s32 joe_forced, joe_here, joe_trading, joe_talking;
 #define JOE_TALK_EVENT 409                 /* Common.arc node 109: talk while walking (build_joe_talk.py) */
 #define HELD_ITEM  (*(volatile unsigned short *)(g + 0x11CC6))
+/* Joe's hearts: the name-plate hearts code (v03 main.dol, hook 0x80102598, hearts v7) shows a villager's
+   long-term friendship, record +0xF (0..100): <=50 1 grey, 51-60 green, 61-70 blue, 71-80 red, 81-90 2 red,
+   91-100 3 red. Joe speaks as character 0x23 (Mukumuku's slot): its record's +0xF follows his $JOE gifts. */
+#define villager_rec F(0x8000DC24, u8 *, (u8 *, s32))
+static void joe_hearts(u8 *g)
+{
+    u8 *r = villager_rec(g, 0x23);
+    s32 f = 40 + 6 * *(s32 *)(g + 0x12194 + 46 * 4);
+    if (r) r[0xF] = (u8)(f > 100 ? 100 : f);
+}
 /* event counters kept in the save: 45 met, 46 $JOE gifts (10 = full friendship), 47 day of the last gift + 1;
    48 = the line for event 409 */
 #define JOE_ITEM   0x442
@@ -547,6 +557,7 @@ static s32 joe_frame(u8 *g, s32 map, u32 t)
             JCNT(41) = 0; JCNT(42) = 0; JCNT(44) = item_count(g + 0x50, JOE_ITEM);
             if (MSGMGR) msg_number(MSGMGR, 0, joe_price_today());
             joe_trading = 1;
+            joe_hearts(g);
             joe_cam(g, BENCH_X, BENCH_Z, S.pos.y + 0.95f);
             event_start(EVMGR, JOE_EVENT, 0, 0);
         }
@@ -572,6 +583,7 @@ static s32 joe_frame(u8 *g, s32 map, u32 t)
             actor_setdir(S.actor, &S.dir);
             joe_motion(JM_IDLE);
             joe_cam(g, S.pos.x, S.pos.z, S.pos.y + 1.1f);
+            joe_hearts(g);
             joe_talking = 1;
             event_start(EVMGR, JOE_TALK_EVENT, 0, 0);
         }
