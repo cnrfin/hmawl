@@ -25,6 +25,7 @@ KEYED = [13, 18, 39, 8, 48, CIG_NODE]
 
 def Rx(a): c, s = np.cos(a), np.sin(a); return np.array([[1, 0, 0], [0, c, -s], [0, s, c]])
 def Ry(a): c, s = np.cos(a), np.sin(a); return np.array([[c, 0, s], [0, 1, 0], [-s, 0, c]])
+def Rz(a): c, s = np.cos(a), np.sin(a); return np.array([[c, -s, 0], [s, c, 0], [0, 0, 1]])
 def Ryh(a): M = np.eye(4); M[:3, :3] = Ry(a); return M
 def Tr(p): M = np.eye(4); M[:3, 3] = p; return M
 def ease(x): x = min(max(x, 0), 1); return x * x * (3 - 2 * x)
@@ -163,11 +164,60 @@ def f_loop(f):
 def f_up(f):
     t = f / FPS / SPEED; return standup(t), f == 0
 HOLD = 90
+
+# ---------------------------------------------------------------- talking and the gift (clips 9-11)
+# 9 standing talk: Van's "explaining" clip 17 (both hands out in front), on the keyed nodes
+v17 = parse(open(VAN + 'anm17.bin', 'rb').read()); n_talk = int(v17[0]['length'])
+def f_talk(f):
+    W = [D @ w for w in world(nodes, P_.locals_at(nodes, v17, f))]; return {n: W[n] for n in KEYED[:-1]}, False
+# 10 sitting talk: the sitting pose, the cigarette hand comes up off the knee and gestures; head nods
+TLOOP = 4.0
+PG = np.array([-0.56, 0.60, 0.40])                       # hand out in front, at chest height
+RG = Rx(-0.55) @ Ry(0.35) @ RK                           # wrist turned up: open hand
+SLG = Slerp([0, 1], Rot.from_matrix([RK, RG]))
+def sit_talk_spec(t):
+    s = base_spec()
+    up = seg(t, 0.15, 0.7) - seg(t, 3.0, 3.7)
+    wave = up * np.array([0.05 * np.sin(2 * np.pi * (t - 0.7) / 1.15), 0.045 * np.sin(2 * np.pi * (t - 0.7) / 0.575), 0.03 * np.sin(2 * np.pi * (t - 0.7) / 1.15)])
+    R = SLG([up]).as_matrix()[0] @ Rx(0.18 * up * np.sin(2 * np.pi * (t - 0.7) / 0.575))
+    s[39] = (list(P0 + (PG - P0) * up + wave), R)
+    nod = 0.07 * np.sin(2 * np.pi * t / 1.0) * (seg(t, 0.3, 0.8) - seg(t, 3.0, 3.5))
+    s[13] = ([0, HY, -0.06], Ry(-0.12 * up) @ Rx(-0.10 + nod)); return s
+def f_sittalk(f):
+    W = posedW(sit_talk_spec(f / FPS)); return {n: W[n] for n in KEYED[:-1]}, True
+# 11 gift: takes the coin with the right hand, looks at it, slips it into a back pocket, back to idle
+def place_s(n, t, R):                                    # standing frame: R relative to the idle rotation
+    out = np.eye(4); out[:3, :3] = R @ WI[n][:3, :3]; out[:3, 3] = t; return out
+PI39 = WI[39][:3, 3]
+KEYS39 = [(0.0, PI39, np.eye(3)),
+          (0.45, np.array([-0.30, 0.66, 0.42]), Rz(-0.9) @ Rx(-0.4)),     # reach out, palm up
+          (0.75, np.array([-0.30, 0.66, 0.42]), Rz(-0.9) @ Rx(-0.4)),
+          (1.15, np.array([-0.40, 0.78, 0.30]), Rz(-0.6) @ Rx(-0.7)),     # bring it up to look at it
+          (1.55, np.array([-0.40, 0.78, 0.30]), Rz(-0.6) @ Rx(-0.7)),
+          (2.10, np.array([-0.42, 0.42, -0.42]), Ry(-0.9) @ Rz(0.3)),     # round to the back pocket
+          (2.40, np.array([-0.40, 0.38, -0.46]), Ry(-0.9) @ Rz(0.3)),
+          (3.00, PI39, np.eye(3))]
+def key_at(K, t):
+    for (t0, p0, r0), (t1, p1, r1) in zip(K, K[1:]):
+        if t <= t1:
+            w = ease((t - t0) / (t1 - t0)); return p0 + (p1 - p0) * w, Slerp([0, 1], Rot.from_matrix([r0, r1]))([w]).as_matrix()[0]
+    return K[-1][1], K[-1][2]
+def f_pocket(f):
+    t = f / FPS; W = {n: WI[n].copy() for n in KEYED[:-1]}
+    p, R = key_at(KEYS39, t); W[39] = place_s(39, p, R)
+    look = seg(t, 0.2, 0.6) - seg(t, 1.6, 2.1); turn = seg(t, 1.6, 2.0) - seg(t, 2.3, 2.9)
+    H = WI[13].copy(); H[:3, :3] = Ry(-0.35 * turn) @ Rx(0.22 * look) @ WI[13][:3, :3]; H[1, 3] += 0.02 * np.sin(np.pi * seg(t, 0.9, 1.5)); W[13] = H
+    return W, False
+n_stalk = int(TLOOP * FPS); n_pocket = int(3.0 * FPS)
+
 clips = {'anm_sitdown.bin': clip(f_down, n_down, 2, ROOT_FACE, HOLD),
          'anm_sitloop.bin': clip(f_loop, n_loop, 3, ROOT_AWAY),
-         'anm_standup.bin': clip(f_up, n_up, 2, ROOT_AWAY, HOLD)}
+         'anm_standup.bin': clip(f_up, n_up, 2, ROOT_AWAY, HOLD),
+         'anm_talk.bin': clip(f_talk, n_talk, 2, np.eye(4)),
+         'anm_sittalk.bin': clip(f_sittalk, n_stalk, 2, ROOT_AWAY),
+         'anm_pocket.bin': clip(f_pocket, n_pocket, 2, np.eye(4), HOLD)}
 for k, v in clips.items(): open(os.path.join(OUT, k), 'wb').write(v); print(k, len(v))
 P, B, F = cig_mesh()
 json.dump(dict(park=list(park), mesh_P=P.tolist(), mesh_band=B, mesh_F=F.tolist(), clips=list(clips),
-               frames=dict(sitdown=n_down, sitloop=n_loop, standup=n_up), stand_spot=ZS), open(os.path.join(OUT, 'cig.json'), 'w'))
-print('frames', n_down, n_loop, n_up)
+               frames=dict(sitdown=n_down, sitloop=n_loop, standup=n_up, talk=n_talk, sittalk=n_stalk, pocket=n_pocket), stand_spot=ZS), open(os.path.join(OUT, 'cig.json'), 'w'))
+print('frames', n_down, n_loop, n_up, n_talk, n_stalk, n_pocket)

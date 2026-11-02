@@ -55,10 +55,11 @@ a.num(0); a.num(0); a.sys(0x5A)                              # cmd_5A(0, 0): hid
 a.num(1); a.sys(0xDD); a.sys(0x00)                           # cmd_DD(1): the money window (as the shops)
 done = L('done')
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from build_joe_mes import FILE as MFILE, LINES
+from build_joe_mes import FILE as MFILE, LINES, BASE as LBASE
 MSG = {11: 'sell_intro', 12: 'buy_q', 13: 'poor', 14: 'bought', 15: 'sell_q', 16: 'what', 17: 'offer', 18: 'none', 19: 'later', 20: 'sold'}   # old debug.mes slot -> Joe's line in mukumuku.mes
 def wait_msg(m, var=None):
     """cmd_04(mukumuku.mes, line, speaker 0x23 = Joe's character): the talk window shows his name and heart"""
+    a.num(49); a.num(LINES[MSG[m]] - LBASE + 1); a.sys(0x93)   # counter 49 = the line (+1): pm.c's face and talk animation
     top = a.new('msg'); a.label(top); a.sys(0x00)
     if var is not None: a.addr(var)
     a.num(MFILE); a.num(LINES[MSG[m]]); a.num(0x23); a.sys(0x04)
@@ -100,6 +101,7 @@ a.label(no_coins); say(18); a.jmp(done)
 a.label(bye); say(19)
 a.label(done)
 setc(REQ, 0)
+setc(49, 0)
 a.num(0); a.sys(0xDD)                                         # money window off
 a.num(0); a.num(1); a.sys(0x5A)                              # player shown again
 a.emit('end'); a.emit('end')

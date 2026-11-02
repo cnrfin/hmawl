@@ -30,12 +30,13 @@ a session's temporary folder; the ones still only there are marked.
 | Bench "sit until evening/morning" (time skip, shipping, rest) | pm.c, Common.arc event 407 | tools/benchsit |
 | Joe speaks as character 0x23 (Mukumuku's slot): name "Joe" in Message.arc people.mes, hearts from his gifts | events 408/409 speaker 0x23, pm.c joe_hearts | tools/joe/visit test 12 (HOOK12 stub unused, site restored) |
 | Joe's visit, trade, talk, gifts | pm.c joe_* , events 408/409 | tools/joe (DESIGN.md, visit/README.md) |
+| Joe's faces (blink, angry/happy/neutral per line), mouth flaps + talk gestures timed to the typing, gift take-and-pocket | pm.c joe_face / joe_talk_frame, joe_lines.h, counters 49/50 | visit/README.md test 13 |
 | Z+B test key (clock to 22:00), Z+D-Up (Joe's next stage), Z+X (gd slot test), Z+D-Left/Right/Down (Postman tests) | pm.c | test keys |
 
 ## Data files
 | Feature | Files | Where |
 |---|---|---|
-| Joe model, 90 %, cigarette, bench clips, 1.2x walk | gd/gd_0.arc, gd/gd_0.anm.arc | tools/joe/build/test6 + test7 |
+| Joe model, 90 %, cigarette, bench clips, 1.2x walk, face 80 %, talk / sitting talk / pocket clips | gd/gd_0.arc, gd/gd_0.anm.arc | tools/joe/build/test8 |
 | Joe's lines (mukumuku.mes 38+), people.mes 35 = "Joe" | mukumuku.mes, people.mes | tools/joe/visit/data |
 | Trade/talk events 408/409, bench 407 (no cmd_10) | Common.arc | tools/joe/visit/data |
 | Villager paths: dig-site bridge, bench spot | PathData.arc | tools/paths |

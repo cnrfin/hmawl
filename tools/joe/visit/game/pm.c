@@ -110,7 +110,9 @@ static const float gd_size[3] = { 0.95f, 1.96f, 1.2f };
 #define GD_X 270.3f                       /* Pool B, the goddess pond (centre) */
 #define GD_Z 139.0f
 #define GD_AHEAD 2.4f                     /* test spawn: this far in front of the player */
-#define GD_ANIMS 9                        /* Joe (gd_0 test 5+): idle, walk, Van's 2-5, sit down, sitting, stand up */
+#define GD_ANIMS 13                       /* Joe (gd_0 test 13+): idle, walk, Van's 2-5, sit down, sitting, stand up,
+                                             talk (Van's 17), sitting talk, gift (take + pocket),
+                                             12 = the sitting loop again, with the cross-fade (after talking) */
 #define SET71_LIST (*(u32 ***)(0x80248B40 + 71 * 0x14 + 0xC))   /* set 71's motion list (motion n -> entry) */
 static u32 gd_mot[GD_ANIMS][6];           /* her motion entries: [set*2, flags, anim], mask, ... (as the teddy's) */
 static u32 *gd_list[GD_ANIMS];
@@ -213,7 +215,7 @@ static void setup_model(void)
     S.orig_list = SET71_LIST;
     if (S.who) {                              /* the goddess: motion n = Celia's animation n */
         for (i = 0; i < GD_ANIMS; i++) {
-            gd_mot[i][0] = 0x8E000400u | (u32)i; gd_mot[i][2] = 0;
+            gd_mot[i][0] = 0x8E000400u | (u32)(i == 12 ? 7 : i); gd_mot[i][2] = 0;
             /* word 1 bits 6-10 = cross-fade frames into this motion (31 = the default 10, func_8017DB28).
                Joe's sitting loop (7) starts with no fade: it begins right as he turns 180 degrees, and a
                fade from the sit down's pose under the new facing looked like a second sit down. */
@@ -408,6 +410,10 @@ s32 joe_visit_day(u32 day);
 #define JM_SITDOWN 6
 #define JM_SIT 7
 #define JM_STANDUP 8
+#define JM_TALK 9
+#define JM_SITTALK 10
+#define JM_POCKET 11
+#define JM_SIT2 12                         /* sitting loop faded into (from the sitting talk) */
 static s32 joe_forced, joe_here, joe_trading, joe_talking;
 #define JOE_TALK_EVENT 409                 /* Common.arc node 109: talk while walking (build_joe_talk.py) */
 #define HELD_ITEM  (*(volatile unsigned short *)(g + 0x11CC6))
@@ -489,6 +495,72 @@ static void joe_place(float s)
     S.pos.x = jr_pt[i][0] + dx * t; S.pos.z = jr_pt[i][1] + dz * t;
     S.dir.x = dx / len; S.dir.y = 0; S.dir.z = dz / len;
 }
+/* ---- Joe's face and talking. His character slot's face (slot +0x124, func_8002F3E8's object): +0 eye,
+   +4 mouth; a value >= 58 (eye) / 36 (mouth) plays animation (value - 58 / - 36) of char_com_eye.tam /
+   char_com_mouth.tam (pointers 0x803490F0 / F4) into the players at +0x14 / +0x24, else it is a still frame.
+   Those common animations match Joe's frame numbering: eye 9 = blink 0-2, 3 = angry blink 6-8, 11 = sad
+   blink 18-20; mouth 11 = flaps 0/1, 9 = angry 7/8, 0 = smile 4/5, 6 = sad 9/10.
+   The events set counter 49 = line + 1 (joe_lines.h) right before each line; pm.c follows the typing (letters
+   per page x JT_FRAMES; A finishes a page early or turns it) to flap the mouth and play the talk gesture. */
+#include "joe_lines.h"
+#define tam_play   F(0x8017E11C, void, (u8 *, void *, s32, s32))
+#define JT_FRAMES  2                       /* frames per letter (the message window's typing speed) */
+#define JC_LINE    49                      /* counter: the line being said (+1) */
+#define JC_POCKET  50                      /* counter: the gift event asks for the take-and-pocket (1 -> pm.c 0) */
+#define JT_POCKET  90                      /* frames of the pocket clip (it holds after) */
+static const unsigned char joe_faces[4][3] = {    /* eye, mouth still, mouth talking */
+    { 58 + 9, 0, 36 + 11 },                /* neutral */
+    { 58 + 3, 7, 36 + 9 },                 /* angry */
+    { 58 + 9, 4, 36 + 0 },                 /* happy: smile */
+    { 58 + 11, 9, 36 + 6 },                /* sad */
+};
+static struct { s32 line, page, timer, face, pocket; } jt;
+static s32 jcnt(u8 *g, s32 i)
+{
+    s32 v = *(s32 *)(g + 0x12194 + i * 4);
+    if (v >= 128 && !(v & 127)) v >>= 7;   /* script numbers come x128 */
+    return v;
+}
+static void joe_face(s32 eye, s32 mouth)
+{
+    u8 *slot, *f;
+    if (!S.actor) return;
+    slot = *(u8 **)(S.actor + 0xD4);
+    if ((u32)slot < 0x80000000u || (u32)slot >= 0x81800000u) return;
+    f = slot + 0x124;
+    if (*(s32 *)(f + 8) >= 0) return;     /* a motion's own face animation is playing */
+    if (*(s32 *)f != eye) {
+        *(s32 *)f = eye;
+        if (eye >= 58) tam_play(f + 0x14, *(void **)0x803490F0, eye - 58, 0);
+    }
+    if (*(s32 *)(f + 4) != mouth) {
+        *(s32 *)(f + 4) = mouth;
+        if (mouth >= 36) tam_play(f + 0x24, *(void **)0x803490F4, mouth - 36, 0);
+    }
+}
+/* every frame Joe is out; in_event: our talk (1) or trade (2) event is running */
+static void joe_talk_frame(u8 *g, s32 in_event)
+{
+    s32 line = in_event ? jcnt(g, JC_LINE) : 0, talking;
+    if (line != jt.line) {                 /* a new line: page 1 starts typing */
+        jt.line = line; jt.page = 0; jt.timer = 0;
+        if (line > 0 && line <= JL_N) { jt.face = joe_lines[line - 1].face; jt.timer = joe_lines[line - 1].len[0] * JT_FRAMES; }
+        else if (!line) jt.face = 0;
+    }
+    if (line > 0 && line <= JL_N && (PAD_PRESS & 0x100)) {
+        if (jt.timer > 0) jt.timer = 0;    /* A: the page shows at once */
+        else if (jt.page + 1 < joe_lines[line - 1].pages) { jt.page++; jt.timer = joe_lines[line - 1].len[jt.page] * JT_FRAMES; }
+    }
+    if (jt.timer > 0) jt.timer--;
+    talking = jt.timer > 0;
+    if (in_event == 1 && jcnt(g, JC_POCKET) == 1 && !jt.pocket) jt.pocket = JT_POCKET;
+    if (jt.pocket) {
+        joe_motion(JM_POCKET);
+        if (!--jt.pocket) *(s32 *)(g + 0x12194 + JC_POCKET * 4) = 0;
+    } else if (in_event == 1) joe_motion(talking ? JM_TALK : JM_IDLE);
+    else if (in_event == 2) joe_motion(talking ? JM_SITTALK : JM_SIT2);
+    joe_face(joe_faces[jt.face][0], joe_faces[jt.face][talking ? 2 : 1]);
+}
 static s32 joe_frame(u8 *g, s32 map, u32 t)
 {
     u32 tod = t % T_DAY;
@@ -517,12 +589,12 @@ static s32 joe_frame(u8 *g, s32 map, u32 t)
         return 1;
     }
     if (joe_talking) {                        /* talking while walking: he waits, then carries on */
-        if (no_event()) joe_talking = 0;
-        else return 1;
+        if (no_event()) { joe_talking = 0; JCNT(JC_LINE) = 0; JCNT(JC_POCKET) = 0; jt.pocket = 0; }
+        else { joe_talk_frame(g, 1); return 1; }
     }
     if (joe_trading) {                        /* our trade event: settle its requests */
-        if (no_event()) { joe_trading = 0; JCNT(41) = 0; }
-        else { joe_trade(g); return 1; }
+        if (no_event()) { joe_trading = 0; JCNT(41) = 0; JCNT(JC_LINE) = 0; }
+        else { joe_trade(g); joe_talk_frame(g, 2); return 1; }
     }
     if (!no_event()) return 1;
     if (S.loaded && S.who != 2) { if (S.actor) despawn(); release_model(); }
@@ -547,7 +619,9 @@ static s32 joe_frame(u8 *g, s32 map, u32 t)
     S.pos.y = ground_y(COLLMAP, &S.pos);
     actor_setpos(S.actor, &S.pos);
     actor_setdir(S.actor, &S.dir);
+    if (m == JM_SIT && (S.motion == JM_SIT2 || S.motion == JM_SITTALK)) m = JM_SIT2;
     joe_motion(m);
+    joe_talk_frame(g, 0);                     /* blinking, neutral face */
     /* A next to Joe on the bench (player free, facing him): the trade */
     if (joe_here && (PAD_PRESS & 0x100) && !(PAD_HELD & 0x10) && CONTROL == 1 && !(FADER && *(u8 *)(FADER + 0x60))) {
         float *p = (float *)(g + 0x29C78), *d = (float *)(g + 0x29F84);

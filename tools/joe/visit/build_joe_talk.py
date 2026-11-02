@@ -47,10 +47,11 @@ for base, cmd in ((20, 0x14), (23, 0x15)):                   # camera from count
 a.num(0); a.num(0); a.sys(0x5A); a.sys(0x00)                 # player hidden (first person)
 done = L('done')
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from build_joe_mes import FILE as MFILE, LINES
+from build_joe_mes import FILE as MFILE, LINES, BASE as LBASE
 MSG = {21: 'intro', 22: 'hint', 23: 'dig', 24: 'winter', 25: 'gift', 26: 'gift', 27: 'gift_again'}   # old debug.mes slot -> Joe's line in mukumuku.mes
 def wait_msg(m, var=None):
     """cmd_04(mukumuku.mes, line, speaker 0x23 = Joe's character): the talk window shows his name and heart"""
+    a.num(49); a.num(LINES[MSG[m]] - LBASE + 1); a.sys(0x93)   # counter 49 = the line (+1): pm.c's face and talk animation
     top = a.new('msg'); a.label(top); a.sys(0x00)
     if var is not None: a.addr(var)
     a.num(MFILE); a.num(LINES[MSG[m]]); a.num(0x23); a.sys(0x04)
@@ -65,11 +66,15 @@ a.label(labels[1]); say(21); say(22); a.jmp(done)
 a.label(labels[2]); say(22); a.jmp(done)
 a.label(labels[3]); say(23); a.jmp(done)
 a.label(labels[4]); say(24); a.jmp(done)
-a.label(labels[5]); a.sys(0x56); say(25); a.jmp(done)        # cmd_56: take the coin out of the hands
-a.label(labels[6]); a.sys(0x56); say(26); a.jmp(done)
+def pocket():                                                 # counter 50 = 1: pm.c plays Joe's take-and-pocket, then sets 0
+    a.num(50); a.num(1); a.sys(0x93)
+    top = L('pk'); a.label(top); a.sys(0x00); a.num(50); a.sys(0x95); a.num(1); a.emit('cmp'); a.jz(top)
+a.label(labels[5]); a.sys(0x56); pocket(); say(25); a.jmp(done)        # cmd_56: take the coin out of the hands
+a.label(labels[6]); a.sys(0x56); pocket(); say(26); a.jmp(done)
 a.label(labels[7]); say(27); a.jmp(done)
 a.label(done)
 a.num(KIND); a.num(0); a.sys(0x93)
+a.num(49); a.num(0); a.sys(0x93)
 a.num(0); a.num(1); a.sys(0x5A)                              # player shown again
 a.emit('end'); a.emit('end')
 script = a.build()

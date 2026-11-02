@@ -128,3 +128,25 @@ hook forced mode 1 (board). Now: speaker 0x23 in both events, HOOK12 site restor
 (make_pm_dol.py update mode accepts the test 11 word). The name plate reads people.mes inside Message.arc
 (loaded at boot): `build_joe_message_arc.py` sets entry 35 to "Joe" (input: the $JOE coin build 3205b29b).
 data/: Common.arc d40c7e13, Message.arc 70a46b73. pm.bin c019bebd, make_pm_dol.py dff40754.
+
+## Test 13: faces, talking, the gift pocket, smaller face
+- Face: Joe's character slot has a face object at slot +0x124 (func_8002F39C / F3E8 set, F548 draws):
+  +0 eye, +4 mouth; eye >= 58 / mouth >= 36 = animation (value - 58 / - 36) of the common
+  char_com_eye.tam / char_com_mouth.tam (commonall.arc; pointers 0x803490F0 / F4, played with
+  func_8017E11C into +0x14 / +0x24), else a still frame. +8 >= 0 = a motion's own face animation.
+  The common animations fit Joe's frames: eye 9 blink 0-2, 3 angry 6-8, 11 sad 18-20; mouth 11 flaps 0/1,
+  9 angry 7/8, 0 smile 4/5, 6 sad 9/10. (The 0x1AC chara class has a second face at +0x17C with
+  chanml_com_*.tam = animals.)
+- Talking: both events set counter 49 = line + 1 before each line (`gen_joe_lines.py` -> game/joe_lines.h:
+  face and letters per page). pm.c follows the typing (JT_FRAMES = 2 frames a letter; A finishes a page or
+  turns it): mouth flaps and the talk clip while typing, still mouth and idle / sitting loop after.
+  Faces: angry on "What!?", happy (smile) on intro, bought, gifts; neutral otherwise. Blinks all the time.
+- Gift: the talk event sets counter 50 = 1 after taking the coin (cmd_56) and waits; pm.c plays the
+  take-and-pocket clip (90 frames) and sets 0, then the line.
+- Clips (joe_sit.py): 9 standing talk (Van's clip 17 "explaining", 155 frames), 10 sitting talk (cigarette
+  hand comes off the knee and gestures, head nods, left hand stays on the backrest, 120), 11 gift (reach,
+  look, back pocket, 90 + 90 hold); motion 12 = the sitting loop with the cross-fade (after talking).
+- Face 20 % smaller: `JOE_FACE=0.8` (joe_game.py scales the eye and mouth patches about the canvas
+  centre 256, 269). Build: `JOE_SCALE=0.9 JOE_CIG=.../cig.json JOE_WALK=28 JOE_FACE=0.8 joe_game.py`;
+  with JOE_FACE unset the build reproduces test 6 / test 7 exactly.
+- Files: data/Common.arc f8cdeca9, build/test8 gd_0.arc d0d845f6, gd_0.anm.arc 406beace; pm.bin ed25ecff.

@@ -87,7 +87,9 @@ def patch(box,nx,ny,lift):
     pts=np.array(pts); F=np.array(F); nn=np.array(nn)
     c2=pts[F].mean(1)-C; n2=np.cross(pts[F[:,1]]-pts[F[:,0]],pts[F[:,2]]-pts[F[:,0]]); fl=(n2*c2).sum(1)<0; F[fl]=F[fl][:,::-1]
     return pts,np.array(uv),F,nn
-eP,eU,eF,eN=patch(FR.EYE_BOX,10,9,0.010); mP,mU,mF,mN=patch(FR.MOUTH_BOX,10,7,0.006)
+FACE=float(os.environ.get('JOE_FACE','1'))   # 0.8: eyes and mouth 20% smaller, about the face's centre (canvas 256, 269)
+fbox=lambda b: tuple(c+(v-c)*FACE for v,c in zip(b,(256,269,256,269)))
+eP,eU,eF,eN=patch(fbox(FR.EYE_BOX),10,9,0.010); mP,mU,mF,mN=patch(fbox(FR.MOUTH_BOX),10,7,0.006)
 pieces.append(('eyes',G(eP),eU,eF,'eyeframe',13)); pieces.append(('mouth',G(mP),mU,mF,'mouthframe',13))
 NORMALS['eyes']=eN; NORMALS['mouth']=mN
 # gloves and shoes
