@@ -174,3 +174,11 @@ pm.bin 5e1ca972, zt_dbg 0x80367B3C.
   (pitch varies 0.04-0.23 with the terrain) and +0x10 (1.5) is added to both eye and aim: test 8 eases +0x10
   to 1.0 while locked (camera nearer the ground), with the zoom to 9.5.
 - pm.bin f91f513d, zt_dbg 0x80367B60.
+
+## Test 8 results -> test 9
+Test 8 worse. Likely: the pad hook runs more than once per game frame, so the "Z down last time" kept in
+zt.c saw the copy's held Z we had just cleared on the first call, and a held Z turned into presses over and
+over. Test 9 reads Z from the pad master record (0x80341464, pad 0 held: nothing of ours writes it).
+Event log zt_log at 0x80367D28 (magic 'ZLOG', n, calls, 32 x {clock, call, kind, a, b}): 1 Z press (master
+held, copy pressed bit), 2 lock (id, candidates), 3 switch, 4 let go by Z, 5 out of range, 6 target gone,
+7 not free, 8 Z with nothing to lock. zt_dbg 0x80367F34. pm.bin 44129705.

@@ -136,8 +136,20 @@ static s32 pick(u8 *g, s32 map, s32 switching)
     zt_dbg.cands = n; zt_dbg.last_pick = found; zt_dbg.picks++;
     return found;
 }
-static void release(void) { Z.target = 0; }
-static void let_go(void) { if (Z.target) sfx_play(*(u8 **)0x803491E4, SE_FREE, 0); Z.target = 0; }
+/* event log for RAM dumps (magic 'ZLOG'): the last 32 events with the game clock (+20 a frame) and our call
+   counter (two calls on one clock = the pad hook ran twice in a frame).
+   kinds: 1 Z press (a = master held, b = copy pressed bit), 2 lock (a id, b candidates), 3 switch (a id),
+   4 let go: Z, 5 let go: out of range, 6 let go: target gone, 7 release: not free, 8 Z with nothing to lock */
+struct { u32 magic, n, calls; struct { u32 clock, call; s16 kind, a, b, pad; } e[32]; } zt_log;
+static void zlog(s32 kind, s32 a, s32 b)
+{
+    u32 i = zt_log.n++ & 31;
+    zt_log.magic = 0x5A4C4F47u;
+    zt_log.e[i].clock = *(u32 *)*(u8 **)0x80349218; zt_log.e[i].call = zt_log.calls;
+    zt_log.e[i].kind = (s16)kind; zt_log.e[i].a = (s16)a; zt_log.e[i].b = (s16)b;
+}
+static void release(void) { if (Z.target) zlog(7, Z.target, 0); Z.target = 0; }
+static void let_go_why(s32 why) { if (Z.target) { zlog(why, Z.target, 0); sfx_play(*(u8 **)0x803491E4, SE_FREE, 0); } Z.target = 0; }
 static void reticle(u8 *g);
 
 /* ---- the reticle: 4 HUD quads (opguide.agc element 7, AGC_RET_Q) around the target's projected chest.
@@ -202,6 +214,7 @@ void zt_frame(u8 *g, s32 map, volatile u32 *held, volatile u32 *press)
        which looks like their own goings-on setting it (see zt_dbg.noev in a dump) */
     s32 free = map >= 0 && CONTROL == 1 && ev && *(s32 *)(ev + 0x680) == -1 && !(f && *(u8 *)(f + 0x60));
     static s32 notfree;
+    zt_log.calls++;
     zt_dbg.magic = 0x5A544442u; zt_dbg.frames++; zt_dbg.map = map; zt_dbg.control = CONTROL; zt_dbg.noev = ev ? *(s32 *)(ev + 0x58C) : -2;
     zt_dbg.fade = f ? *(u8 *)(f + 0x60) : -1; zt_dbg.free = free;
     if (!free) {                                         /* let go only if it lasts (events, menus, fades) */
@@ -213,28 +226,32 @@ void zt_frame(u8 *g, s32 map, volatile u32 *held, volatile u32 *press)
     scan_actors();
     if (Z.target) {                                      /* let go when out of reach or gone */
         float *p = SLOT_POS(g, 0), dx, dz;
-        if (!tpos(g, Z.target, map, &Z.tx, &Z.tz)) let_go();
+        if (!tpos(g, Z.target, map, &Z.tx, &Z.tz)) let_go_why(6);
         else {
             dx = Z.tx - p[0]; dz = Z.tz - p[2];
-            if (dx * dx + dz * dz > ZT_LEASH * ZT_LEASH) let_go();
+            if (dx * dx + dz * dz > ZT_LEASH * ZT_LEASH) let_go_why(5);
         }
     }
     {   /* Z press from our own record of the last frame: the game's "pressed" compares with a held word we
            clear, so a Z held 2+ frames looked like a second press (test 7: lock + lock-off sounds together) */
+        /* from the pad's master record (0x80341464, pad 0 held), which nothing of ours writes: if the hook runs
+           twice in a frame, the copy's held Z we cleared on the first call can't fake a new press later */
         static u32 zlast;
-        u32 zdown = *held & 0x10;
+        u32 zdown = *(volatile u32 *)0x80341464 & 0x10;
         zpress = zdown && !zlast; zlast = zdown;
+        if (zpress) zlog(1, (s32)(*(volatile u32 *)0x80341464 & 0xFFFF), (s32)(*press & 0x10));
     }
     *press &= ~0x10u;
     if (zpress) {                                        /* Z: ours now (no first-person look) */
         zt_dbg.presses++;
         if (!Z.target) {
             Z.target = pick(g, map, 0);
-            if (Z.target) { tpos(g, Z.target, map, &Z.tx, &Z.tz); Z.r = 60; sfx_play(*(u8 **)0x803491E4, SE_LOCK, 0); }
+            if (Z.target) { zlog(2, Z.target, zt_dbg.cands); tpos(g, Z.target, map, &Z.tx, &Z.tz); Z.r = 60; sfx_play(*(u8 **)0x803491E4, SE_LOCK, 0); }
+            else zlog(8, 0, zt_dbg.cands);
         } else {
             s32 next = pick(g, map, 1);
-            if (next) { Z.target = next; tpos(g, next, map, &Z.tx, &Z.tz); Z.r = 60; sfx_play(*(u8 **)0x803491E4, SE_LOCK, 0); }
-            else let_go();
+            if (next) { zlog(3, next, zt_dbg.cands); Z.target = next; tpos(g, next, map, &Z.tx, &Z.tz); Z.r = 60; sfx_play(*(u8 **)0x803491E4, SE_LOCK, 0); }
+            else let_go_why(4);
         }
     }
     *held &= ~0x10u;                                     /* holding Z never reaches the game either */
