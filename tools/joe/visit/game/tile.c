@@ -1,8 +1,8 @@
 /* Field tile cursor in the Z-target reticle's style. The game draws the highlighted tile with
    func_80091F58(pos, view mtx): a 1-pixel yellow line square (u8 corners 0x8024FBE0, colour 0x8024FC00
    F1F50F / F3) at (pos.x - 0.5, pos.y + 0.05, pos.z - 0.5). HOOK18 sends it here instead: four flat yellow
-   corner brackets lying on the tile (quads, both windings), snapping in when the cursor moves to another
-   tile and pulsing gently, like the lock-on brackets (zt.c). Same GX set-up as the original. */
+   corner brackets lying on the tile (quads, both windings), settling in (slightly larger, no bounce) when the
+   cursor moves to another tile and pulsing gently, like the lock-on brackets (zt.c). Same GX set-up as the original. */
 typedef unsigned int u32;
 typedef int s32;
 typedef unsigned char u8;
@@ -28,7 +28,7 @@ typedef unsigned char u8;
 #define TC_HALF  0.46f              /* bracket box half-size (the tile is 1 x 1) */
 #define TC_ARM   0.26f
 #define TC_W     0.07f              /* bar width */
-#define TC_SNAP  7.0f               /* frames to snap in from 1.6x */
+#define TC_SNAP  6.0f               /* frames to settle from 1.15x (test 15's bounce from 1.6x was too much) */
 static float tsin(float x)
 {
     float x2;
@@ -50,7 +50,7 @@ void zt_tile_cursor(const float *pos, const float *view)
     s32 sx, sz;
     if (pos[0] != TC.x || pos[2] != TC.z) { TC.x = pos[0]; TC.z = pos[2]; TC.t = 0; }   /* a new tile: snap in */
     t = (float)TC.t; if (TC.t < 100000) TC.t++;
-    if (t < TC_SNAP) { float u = t / TC_SNAP - 1; h = 1.6f - 0.6f * (1 + 3.0f * u * u * u + 2.0f * u * u); }
+    if (t < TC_SNAP) { float u = 1 - t / TC_SNAP; h = 1.0f + 0.15f * u * u * u; }   /* small settle, no overshoot */
     else h = 1.0f + 0.04f * tsin((t - TC_SNAP) * (6.28318548f / 42.0f));
     H = TC_HALF * h; A = TC_ARM * h;
     GXSetBlendMode(1, 4, 5, 0);

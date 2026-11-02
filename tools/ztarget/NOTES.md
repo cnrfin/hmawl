@@ -237,3 +237,6 @@ translated to (x - 0.5, y + 0.05, z - 0.5). HOOK18 (its first instruction) -> pm
 zt_tile_cursor (tile.c): the same GX set-up with direct f32 / RGBA8 vertices, four flat yellow corner
 brackets as ground quads (both windings), half-size 0.46, arm 0.26, bar 0.07; snap in from 1.6x over 7
 frames on a new tile, pulse 4 %. pm.bin deae3820.
+
+## Test 16: tile cursor settle softened
+No overshoot: from 1.15x to 1x over 6 frames (ease-out cubic), then the 4 % pulse. pm.bin 4e0cc987.
