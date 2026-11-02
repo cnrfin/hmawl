@@ -49,11 +49,6 @@ static void scan_actors(void)
     }
 }
 
-static s32 no_event(void)
-{
-    u8 *m = EVMGR;
-    return m && *(s32 *)(m + 0x680) == -1 && *(s32 *)(m + 0x58C) == 0;
-}
 static float rsq(float x)
 {
     float r;
@@ -61,6 +56,14 @@ static float rsq(float x)
     r = r * (1.5f - 0.5f * x * r * r);
     r = r * (1.5f - 0.5f * x * r * r);
     return r;
+}
+static float zsin(float x)                              /* x in -pi..pi */
+{
+    float x2;
+    while (x > 3.14159274f) x -= 6.28318548f;
+    while (x < -3.14159274f) x += 6.28318548f;
+    x2 = x * x;
+    return x * (1 - x2 / 6 * (1 - x2 / 20 * (1 - x2 / 42)));
 }
 /* a candidate's position; 0 if it is not out on the player's map */
 static s32 tpos(u8 *g, s32 id, s32 map, float *x, float *z)
@@ -74,6 +77,11 @@ static s32 tpos(u8 *g, s32 id, s32 map, float *x, float *z)
     if (!s || SLOT_MAP(g, id) != map) return 0;
     *x = s[0]; *z = s[2]; return 1;
 }
+static float ztan_half_fov(u8 *c)
+{
+    float f = *(float *)(c + 0x38) * (3.14159274f / 360.0f);
+    return zsin(f) / zsin(f + 1.57079637f);
+}
 static float theight(u8 *g, s32 id)
 {
     float p[3];
@@ -82,22 +90,46 @@ static float theight(u8 *g, s32 id)
 }
 /* best target in front: switching = 1 skips the current one, widens the cone to 90 degrees and favours
    targets straight ahead (distance x0.6 ahead .. x1.0 at the side) */
+/* debug block for RAM dumps (magic 'ZTDB') */
+struct { u32 magic; s32 target, alpha, free, map, control, noev, fade, presses, picks, cands, last_pick, agc_ok, cx, cy, frames, nfree; float w, ndx, ndy; } zt_dbg;
+static float ztan_half_fov(u8 *c);
+/* project a world point with the field camera: returns depth (<= 0: behind), ndc x / y in -1..1 */
+static float proj(float x, float y, float z, float *nx, float *ny)
+{
+    u8 *c = CAM;
+    float *M, sx, sy, w, f;
+    if ((u32)c < 0x80000000u || (u32)c >= 0x81800000u) return 0;
+    M = (float *)(c + 0x50);
+    sx = M[0] * x + M[1] * y + M[2] * z + M[3];
+    sy = M[4] * x + M[5] * y + M[6] * z + M[7];
+    w = -(M[8] * x + M[9] * y + M[10] * z + M[11]);
+    if (w < 0.3f) return 0;
+    f = ztan_half_fov(c);
+    *nx = sx / w / (f * *(float *)(c + 0x34)); *ny = sy / w / f;
+    return w;
+}
+/* OoT-like choice: anyone out here within range whose chest is on screen; nearest and most central wins.
+   switching = 1 skips the current target. */
+static float theight(u8 *g, s32 id);
 static s32 pick(u8 *g, s32 map, s32 switching)
 {
-    float *p = SLOT_POS(g, 0), *d = SLOT_DIR(g, 0), best = 1e30f, x, z;
-    s32 id, found = 0, i;
+    float *p = SLOT_POS(g, 0), best = 1e30f, x, z, nx, ny;
+    s32 id, found = 0, i, n = 0;
     for (i = 0; i <= 0x26; i++) {
-        float dx, dz, d2, inv, c, score;
+        float dx, dz, d2, score, ax;
         id = i == 0 ? ZT_JOE : i;
         if (switching && id == Z.target) continue;
         if (!tpos(g, id, map, &x, &z)) continue;
         dx = x - p[0]; dz = z - p[2]; d2 = dx * dx + dz * dz;
         if (d2 > ZT_RANGE * ZT_RANGE || d2 < 0.0001f) continue;
-        inv = rsq(d2); c = (dx * d[0] + dz * d[2]) * inv;  /* cos of the angle from the facing */
-        if (c < (switching ? 0.0f : ZT_COS60)) continue;
-        score = d2 * (switching ? 1.0f - 0.4f * c : 1.0f);
+        if (proj(x, theight(g, id) + 0.85f, z, &nx, &ny) <= 0) continue;
+        if (nx < -0.95f || nx > 0.95f || ny < -0.95f || ny > 0.95f) continue;
+        n++;
+        ax = nx < 0 ? -nx : nx;
+        score = d2 * (1.0f + ax);
         if (score < best) { best = score; found = id; }
     }
+    zt_dbg.cands = n; zt_dbg.last_pick = found; zt_dbg.picks++;
     return found;
 }
 static void release(void) { Z.target = 0; }
@@ -110,14 +142,6 @@ static void reticle(u8 *g);
 #define AGC        (*(u8 **)0x80349110)
 #define RET_COL    0x9696FF00u
 #define RET_Y      0.85f                                /* aim this far above the target's feet */
-static float zsin(float x)                              /* x in -pi..pi */
-{
-    float x2;
-    while (x > 3.14159274f) x -= 6.28318548f;
-    while (x < -3.14159274f) x += 6.28318548f;
-    x2 = x * x;
-    return x * (1 - x2 / 6 * (1 - x2 / 20 * (1 - x2 / 42)));
-}
 static s32 rframe;
 static void quad(u8 *a, s32 k, s32 x0, s32 y0, s32 x1, s32 y1, const float *uv, u32 rgba)
 {
@@ -130,26 +154,29 @@ static void quad(u8 *a, s32 k, s32 x0, s32 y0, s32 x1, s32 y1, const float *uv, 
 static void reticle(u8 *g)
 {
     u8 *a = AGC, *c = CAM;
-    float *M, x, y, z, w, f, sx, sy, r;
+    float x, y, z, w, sx, sy, r;
     s32 cx, cy, e7y, h = TRI_W / 2, k, ri;
     u32 col;
+    zt_dbg.agc_ok = 0;
     if ((u32)a < 0x80000000u || (u32)a >= 0x81800000u) return;
-    if (*(u32 *)a != 0xC1C7C3C6u || *(u32 *)(a + AGC_E7_COUNT) != E7_COUNT) return;   /* our opguide.agc */
+    zt_dbg.agc_ok = 1;
+    if (*(u32 *)a != 0xC1C7C3C6u) return;
+    zt_dbg.agc_ok = 2;
+    if (*(u32 *)(a + AGC_E7_COUNT) != E7_COUNT) return;   /* our opguide.agc */
+    zt_dbg.agc_ok = 3;
     if (Z.target) { if (Z.alpha < 255) Z.alpha += 51; if (Z.alpha > 255) Z.alpha = 255; }
     else { Z.alpha -= 64; if (Z.alpha < 0) Z.alpha = 0; Z.r = 60; }
     if (!Z.alpha || (u32)c < 0x80000000u || (u32)c >= 0x81800000u) {
         for (k = 0; k < 4; k++) quad(a, k, 0, 0, 0, 0, UV_TRI[k], 0xFFFFFF00u);
         return;
     }
-    M = (float *)(c + 0x50); x = Z.tx; y = Z.ty + RET_Y; z = Z.tz;
-    sx = M[0] * x + M[1] * y + M[2] * z + M[3];
-    sy = M[4] * x + M[5] * y + M[6] * z + M[7];
-    w = -(M[8] * x + M[9] * y + M[10] * z + M[11]);
-    if (w < 0.5f) { for (k = 0; k < 4; k++) quad(a, k, 0, 0, 0, 0, UV_TRI[k], 0xFFFFFF00u); return; }
-    f = *(float *)(c + 0x38) * (3.14159274f / 360.0f);  /* half the FOV, radians */
-    f = zsin(f) / zsin(f + 1.57079637f);                 /* tan */
-    cx = (s32)(sx / w / (f * *(float *)(c + 0x34)) * 320.0f);
-    cy = (s32)(-sy / w / f * 240.0f);
+    x = Z.tx; y = Z.ty + RET_Y; z = Z.tz;
+    w = proj(x, y, z, &sx, &sy);
+    zt_dbg.w = w; zt_dbg.ndx = sx; zt_dbg.ndy = sy;
+    if (w <= 0) { for (k = 0; k < 4; k++) quad(a, k, 0, 0, 0, 0, UV_TRI[k], 0xFFFFFF00u); return; }
+    cx = (s32)(sx * 320.0f);
+    cy = (s32)(-sy * 240.0f);
+    zt_dbg.cx = cx; zt_dbg.cy = cy;
     if (Z.r < 20.5f) Z.r = 20 + 2.0f * zsin((float)(rframe++ % 60) * (6.28318548f / 60.0f));
     else Z.r += (20 - Z.r) * 0.3f;
     r = Z.r; ri = (s32)r;
@@ -164,8 +191,19 @@ static void reticle(u8 *g)
 void zt_frame(u8 *g, s32 map, volatile u32 *held, volatile u32 *press)
 {
     u8 *f = FADER;
-    s32 free = map >= 0 && CONTROL == 1 && no_event() && !(f && *(u8 *)(f + 0x60));
-    if (!free) { release(); reticle(g); return; }
+    u8 *ev = EVMGR;
+    /* free: no script event running (+0x680 == -1). Not +0x58C: test 3 lost the lock near several villagers,
+       which looks like their own goings-on setting it (see zt_dbg.noev in a dump) */
+    s32 free = map >= 0 && CONTROL == 1 && ev && *(s32 *)(ev + 0x680) == -1 && !(f && *(u8 *)(f + 0x60));
+    static s32 notfree;
+    zt_dbg.magic = 0x5A544442u; zt_dbg.frames++; zt_dbg.map = map; zt_dbg.control = CONTROL; zt_dbg.noev = ev ? *(s32 *)(ev + 0x58C) : -2;
+    zt_dbg.fade = f ? *(u8 *)(f + 0x60) : -1; zt_dbg.free = free;
+    if (!free) {                                         /* let go only if it lasts (events, menus, fades) */
+        zt_dbg.nfree++;
+        if (++notfree > 8) release();
+        reticle(g); return;
+    }
+    notfree = 0;
     scan_actors();
     if (Z.target) {                                      /* let go when out of reach or gone */
         float *p = SLOT_POS(g, 0), dx, dz;
@@ -176,7 +214,7 @@ void zt_frame(u8 *g, s32 map, volatile u32 *held, volatile u32 *press)
         }
     }
     if (*press & 0x10) {                                 /* Z: ours now (no first-person look) */
-        *press &= ~0x10u; *held &= ~0x10u;
+        *press &= ~0x10u; *held &= ~0x10u; zt_dbg.presses++;
         if (!Z.target) {
             Z.target = pick(g, map, 0);
             if (Z.target) { tpos(g, Z.target, map, &Z.tx, &Z.tz); Z.r = 60; sfx_play(*(u8 **)0x803491E4, SE_LOCK, 0); }
@@ -189,6 +227,7 @@ void zt_frame(u8 *g, s32 map, volatile u32 *held, volatile u32 *press)
     *held &= ~0x10u;                                     /* holding Z never reaches the game either */
     if (Z.target) Z.ty = theight(g, Z.target);
     reticle(g);
+    zt_dbg.target = Z.target; zt_dbg.alpha = Z.alpha;
 }
 
 /* atan2 (radians), polynomial: about 0.005 rad worst error, plenty for a camera */

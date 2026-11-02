@@ -129,3 +129,16 @@ Test 2: much better, camera turns, but locking is hit and miss and there is no m
   the dump's player feet project 110 px below the centre, as in the user's screenshot. OoT-style close-in
   (60 -> 20 px) then a slow breathe, light blue (150,150,255), fade out on release.
 - data/commonall.arc.clz 982dfad1, pm.bin 970bd3b5 (code ends 0x80367770; 10 KB left below the arena).
+
+## Test 3 results -> test 4
+Test 3: no reticle seen; with one villager smooth, with several it breaks (switching only works from some
+spots, sometimes Z stops working while walking).
+- Choice is now OoT-like and independent of the player's facing (which the stick and the lock keep
+  changing): any present villager / Joe within 10 whose chest projects on screen (ndc within 0.95);
+  score = distance^2 x (1 + |ndc x|). Switching uses the same rule without the current target.
+- "Free" now ignores EVMGR +0x58C (suspected: set by villagers' own goings-on when several are near) and
+  only needs +0x680 == -1 (no script event), CONTROL 1, no fade; a not-free spell must last 8+ frames to
+  drop the lock.
+- Debug block zt_dbg at 0x80367944 (magic 'ZTDB'): target, alpha, free, map, control, +0x58C, fade, Z
+  presses, picks, candidates at the last pick, last pick, agc_ok (3 = HUD file found), reticle cx/cy, frames,
+  not-free frames, depth w, ndc x/y. pm.bin 88366ec6.
