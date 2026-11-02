@@ -105,3 +105,11 @@ the trade (cmd_A0 did that), cmd_5A(0, 1) shows him again. Common.arc e3022926, 
   with your $JOE before then."
 - data/: Common.arc d0f89ea4, mukumuku.mes 5dfdab5d, people.mes 22b9572a (debug.mes as test 9). pm.bin c721c54c.
 - The heart shows character 0x23's friendship (not yet tied to the gifts).
+
+## Test 11: name plate for Joe's lines (HOOK12)
+Test 10 showed no name: every script message goes through func_80113864, which calls func_801020E4 with
+mode 0 (window without name plate; the speaker is ignored). Villager talk uses mode 1 (name + heart:
++0x5C layout +0x314, speaker -> character via table 0x80251A38). HOOK12 = that bl at 0x80113894 ->
+pm_msg_stub (pm.bin +0x1E4): file 0x15 (Joe's lines in mukumuku.mes) opens in mode 1, everything else as
+before. make_pm_dol.py: new 'blhook' patch type. Checked on the mock disc (update mode). pm.bin ab37596e,
+make_pm_dol.py 17653839.

@@ -175,3 +175,13 @@ pm_van_stub:
     addi  r1, r1, 0x20
     stwu  r1, -0x140(r1)            # original first instruction
     b     van_hook_return           # 0x80060EFC
+
+# Script messages: func_80113864 (every script message command) opens the window with mode 0, which never
+# shows the speaker's name and heart. HOOK12 (its bl func_801020E4 at 0x80113894) comes here: Joe's lines
+# (file 0x15, mukumuku.mes) open in mode 1, the villager talk window with name and heart.
+    .globl pm_msg_stub
+pm_msg_stub:
+    cmpwi r5, 0x15
+    bne   1f
+    li    r4, 1
+1:  b     msg_open                  # 0x801020E4

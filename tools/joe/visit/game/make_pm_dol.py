@@ -39,6 +39,8 @@ HOOK10 = 0x80148A4C
 HOOK10_OFF = 0x1A0                                    # pm_want_stub in pm.bin (after pm_talk_stub)
 HOOK11 = 0x80060EF8
 HOOK11_OFF = 0x1B8                                    # pm_van_stub in pm.bin (after pm_want_stub)
+HOOK12 = 0x80113894                                   # func_80113864's bl func_801020E4 (script messages)
+HOOK12_OFF = 0x1E4                                    # pm_msg_stub in pm.bin (after pm_van_stub)
 PREV = {0x801B0EE4: (0x3C608036,), 0x801B0EE8: (0x38636000,), 0x801B0F2C: (0x38636000,)}   # earlier builds' words (update mode)
 PATCHES = [  # (RAM address, original word, new word, why)
     (0x801B0EE4, 0x80630030, 0x3C608037, 'OSInit: arena low = 0x8036A000 (was BootInfo->arenaLo or __ArenaLo) ...'),
@@ -67,6 +69,7 @@ PATCHES = [  # (RAM address, original word, new word, why)
     (HOOK8, 0x9421FFE0, None, 'TV channel 3 caption (func_8008E298) -> pm_tv_stub: $JOE Coin Daily'),
     (HOOK9, 0x9421FFC0, None, 'villager talk line (func_80117B10) -> pm_talk_stub: villagers hate the $JOE coin'),
     (HOOK10, 0x9421FFD0, None, 'villager liked/wanted-item lists (func_80148A4C) -> pm_want_stub: never the $JOE coin'),
+    (HOOK12, 0x4BFEE851, 'blhook', 'script message window -> pm_msg_stub: Joe\'s lines (file 0x15) in mode 1 (name + heart)'),
     (HOOK11, 0x9421FEC0, None, 'villager daily plan (func_80060EF8) -> pm_van_stub: log who plans (bench sit probe)'),
     (0x802952D4, 0x5000037B, 0x000003BB, 'day table row 33 = Van (villager 0x24): chance of an extra visit 80 -> 0, day mask 0x37B -> 0x3BB (comes on the 3rd and 7th only)'),
     (0x8028C74C, 0x00020000, 0x00000000, '$JOE coin (item 0x442): price 0 (was 2; ships for 0 G, shops/Van see no value)'),
@@ -105,7 +108,7 @@ def main():
     if CODE_ADDR + len(code) > ARENA_LO: die('code does not fit below the new arena start')
     entry = CODE_ADDR                                   # pm_hook is the first thing in pm.bin
     if be32(code, HOOK2_OFF) != 0x9421FFE0: die('pm.bin does not have pm_hook2 at +0x14')
-    targets = {HOOK: entry, HOOK2: entry + HOOK2_OFF, HOOK3: entry + HOOK3_OFF, HOOK4: entry + HOOK4_OFF, HOOK5: entry + HOOK5_OFF, HOOK6: entry + HOOK6_OFF, HOOK7: entry + HOOK7_OFF, HOOK8: entry + HOOK8_OFF, HOOK9: entry + HOOK9_OFF, HOOK10: entry + HOOK10_OFF, HOOK11: entry + HOOK11_OFF}
+    targets = {HOOK: entry, HOOK2: entry + HOOK2_OFF, HOOK3: entry + HOOK3_OFF, HOOK4: entry + HOOK4_OFF, HOOK5: entry + HOOK5_OFF, HOOK6: entry + HOOK6_OFF, HOOK7: entry + HOOK7_OFF, HOOK8: entry + HOOK8_OFF, HOOK9: entry + HOOK9_OFF, HOOK10: entry + HOOK10_OFF, HOOK11: entry + HOOK11_OFF, HOOK12: entry + HOOK12_OFF}
     if be32(code, HOOK3_OFF) >> 16 != 0x3D80: die('pm.bin does not have pm_player_stub at +0x58')
     if be32(code, HOOK4_OFF) != 0x9421FFF0: die('pm.bin does not have pm_label_stub at +0x68')
     if be32(code, HOOK5_OFF) != 0x9421FFD0: die('pm.bin does not have pm_sfx_stub at +0x98')
@@ -115,6 +118,7 @@ def main():
     if be32(code, HOOK9_OFF) != 0x9421FFE0: die('pm.bin does not have pm_talk_stub at +0x150')
     if be32(code, HOOK10_OFF) != 0x2C050442: die('pm.bin does not have pm_want_stub at +0x1A0')
     if be32(code, HOOK11_OFF) != 0x9421FFE0: die('pm.bin does not have pm_van_stub at +0x1B8')
+    if be32(code, HOOK12_OFF) != 0x2C050015: die('pm.bin does not have pm_msg_stub at +0x1E4')
     if be32(code, AXE_STUB_OFF) >> 26 != 18: die('pm.bin does not have pm_axe_stub at +0x54')
     with open(src, 'rb') as f:
         hdr = f.read(0x440)
@@ -150,6 +154,7 @@ def main():
         if be32(dol, at(addr)) != want: die(f'{addr:#010x}: the baked Cursed Axe code is not there (has {be32(dol, at(addr)):08x})')
     def final(addr, new):
         if new is None: return 0x48000000 | ((targets[addr] - addr) & 0x03FFFFFC)
+        if new == 'blhook': return 0x48000001 | ((targets[addr] - addr) & 0x03FFFFFC)
         if new == 'axe': return 0x48000001 | ((entry + AXE_STUB_OFF - addr) & 0x03FFFFFC)
         return new
     for addr, old, new, why in PATCHES:
