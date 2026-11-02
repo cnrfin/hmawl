@@ -185,3 +185,18 @@ pm_msg_stub:
     bne   1f
     li    r4, 1
 1:  b     msg_open                  # 0x801020E4
+
+# Z targeting: 0x800313C4, in the player's update right after his state handler (r30 = player), before his
+# position and facing are copied into event slot 0. zt_post(player) turns him toward the lock-on target.
+    .globl pm_zt_stub
+pm_zt_stub:
+    stwu  r1, -0x10(r1)
+    mflr  r0
+    stw   r0, 0x14(r1)
+    mr    r3, r30
+    bl    zt_post
+    lwz   r0, 0x14(r1)
+    mtlr  r0
+    addi  r1, r1, 0x10
+    lwz   r3, -0x57F4(r13)          # original instruction (lwz r3, lbl_803491CC@sda21(r13))
+    b     zt_hook_return            # 0x800313C8

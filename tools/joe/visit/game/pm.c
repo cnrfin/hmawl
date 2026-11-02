@@ -649,6 +649,14 @@ void pm_scene_change(void)
     if (S.loaded) release_model();
 }
 
+void zt_frame(u8 *g, s32 map, volatile u32 *held, volatile u32 *press);
+/* Z targeting (zt.c): Joe's position while he is out (who 2 = Joe) */
+s32 pm_joe_pos(float *p)
+{
+    if (S.who != 2 || !S.actor) return 0;
+    p[0] = S.pos.x; p[1] = S.pos.y; p[2] = S.pos.z;
+    return 1;
+}
 void pm_frame(void)
 {
     u8 *g = GAME;
@@ -662,6 +670,7 @@ void pm_frame(void)
     tod = t % T_DAY;
     map = *(s32 *)(g + 0x2A290);              /* the player's current map */
     if (!*(u8 **)0x80349208 || *(s32 *)(*(u8 **)0x80349208 + 0x68) != map) map = -1;  /* g_system: in the field */
+    zt_frame(g, map, &PAD_HELD, &PAD_PRESS);  /* Z targeting (zt.c): takes Z before anything else reads it */
     logs_frame(g, map, PAD_HELD, PAD_PRESS);  /* choppable logs (logs.c) */
     skill_frame(g, PAD_HELD, PAD_PRESS);      /* tool skill on the HUD (skill.c) */
     spring_frame(g, map, PAD_HELD, PAD_PRESS);  /* offerings at the goddess pond (spring.c) */

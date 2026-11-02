@@ -87,3 +87,20 @@ line by line, so check it before relying on it.
 - **For AWL:** a simple version of KeepOn1. The eye sits behind the player on the line from the target
   through the player, raised and a little to the side, looking at a point between the two, all eased
   with the rates above.
+
+## Test 1 (pm.bin, HOOK13): lock-on and strafe, no marker yet
+Found for it (static reading plus earlier RAM dumps):
+- Player object (r30 in his update func_800312xx): position +0x4C, facing +0x58 (unit vector), map +0x64,
+  state +0x1364 (state table 0x802A3AA8, 0x3C per state, filled at runtime: state 1 = free in the field,
+  its update 0x80042CA8, A/Z routine 0x80042DFC..0x80043120). Target speed +0x136C, current speed +0x1370,
+  stick direction (stick space) +0x1374.
+- func_8003083C: stick (pad +0x18/+0x19) -> speed class, facing = stick angle + camera yaw (camera
+  *(0x8034922C) +0x1C). The position step (0x80030AEC) uses the stick vector and the camera yaw again, not
+  the facing. So rewriting the facing after the update leaves movement to the stick: a strafe.
+- Villagers keep their live position / direction / map in the event slots (game +0x29C78 / +0x29F84 /
+  +0x2A290, 12 / 12 / 4 bytes x character id), same as slot 0 = the player (copied at 0x800313D0).
+Code: zt.c. zt_frame (pad hook) takes Z (press and hold) whenever the player is free in the field. Z picks
+the nearest villager (ids 1..0x26, same map) or Joe within 10 units and 60 degrees of the facing; Z again
+switches (90 degrees, ahead favoured) or lets go; out past 13.5 units = let go. HOOK13 (0x800313C4, original
+lwz r3,-0x57F4(r13) replayed in pm_zt_stub at pm.bin +0x1F4) calls zt_post(player): facing -> target.
+Sounds: 3 on lock, 4 on release (4 is a guess).
