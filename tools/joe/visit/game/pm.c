@@ -418,6 +418,16 @@ static s32 joe_forced, joe_here, joe_trading;
 #define msg_number F(0x80102300, void, (u8 *, s32, s32))
 #define MSGMGR     (*(u8 **)0x803491C4)
 s32 joe_price_today(void);
+#define sfx_play   F(0x8012A52C, s32, (u8 *, s32, s32))
+#define SE_CASH    0xCD                    /* the gold-change chime (script cmd_C1 plays it) */
+/* the event system's per-character position/direction (game+0x29C78 / +0x29F84, 12 bytes per id): Joe's
+   seat in character 37's slot, so the talk camera (script cmd_A0(37)) frames him as it does a villager */
+static void joe_char_slot(u8 *g)
+{
+    float *p = (float *)(g + 0x29C78 + 37 * 12), *d = (float *)(g + 0x29F84 + 37 * 12);
+    p[0] = BENCH_X; p[1] = S.pos.y; p[2] = BENCH_Z;
+    d[0] = 1; d[1] = 0; d[2] = 0;
+}
 /* the trade event asks through counter 41: 1 buy / 4 sell (count in 42); answer 2 bought, 3 short of gold, 5 sold */
 static void joe_trade(u8 *g)
 {
@@ -430,7 +440,7 @@ static void joe_trade(u8 *g)
     total = p * (u32)n;
     if (req == 1) {
         if (GOLD < total) JCNT(41) = 3;
-        else { GOLD -= total; rucksack_add(g + 0x50, JOE_ITEM, n, -1); JCNT(41) = 2; }
+        else { GOLD -= total; rucksack_add(g + 0x50, JOE_ITEM, n, -1); JCNT(41) = 2; sfx_play(*(u8 **)0x803491E4, SE_CASH, 0); }
     } else if (req == 4) {
         s32 have = item_count(g + 0x50, JOE_ITEM);
         if (n > have) n = have;
@@ -438,6 +448,7 @@ static void joe_trade(u8 *g)
         total = p * (u32)n;
         GOLD = GOLD + total > GOLD_MAX ? GOLD_MAX : GOLD + total;
         JCNT(41) = 5;
+        sfx_play(*(u8 **)0x803491E4, SE_CASH, 0);
     }
 }
 static void joe_motion(s32 m)               /* start a clip once (sit down / stand up must not restart) */
@@ -485,7 +496,7 @@ static s32 joe_frame(u8 *g, s32 map, u32 t)
     }
     if (joe_trading) {                        /* our trade event: settle its requests */
         if (no_event()) { joe_trading = 0; JCNT(41) = 0; }
-        else { joe_trade(g); return 1; }
+        else { joe_char_slot(g); joe_trade(g); return 1; }
     }
     if (!no_event()) return 1;
     if (S.loaded && S.who != 2) { if (S.actor) despawn(); release_model(); }
@@ -520,6 +531,7 @@ static s32 joe_frame(u8 *g, s32 map, u32 t)
             JCNT(41) = 0; JCNT(42) = 0; JCNT(44) = item_count(g + 0x50, JOE_ITEM);
             if (MSGMGR) msg_number(MSGMGR, 0, joe_price_today());
             joe_trading = 1;
+            joe_char_slot(g);
             event_start(EVMGR, JOE_EVENT, 0, 0);
         }
     }

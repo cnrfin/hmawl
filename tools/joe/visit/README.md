@@ -50,3 +50,13 @@ worth checking if a clip ever plays at the wrong speed.)
   make_pm_dol.py's update mode accepts the earlier arena words. Checked on a mock disc (fresh then update).
 - No expressions yet (the angry "What!?" line is plain).
 pm.bin cca2dccd, make_pm_dol.py ce24f38c.
+
+## Test 5: talk camera, cash chime, bench camera test
+- Trade event: `cmd_10` then `cmd_A0(37)` = the game's NPC talk camera (as Common script 88 does with
+  character 5). cmd_A0 reads the character's position/direction from the event system's per-character
+  slots, game+0x29C78 / +0x29F84 + 12 x id (id 0 = the player); pm.c writes Joe's seat (bench centre,
+  facing +x) into slot 37 before and during the event.
+- Cash chime: sound 0xCD (what script cmd_C1 plays on a gold change) after a buy or a sale.
+- Bench (event 407): built without `cmd_10` (`BENCH_NOCAM=1`) to test whether that is the camera jump.
+- Common.arc a4646e86 (bench without cmd_10 + trade), debug.mes unchanged (6c1b2dbc). pm.bin 84f171ce.
+- Money window: not found yet (the shops draw it from their own REL code).

@@ -36,7 +36,8 @@ V_ANS = 2
 REST = 40                                                    # event counter 40 (no script uses it; 0-29 count up daily)
 EVE_REQ, MORN_REQ = 7771, 7772                               # values pm.c accepts: skip to 18:00 / 6:00
 a = Asm(); L = a.new
-a.sys(0x10); a.sys(0x00)                                     # event start
+if not os.environ.get('BENCH_NOCAM'): a.sys(0x10)            # cmd_10: event camera on the player (made the camera jump)
+a.sys(0x00)
 def fade(cmd):
     a.num(0); a.raw(64); a.sys(cmd)                          # cmd_0B out / cmd_0C in: black, 0.5 s
     top = L('fade'); a.label(top); a.sys(0x00); a.sys(0x0D); a.jnz(top)
