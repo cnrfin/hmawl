@@ -32,3 +32,5 @@ calcprogress.bat
 in/
 GYWEE9/
 test/
+**/__pycache__/
+*.pyc
