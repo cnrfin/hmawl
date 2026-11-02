@@ -46,3 +46,8 @@ a session's temporary folder; the ones still only there are marked.
 | Sound bank: item-get fanfare (224), wood hit (432), Breeze level-up jingle G (433) | sound/GAME_ALL.arc + .samp | tools/sound (README: rebuild chain from vanilla; SoundFont script, not the 51 MB .sf2) |
 | Muffy recolour (pink hair, black dress, orange eyes): textures only, not built into her files yet | mumu_0.arc (future) | tools/muffy |
 | Skip intro | Chapter1.arc etc. | tools/skipintro |
+
+## Ideas (not started)
+| Idea | Notes |
+|---|---|
+| Zelda-style Z targeting | Replaces Z's first-person view. Use the OoT decompilation (zeldaret/oot) as a behaviour reference only. Plan: 1) Z locks the nearest villager or animal in range, with a marker, and the player keeps facing them while walking (existing walk animation); 2) a follow camera, which needs the field camera object found (RAM dumps); 3) new player clips for strafing left and right and walking backwards (to work on every chapter's look); 4) cycling targets, targetable objects, a release distance. Needs a hook in the player's movement update. |
