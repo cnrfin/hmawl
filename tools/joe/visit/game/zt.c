@@ -224,6 +224,7 @@ static void reticle(u8 *g)
 }
 
 static void swing_frame(s32 bpress, s32 free);
+struct { u32 magic, n, lastm, bpress, tries, fail, starts, bones, slot, arc, anim; float w, frame, len; u32 ring[8][4]; } sw_dbg;   /* 'SWDB' (dump) */
 void zt_frame(u8 *g, s32 map, volatile u32 *held, volatile u32 *press)
 {
     u8 *f = FADER;
@@ -278,6 +279,10 @@ void zt_frame(u8 *g, s32 map, volatile u32 *held, volatile u32 *press)
         static u32 blast;
         u32 bdown = *(volatile u32 *)0x80341464 & 0x200;
         s32 bpress = bdown && !blast; blast = bdown;
+        u32 mw = *(volatile u32 *)0x80341464;
+        if (mw != sw_dbg.lastm) { sw_dbg.lastm = mw; sw_dbg.ring[sw_dbg.n & 7][0] = mw; sw_dbg.ring[sw_dbg.n & 7][1] = *held;
+                                  sw_dbg.ring[sw_dbg.n & 7][2] = *press; sw_dbg.ring[sw_dbg.n & 7][3] = (u32)Z.target; sw_dbg.n++; }
+        if (bpress) sw_dbg.bpress++;
         if (Z.target) { *press &= ~0x200u; *held &= ~0x200u; }
         swing_frame(bpress && Z.target, 1);
     }
@@ -428,12 +433,21 @@ static float smooth01(float x) { if (x <= 0.0f) return 0.0f; if (x >= 1.0f) retu
 static void swing_frame(s32 bpress, s32 free)
 {
     if (!free) { SW.on = 0; SW.w = 0.0f; return; }
-    if (bpress && sw_slot && !SW.on) {
-        u8 *tab = *(u8 **)(sw_slot + 0x88), *arc = tab ? *(u8 **)tab : 0, *a;
-        if (arc && *(u32 *)arc == 0x55AA382Du && (a = arc_anim(arc, 0, SW_CLIP)) != 0) {
-            ctl_init((u8 *)&SWC, a, 0.0f); SWC.rate = 1.0f; SWC.next = 0; SW.on = 1; SW.swings++;
+    sw_dbg.magic = 0x53574442u; sw_dbg.slot = (u32)sw_slot;
+    if (bpress && !SW.on) {
+        sw_dbg.tries++;
+        if (!sw_slot) sw_dbg.fail = 1;
+        else {
+            u8 *tab = *(u8 **)(sw_slot + 0x88), *arc = tab ? *(u8 **)tab : 0, *a = 0;
+            sw_dbg.arc = (u32)arc;
+            if (!arc) sw_dbg.fail = 2;
+            else if (*(u32 *)arc != 0x55AA382Du) sw_dbg.fail = 3;
+            else if ((a = arc_anim(arc, 0, SW_CLIP)) == 0) sw_dbg.fail = 4;
+            else { sw_dbg.anim = (u32)a; sw_dbg.fail = 0; sw_dbg.starts++;
+                   ctl_init((u8 *)&SWC, a, 0.0f); SWC.rate = 1.0f; SWC.next = 0; SW.on = 1; SW.swings++; }
         }
     }
+    sw_dbg.w = SW.w; sw_dbg.frame = SWC.frame; sw_dbg.len = SWC.len;
     if (!SW.on) { SW.w = 0.0f; return; }
     SW.w = smooth01((SWC.frame + SW_RATE) / SW_IN) * smooth01((SWC.len - SWC.frame) / SW_OUT);
     if (SWC.frame + SW_RATE >= SWC.len) { SW.on = 0; SW.w = 0.0f; return; }
@@ -445,7 +459,7 @@ s32 zt_bone(u8 *ctl, s32 n, u8 *trs, u8 *inst)
     if (r && SW.w > 0.0f && n >= SW_SPINE && sw_slot && inst == *(u8 **)(sw_slot + 0x14)) {
         float w = SW.w;
         if (n == SW_SPINE) w *= 0.4f; else if (n == SW_SPINE + 1) w *= 0.7f;
-        anim_blend((u8 *)&SWC, n, trs, w);
+        anim_blend((u8 *)&SWC, n, trs, w); sw_dbg.bones++;
     }
     return r;
 }
