@@ -47,7 +47,11 @@ JOE = 0x442
 REQ, CNT, HELD = 41, 42, 44
 V_ANS, V_N = 2, 3
 a = Asm(); L = a.new
-a.sys(0x10); a.num(37); a.sys(0xA0); a.num(1); a.sys(0xDD); a.sys(0x00)   # + cmd_DD(1): the money window (as the shops)             # event start, NPC talk camera on character 37 (Joe; pm.c fills its slot)
+a.sys(0x10)                                                  # event start
+for base, cmd in ((20, 0x14), (23, 0x15)):                   # first-person camera: counters 20-25 = eye / target x128 (pm.c)
+    for k in range(3): a.num(base + k); a.sys(0x95); a.num(128); a.emit('div')
+    a.sys(cmd)
+a.num(1); a.sys(0xDD); a.sys(0x00)                           # cmd_DD(1): the money window (as the shops)
 done = L('done')
 def say(m):  a.wait_msg(FILE, m)
 def ask(m, no):                                              # yes/no: answer 0 = yes; anything else -> no

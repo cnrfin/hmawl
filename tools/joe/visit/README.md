@@ -70,3 +70,9 @@ pm.bin cca2dccd, make_pm_dol.py ce24f38c.
 - Talk camera a little further: character 37's slot point is 0.4 behind the seat centre.
 - Test 5 results: first-person camera works (slightly too close), the bench jump is gone (cmd_10 removed),
   the cash chime plays. pm.bin 1e2b5c33.
+
+## Test 7: own first-person camera (no cmd_A0)
+cmd_A0(37) also moves character 37 to its slot point and turns it to the player in the talk idle (test 6:
+Joe stood up, behind the bench). Dropped: pm.c writes counters 20-25 (eye at the player's head 1.4 up,
+0.2 toward Joe; target Joe's face, bench centre 0.95 up) and the script feeds them to cmd_14/cmd_15, as the
+Postman's talk does. Re-sit check and slot writes removed. Common.arc 8d2db2a8, pm.bin b2b5effb.
