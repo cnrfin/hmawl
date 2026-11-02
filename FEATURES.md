@@ -31,7 +31,7 @@ a session's temporary folder; the ones still only there are marked.
 | Joe speaks as character 0x23 (Mukumuku's slot): name "Joe" in Message.arc people.mes, hearts from his gifts | events 408/409 speaker 0x23, pm.c joe_hearts | tools/joe/visit test 12 (HOOK12 stub unused, site restored) |
 | Joe's visit, trade, talk, gifts | pm.c joe_* , events 408/409 | tools/joe (DESIGN.md, visit/README.md) |
 | Joe's faces (blink, angry/happy/neutral per line), mouth flaps + talk gestures timed to the typing, gift take-and-pocket | pm.c joe_face / joe_talk_frame, joe_lines.h, counters 49/50 | visit/README.md test 13 |
-| Z+B test key (clock to 22:00), Z+D-Up (Joe's next stage), Z+X (gd slot test), Z+D-Left/Right/Down (Postman tests) | pm.c | test keys |
+| Test keys (Z+B, Z+D-Up, Z+X, Z+D-Left/Right/Down, Z+Y) and debug blocks: removed in Joe test 16; HOOK11 probe unhooked | pm.c, logs.c, skill.c, make_pm_dol.py | visit/README.md test 16 |
 
 ## Data files
 | Feature | Files | Where |

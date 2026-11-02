@@ -165,3 +165,13 @@ loaded (restored in restore_names); every entry = the wanted (eye, mouth) and pm
 each frame. Debug block `joe_dbg` at 0x803660F8 (magic 'JOED'): raw counter 49, line, page, timer, motion,
 face eye/mouth now, wanted eye/mouth, frames, pocket, in_event, slot. Face 90 % (`JOE_FACE=0.9`), soft mouth.
 build/test10 gd_0.arc a18dc9b5; pm.bin 25407471.
+
+## Test 16: test leftovers removed
+- Test keys gone: Z+B (clock to 22:00), Z+D-Up (Joe's next stage; and logs.c's "today counts as rainy" on the
+  same keys), Z+X (Goddess test, goddess_test removed), Z+D-Left/Right/Down (Postman visit / stop / milk),
+  Z+Y (skill.c +250 points).
+- Debug blocks gone: joe_dbg, bench_dbg.
+- HOOK11 (villager daily plan -> pm_van_stub -> plan_log, the bench-sit test 11 probe) restored to the
+  original instruction; make_pm_dol.py update mode accepts the old branch word (0x482FE260). The stubs stay
+  in hook.s (their offsets are checked) but nothing calls them. Same main.dol from a fresh and an update patch.
+- pm.bin bb159d80 (0x7740 bytes), make_pm_dol.py 79640674.

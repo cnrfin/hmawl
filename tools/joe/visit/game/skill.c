@@ -99,10 +99,6 @@ void skill_frame(u8 *g, u32 pad_held, u32 pad_press)
     if ((u32)a < 0x80000000u || (u32)a >= 0x81800000u) return;
     if (*(u32 *)a != 0xC1C7C3C6u || *(u32 *)(a + AGC_E7_COUNT) != E7_COUNT) return;   /* our opguide.agc */
 
-    if ((pad_held & 0x10) && (pad_press & 0x800)) {          /* test: Z + Y = +250 field-tool points */
-        u16 *p = (u16 *)(g + 0x11B80 + 0x30);
-        *p = *p > 65535 - 250 ? 65535 : *p + 250;
-    }
     for (k = 0; k < 2; k++) {                                /* level-ups (no pop-up for the first look) */
         lv = level_of(g, k);
         if (K.lv[k] && lv > K.lv[k]) {

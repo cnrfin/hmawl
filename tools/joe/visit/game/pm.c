@@ -63,7 +63,6 @@ typedef struct { float x, y, z; } Vec;
 #define ANIMSET   71
 #define VALLEY    1
 #define EVENT     406
-struct { u32 presses, started, rested; s32 map, ev680, ev58c; u32 control; } bench_dbg;   /* bench sit test 2 debug */
 static u32 bench_target, bench_start, bench_cool, bench_taka_day = 0xFFFFFFFFu;       /* bench time skip: clock target (0 = idle), clock at the start */
 #define BENCH_CNT 40                        /* event counter 40: set by the bench script on Yes (0-29 count up daily) */
 #define BENCH_EVENT 407                     /* bench: sit until evening / morning */
@@ -103,7 +102,7 @@ static u32 bench_target, bench_start, bench_cool, bench_taka_day = 0xFFFFFFFFu; 
 static const char pm_model[] = "pm/pm_0.arc";
 static const char pm_anims[] = "pm/pm_0.anm.arc";
 static const float pm_size[3] = { 0.95f, 1.58f, 1.2f };
-/* test: the Harvest Goddess in the same slot (Z + X at Pool B; see goddess_test) */
+/* Joe's model and animations (gd_0: first used for the Harvest Goddess test in this slot) */
 static const char gd_model[] = "gd/gd_0.arc";
 static const char gd_anims[] = "gd/gd_0.anm.arc";
 static const float gd_size[3] = { 0.95f, 1.96f, 1.2f };
@@ -354,41 +353,6 @@ static void set_camera(u8 *g)
    a pending scene change (+0x58 != -1) builds the next scene in this same call, and rooms load
    character 37 and animation set 71 themselves (door crash at 0x8019FED8). Doors use their own
    screen effect, not the fader, so this is the only reliable point to unload him first. */
-/* test: Z + X on the valley = the Harvest Goddess standing just in front of the player, facing them; each further
-   Z + X plays her next animation (motion entry 2 pointed at it, as the Postman's jog). Leaving the
-   valley removes her. The Postman's visit is held off while she is out. */
-static void goddess_test(u8 *g, s32 map)
-{
-    float *p = (float *)(g + 0x29C78), dx, dz, l2, inv;
-    if (map != VALLEY) {
-        if (S.actor && !S.talking) despawn();
-        if (S.loaded && !S.actor) restore_names();
-        S.who = 0;
-        return;
-    }
-    if (!(PAD_HELD & 0x10) || !(PAD_PRESS & 0x400)) return;
-    PAD_PRESS &= ~0x400u;
-    if (!no_event()) return;
-    if (S.who != 1 || !S.actor) {                        /* bring her out in front of the player */
-        float *d = (float *)(g + 0x29F84), fl = d[0] * d[0] + d[2] * d[2], r = fl > 0.0001f ? rsqrt(fl) : 0;
-        if (S.actor) despawn();
-        if (S.loaded) release_model();
-        S.who = 1;
-        setup_model();
-        spawn();
-        if (!S.actor) { S.who = 0; return; }
-        S.pos.x = p[0] + d[0] * r * GD_AHEAD; S.pos.z = p[2] + d[2] * r * GD_AHEAD;
-        S.pos.y = p[1] + 2.0f;
-        S.pos.y = ground_y(COLLMAP, &S.pos);
-        S.gd_anim = 0;
-    } else S.gd_anim = (S.gd_anim + 1) % GD_ANIMS;
-    dx = p[0] - S.pos.x; dz = p[2] - S.pos.z; l2 = dx * dx + dz * dz;
-    if (l2 > 0.0001f) { inv = rsqrt(l2); S.dir.x = dx * inv; S.dir.y = 0; S.dir.z = dz * inv; }
-    actor_setpos(S.actor, &S.pos);
-    actor_setdir(S.actor, &S.dir);
-    S.motion = -1;
-    motion(S.gd_anim);
-}
 
 
 /* ---- Joe's visit (on his days, see joe_visit_day in joetv.c). His place follows the clock, as the
@@ -532,7 +496,6 @@ static s32 jcnt(u8 *g, s32 i)
 static u32 joe_expr[11][2];
 static u32 *orig_expr[6];
 static s32 expr_patched;
-struct { u32 magic; s32 line_raw, line, page, timer, motion, face_eye, face_mouth, want_eye, want_mouth, frames, pocket, in_event; u8 *slot; } joe_dbg;
 static void joe_expr_patch(s32 on)
 {
     s32 k;
@@ -549,13 +512,10 @@ static void joe_face(s32 eye, s32 mouth)
     s32 k;
     if (!S.actor) return;
     slot = *(u8 **)(S.actor + 0xD4);
-    joe_dbg.slot = slot;
     if ((u32)slot < 0x80000000u || (u32)slot >= 0x81800000u) return;
     joe_expr_patch(1);
     for (k = 0; k < 11; k++) { joe_expr[k][0] = (u32)eye; joe_expr[k][1] = (u32)mouth; }
     face_set(slot + 0x124, 0);             /* applies only what changed (restarts the blink / flap there) */
-    joe_dbg.face_eye = *(s32 *)(slot + 0x124); joe_dbg.face_mouth = *(s32 *)(slot + 0x128);
-    joe_dbg.want_eye = eye; joe_dbg.want_mouth = mouth;
 }
 /* every frame Joe is out; in_event: our talk (1) or trade (2) event is running */
 static void joe_talk_frame(u8 *g, s32 in_event)
@@ -579,26 +539,12 @@ static void joe_talk_frame(u8 *g, s32 in_event)
     } else if (in_event == 1) joe_motion(talking ? JM_TALK : JM_IDLE);
     else if (in_event == 2) joe_motion(talking ? JM_SITTALK : JM_SIT2);
     joe_face(joe_faces[jt.face][0], joe_faces[jt.face][talking ? 2 : 1]);
-    joe_dbg.magic = 0x4A4F4544u; joe_dbg.line_raw = in_event ? *(s32 *)(g + 0x12194 + JC_LINE * 4) : -1;
-    joe_dbg.line = jt.line; joe_dbg.page = jt.page; joe_dbg.timer = jt.timer; joe_dbg.motion = S.motion;
-    joe_dbg.frames++; joe_dbg.pocket = jt.pocket; joe_dbg.in_event = in_event;
 }
 static s32 joe_frame(u8 *g, s32 map, u32 t)
 {
     u32 tod = t % T_DAY;
     s32 m;
     float y0;
-    if ((PAD_HELD & 0x10) && (PAD_PRESS & 0x8)) {   /* test: Z + D-Up = Joe's day today, clock to his next stage */
-        static const u32 stage[5] = { J_IN, J_DIG - 3000u, J_BENCH - 3000u, J_UP - 1200u, J_GONE - 6000u };
-        u32 *clk = *(u32 **)0x80349218, old = *clk, *copy = 0, k;
-        u8 *tm = *(u8 **)0x80349194;
-        if ((u32)tm >= 0x80000000u && (u32)tm < 0x81800000u && *(u32 *)(tm + 0x404) == old) copy = (u32 *)(tm + 0x404);
-        joe_forced = (s32)(t / T_DAY) + 1;
-        for (k = 0; k < 5 && stage[k] <= tod; k++) ;
-        if (k < 5) { *clk = old - tod + stage[k]; if (copy) *copy = *clk; t = *clk; tod = t % T_DAY; }
-        PAD_PRESS &= ~0x8u;
-        if (S.actor) { despawn(); }
-    }
     if (joe_forced && joe_forced != (s32)(t / T_DAY) + 1) joe_forced = 0;
     joe_here = 0;
     if ((!joe_forced && !joe_visit_day(t / T_DAY)) || tod < J_IN || tod >= J_GONE) {
@@ -720,16 +666,6 @@ void pm_frame(void)
     skill_frame(g, PAD_HELD, PAD_PRESS);      /* tool skill on the HUD (skill.c) */
     spring_frame(g, map, PAD_HELD, PAD_PRESS);  /* offerings at the goddess pond (spring.c) */
     joe_dig_frame();                          /* $JOE coin dig-site halving (joetv.c) */
-    if ((PAD_HELD & 0x10) && (PAD_PRESS & 0x200)) {   /* test: Z + B = clock to 22:00 today (then bed = next morning) */
-        u32 *clk = *(u32 **)0x80349218, old = *clk, *copy = 0;
-        u8 *tm = *(u8 **)0x80349194;                 /* holds a second copy of the clock at +0x404 */
-        if ((u32)tm >= 0x80000000u && (u32)tm < 0x81800000u && *(u32 *)(tm + 0x404) == old) copy = (u32 *)(tm + 0x404);
-        if (old % T_DAY < 792000u) {
-            *clk = old / T_DAY * T_DAY + 792000u;
-            if (copy) *copy = *clk;
-        }
-        PAD_PRESS &= ~0x200u;
-    }
     /* Bench by the tree (valley): A within 1.6 of the seat, facing it, no event running -> event 407
        ("Sit until the evening?" / "Sit until the morning?", Common.arc entry 107, debug.mes 9/10).
        The player's own map (game+0x2A290) is used, not the field check: after the event the latter can differ. */
@@ -741,11 +677,9 @@ void pm_frame(void)
         float dx = BENCH_X - p[0], dz = BENCH_Z - p[2], d2 = dx * dx + dz * dz;
         if (d2 < 1.6f * 1.6f && d2 > 0.0001f && (dx * d[0] + dz * d[2]) * rsqrt(d2) > 0.5f) {
             u8 *ev = EVMGR;
-            bench_dbg.presses++; bench_dbg.map = map; bench_dbg.control = CONTROL;
-            bench_dbg.ev680 = ev ? *(s32 *)(ev + 0x680) : -2; bench_dbg.ev58c = ev ? *(s32 *)(ev + 0x58C) : -2;
             if (ev && *(s32 *)(ev + 0x680) == -1 && !*(s32 *)(ev + 0x58C) && CONTROL != 3) {
                 PAD_PRESS &= ~0x100u; PAD_HELD &= ~0x100u;   /* the player does not act on this A */
-                bench_dbg.started += event_start(ev, BENCH_EVENT, 0, 0) & 0xFF ? 1 : 0;
+                event_start(ev, BENCH_EVENT, 0, 0);
             }
         }
     }
@@ -764,7 +698,6 @@ void pm_frame(void)
             if (bench_target <= c) bench_target = c + 1;
             bench_start = c;
             *req = 0;
-            bench_dbg.rested++;
         }
         if (bench_target) {
             u32 *clk = *(u32 **)0x80349218, old = *clk, step;
@@ -819,18 +752,6 @@ void pm_frame(void)
     if (day != 7 && !S.forced && flag_get(g + 0x12078, FLAG_MET)) flag_clear(g + 0x12078, FLAG_MET);
     if (day != 7 && !S.forced && flag_get(g + 0x12078, FLAG_FED)) flag_clear(g + 0x12078, FLAG_FED);
     active = day == 7 && tod >= T_START && tod < T_END;
-    if (PAD_HELD & 0x10) {                    /* test: Z + D-Left = a visit now, Z + D-Right = stop, Z + D-Down = milk */
-        if (PAD_PRESS & 0x1) { S.forced = 1; S.force_t0 = t; }
-        if (PAD_PRESS & 0x2) S.forced = 0;
-        if (PAD_PRESS & 0x4) {                /* test: Z + D-Down = one milk of each grade into the rucksack */
-            s32 id;
-            for (id = 7; id <= 10; id++) rucksack_add(g + 0x50, id, 1, -1);
-        }
-    }
-    if (S.who == 1 || ((PAD_HELD & 0x10) && (PAD_PRESS & 0x400))) {   /* goddess test (Z + X) */
-        goddess_test(g, map);
-        if (S.who == 1) return;
-    }
     if (S.forced) {
         if (t - S.force_t0 < T_END - T_START) { active = 1; tod = T_START + (t - S.force_t0); }
         else S.forced = 0;

@@ -41,7 +41,7 @@ HOOK11 = 0x80060EF8
 HOOK11_OFF = 0x1B8                                    # pm_van_stub in pm.bin (after pm_want_stub)
 HOOK12 = 0x80113894                                   # func_80113864's bl func_801020E4 (script messages)
 HOOK12_OFF = 0x1E4                                    # pm_msg_stub in pm.bin (after pm_van_stub)
-PREV = {0x80113894: (0x4824B8F1,), 0x801B0EE4: (0x3C608036,), 0x801B0EE8: (0x38636000,), 0x801B0F2C: (0x38636000,)}   # earlier builds' words (update mode)
+PREV = {0x80113894: (0x4824B8F1,), 0x80060EF8: (0x482FE260,), 0x801B0EE4: (0x3C608036,), 0x801B0EE8: (0x38636000,), 0x801B0F2C: (0x38636000,)}   # earlier builds' words (update mode)
 PATCHES = [  # (RAM address, original word, new word, why)
     (0x801B0EE4, 0x80630030, 0x3C608037, 'OSInit: arena low = 0x8036A000 (was BootInfo->arenaLo or __ArenaLo) ...'),
     (0x801B0EE8, 0x28030000, 0x3863A000, '... - 0x6000'),
@@ -70,7 +70,7 @@ PATCHES = [  # (RAM address, original word, new word, why)
     (HOOK9, 0x9421FFC0, None, 'villager talk line (func_80117B10) -> pm_talk_stub: villagers hate the $JOE coin'),
     (HOOK10, 0x9421FFD0, None, 'villager liked/wanted-item lists (func_80148A4C) -> pm_want_stub: never the $JOE coin'),
     (HOOK12, 0x4BFEE851, 0x4BFEE851, 'script message window: original bl func_801020E4 kept (test 11 hook removed: mode 1 = sign-post box)'),
-    (HOOK11, 0x9421FEC0, None, 'villager daily plan (func_80060EF8) -> pm_van_stub: log who plans (bench sit probe)'),
+    (HOOK11, 0x9421FEC0, 0x9421FEC0, 'villager daily plan: original code kept (bench-sit probe hook removed)'),
     (0x802952D4, 0x5000037B, 0x000003BB, 'day table row 33 = Van (villager 0x24): chance of an extra visit 80 -> 0, day mask 0x37B -> 0x3BB (comes on the 3rd and 7th only)'),
     (0x8028C74C, 0x00020000, 0x00000000, '$JOE coin (item 0x442): price 0 (was 2; ships for 0 G, shops/Van see no value)'),
     (0x80109D24, 0x4BF08245, 0x4BF08209, 'cmd_91 item model: symbol (rucksack) model for every item, centred spin'),

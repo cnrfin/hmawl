@@ -217,10 +217,6 @@ static void count_swing(u8 *g);
 void logs_frame(u8 *g, s32 map, u32 pad_held, u32 pad_press)
 {
     s32 i, st;
-    if ((pad_held & 0x10) && (pad_press & 0x8)) {           /* test: Z + D-Up = count today as rainy */
-        LOGST(g) |= WET;
-        sfx_play(*(u8 **)0x803491E4, 3, 0);                   /* cursor_ok: the press registered */
-    }
     day_rules(g);
     if (map != VALLEY) {
         if (L.active) logs_release();
