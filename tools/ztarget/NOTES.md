@@ -240,3 +240,21 @@ frames on a new tile, pulse 4 %. pm.bin deae3820.
 
 ## Test 16: tile cursor settle softened
 No overshoot: from 1.15x to 1x over 6 frames (ease-out cubic), then the 4 % pulse. pm.bin 4e0cc987.
+
+## Upper/lower body layering (research, option A)
+
+Pose build is `func_8019E438(inst, skin, bones)` (called via 8019E3E8/8019E410 from every model draw, player via 0x8007BCE0).
+Per bone n (desc = inst+8 + 0x18n):
+- `func_801A01F8(*(inst+0x178), n, trs@sp+0x38)` evaluates the anim controller into a TRS; false -> rest local `desc+0xC`.
+- local *= desc+0x10 (if set); world[n] = world[parent] * local (temp buffer from func_801A675C).
+- attached nodes (desc+8) and child models (inst+0x15C, 4 slots, bone u16 at +0x16C) take world matrices after this, so a held tool follows the hand.
+- skin: out[n] = world[n] * inst+0x18[n] (inverse bind), CPU-skinned by func_8019C080, then GXInvalidateVtxCache.
+
+Anim controller (0x1C bytes): +0 frame f32, +4 rate, +8 loop, +0xC length, +0x10 anim object, +0x14 next ctl, +0x18 next weight.
+- `func_801A01F8` evaluates ctl, then `func_8019FF8C(next, n, trs, weight)` blends the chain (func_801A23A0 = TRS lerp). This is the game's crossfade.
+- `func_8019FE08(ctl, anim, startFrame)` inits a ctl; `func_801A0A88(arc, 0, clip)` returns a clip's anim object from an anm arc.
+- Player arc: motion player = slot+0x54, set table at mp+0x34 (stride 0x30, +0 = arc); set 0 = boy_0.anm.arc.
+
+Plan: hook the bl at 0x8019E5C4 -> stub `mr r6,r24; b zt_bone`. zt_bone calls the original, then for the player instance
+and upper bones (18-54, spine at partial weight) calls `func_8019FF8C(&swing_ctl, n, trs, w)`. swing_ctl is our own ctl on
+the swing clip, frame advanced by us at our own speed; w fades in/out. Legs/pelvis keep the walk/strafe clip.
