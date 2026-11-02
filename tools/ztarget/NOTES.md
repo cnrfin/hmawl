@@ -280,3 +280,12 @@ the swing clip, frame advanced by us at our own speed; w fades in/out. Legs/pelv
   a 3-frame crossfade through the ctl's next/weight (the game's own chain). Full weight on bones 18+ (the clips own
   the spine). Two ctls ping-pong. A disc without the clips is caught by the U8 node count (sw_dbg.fail 5).
 - add_player_clips.py now writes clips 126-131 (accepts 126..132 already there; idempotent).
+
+## Test 18 crash leaving the house: heap
+- mainchapterN.arc.clz is loaded at the arena start (0x8036A000, lbl_80349018) and the game's heap follows it
+  (heap object *0x80349174, +0x28 = end of the archive). Bytes added to boy_0.anm.arc are heap lost. With clips
+  126-131 at 70.6 KB the outdoor map load corrupted the heap: func_80016014 read the map-object table
+  *(0x80349064)+0x10, already overwritten by bone matrices (PC 0x800160AC).
+- shrink_clips.py: per-track key reduction (Douglas-Peucker on frames, slerp / lerp, 0.35 deg / 0.0006),
+  constant tracks as const. 70.6 KB -> 43.3 KB (test 17's working set was 52 KB), worst bone error 0.007.
+- Budget rule from here: keep our boy_0.anm.arc additions <= ~45 KB unless memory is found elsewhere.
