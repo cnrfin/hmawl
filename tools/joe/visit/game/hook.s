@@ -230,3 +230,9 @@ pm_face_stub:
     mr    r3, r25
     bl    zt_face
     b     face_return               # 0x80030A5C (the replaced instruction was b 0x80030A5C)
+
+# Field tile cursor: func_80091F58(pos, view mtx) (the thin yellow square) -> zt_tile_cursor (tile.c), the
+# Z-target bracket style. b (not bl): it returns straight to the game's caller.
+    .globl pm_tile_stub
+pm_tile_stub:
+    b     zt_tile_cursor

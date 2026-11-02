@@ -228,3 +228,12 @@ now 37 quads) drawn from a 6x6 white patch added to the HUD atlas (UV_WHITE, inn
 half-size 30 x 34.5 px at depth 12, scaled by 12 / depth (0.6-1.6); snaps in from 2x over 9 frames
 (ease-out-back, overshoot 2), then pulses +-5 % every 42 frames. commonall 5d7ab970 (on the $JOE coin build),
 pm.bin c0e945fc.
+
+## Test 15: field tile cursor in the bracket style
+Found from the user's dump on a field plot (tile centre 175.5, 114.5 one tile ahead): func_80091F58(pos, view
+mtx), called once from 0x800922F0, draws the highlighted tile as a GX line strip (GXBegin = func_801CE2CC,
+0xB0, 5 vertices) with indexed u8 corners 0x8024FBE0 (unit square) and colour 0x8024FC00 (F1F50F, alpha F3),
+translated to (x - 0.5, y + 0.05, z - 0.5). HOOK18 (its first instruction) -> pm_tile_stub +0x24C ->
+zt_tile_cursor (tile.c): the same GX set-up with direct f32 / RGBA8 vertices, four flat yellow corner
+brackets as ground quads (both windings), half-size 0.46, arm 0.26, bar 0.07; snap in from 1.6x over 7
+frames on a new tile, pulse 4 %. pm.bin deae3820.
