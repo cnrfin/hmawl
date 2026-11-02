@@ -182,3 +182,13 @@ over. Test 9 reads Z from the pad master record (0x80341464, pad 0 held: nothing
 Event log zt_log at 0x80367D28 (magic 'ZLOG', n, calls, 32 x {clock, call, kind, a, b}): 1 Z press (master
 held, copy pressed bit), 2 lock (id, candidates), 3 switch, 4 let go by Z, 5 out of range, 6 target gone,
 7 not free, 8 Z with nothing to lock. zt_dbg 0x80367F34. pm.bin 44129705.
+
+## Test 9 dump -> test 10
+Test 9 worked. Its log: one press = one event, lock/switch/let-go as expected, 98 calls in 98 frames (the hook
+runs once a frame after all; reading the master record was still the fix that stuck).
+Upward tilt: the camera base (func_8017B834 / func_8017B89C) builds the eye (+0x80), a target from the angles
+(+0x18 + +0x8C pitch, +0x1C + +0x90 yaw) and C_MTXLookAt (func_801B8454) into +0x50. The angles orbit the eye
+around the player (still looking at him), which is why changing +0x18 showed no tilt. HOOK14 (0x8017B888) /
+HOOK15 (0x8017B8F4), the instruction after each look-at, call zt_tilt(camera): for the field camera,
+V' = Rx(-t) V with t eased to 0.07 rad while locked. pm_tilt_stub +0x21C, pm_tilt2_stub +0x22C.
+pm.bin 685a508e; zt_log 0x80367E24, zt_dbg 0x80368030.

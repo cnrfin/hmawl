@@ -277,13 +277,16 @@ static float zatan2(float y, float x)
 #define ZT_HEIGHT  1.0f                                 /* lock-on: camera height (+0x10, normally 1.5; added to both the eye,
                                                            which sits at the ground behind, and the aim point): lower = nearer the ground */
 #define ZT_ZRATE   0.10f
-static struct { s32 on; float dist0, h0; } ZC;      /* the camera's own values while we change them */
+static struct { s32 on; float dist0, h0, tilt; } ZC;
+#define ZT_UP      0.07f                                /* lock-on: view pitched up this much (radians, ~4 degrees) */      /* the camera's own values while we change them */
 
 /* after the player's update (HOOK13): turn toward the target; swing the camera behind him, looking past him
    at the target (so stick-up also means toward the target, as in OoT) */
 static void zoom(u8 *c, s32 locked)
 {
     float *dist = (float *)(c + 0x30), *ht = (float *)(c + 0x10), wd, wh;
+    ZC.tilt += ((locked ? ZT_UP : 0) - ZC.tilt) * ZT_ZRATE;
+    if (!locked && ZC.tilt < 0.0005f) ZC.tilt = 0;
     if (locked && !ZC.on) { ZC.on = 1; ZC.dist0 = *dist; ZC.h0 = *ht; }
     if (!ZC.on) return;
     wd = locked ? ZT_DIST : ZC.dist0; wh = locked ? ZT_HEIGHT : ZC.h0;
@@ -316,5 +319,21 @@ void zt_post(u8 *pl)
         *yaw += dy * ZT_CAMRATE;
         while (*yaw > 3.14159274f) *yaw -= 6.28318548f;      /* keep it in -pi..pi (it counted on: -6.95 in a dump) */
         while (*yaw < -3.14159274f) *yaw += 6.28318548f;
+    }
+}
+
+/* after the camera's look-at (HOOK14/15): pitch the field camera's view up by ZC.tilt. V' = Rx(-t) V on the
+   3 x 4 view matrix at +0x50: rows 1 and 2 turn about the camera's x axis (camera looks down -z). */
+void zt_tilt(u8 *c)
+{
+    float *M, s, k, r1, r2;
+    s32 i;
+    if (c != CAM || ZC.tilt <= 0) return;
+    M = (float *)(c + 0x50);
+    s = zsin(ZC.tilt); k = zsin(ZC.tilt + 1.57079637f);
+    for (i = 0; i < 4; i++) {
+        r1 = M[4 + i]; r2 = M[8 + i];
+        M[4 + i] = k * r1 + s * r2;
+        M[8 + i] = -s * r1 + k * r2;
     }
 }

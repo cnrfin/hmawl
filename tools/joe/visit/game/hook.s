@@ -200,3 +200,19 @@ pm_zt_stub:
     addi  r1, r1, 0x10
     lwz   r3, -0x57F4(r13)          # original instruction (lwz r3, lbl_803491CC@sda21(r13))
     b     zt_hook_return            # 0x800313C8
+
+# Z targeting tilt: the camera base's look-at (func_8017B834 / func_8017B89C: C_MTXLookAt into camera +0x50, r31 =
+# camera) -> zt_tilt(camera) pitches the field camera's view up a little while locked on. Hooked at the
+# instruction after each look-at (lwz r0, 0x34(r1)), replayed here.
+    .globl pm_tilt_stub
+pm_tilt_stub:
+    mr    r3, r31
+    bl    zt_tilt
+    lwz   r0, 0x34(r1)
+    b     tilt_return1              # 0x8017B88C
+    .globl pm_tilt2_stub
+pm_tilt2_stub:
+    mr    r3, r31
+    bl    zt_tilt
+    lwz   r0, 0x34(r1)
+    b     tilt_return2              # 0x8017B8F8
