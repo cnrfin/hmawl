@@ -2,11 +2,14 @@
 #define AGC_ELEMENTS   0xE34   /* element table (12 bytes each) */
 #define AGC_E7_Y       0xE92   /* element 7 y (s16), the HUD slide moves it */
 #define AGC_E7_COUNT   0xE88
-#define E7_COUNT       29
+#define E7_COUNT       33
 #define E7_X           -242
 #define AGC_ROW_Q      0x11AC   /* icon, then 5 gems */
 #define AGC_POP_Q      0x12B4   /* 11 letter quads */
 #define POP_QUADS      11
+#define AGC_RET_Q      0x1498   /* 4 Z-target reticle quads (zt.c) */
+static const float UV_TRI[4][4] = {{0.000000f, 0.625000f, 0.093750f, 0.812500f}, {0.125000f, 0.625000f, 0.218750f, 0.812500f}, {0.250000f, 0.625000f, 0.343750f, 0.812500f}, {0.375000f, 0.625000f, 0.468750f, 0.812500f}};  /* down, up, left, right */
+#define TRI_W 12
 static const float UV_HOE[4] = {0.000000f, 0.000000f, 0.218750f, 0.500000f};
 static const float UV_CAN[4] = {0.250000f, 0.000000f, 0.468750f, 0.500000f};
 static const float UV_GEMY[4] = {0.500000f, 0.000000f, 0.625000f, 0.250000f};

@@ -10,6 +10,8 @@
 typedef unsigned int u32;
 typedef int s32;
 typedef unsigned char u8;
+typedef short s16;
+#include "skill_hud.h"                                  /* AGC_RET_Q, UV_TRI, element 7 (the HUD quads) */
 #define F(addr, ret, args) ((ret (*) args)(addr))
 #define sfx_play   F(0x8012A52C, s32, (u8 *, s32, s32))
 #define CONTROL    (*(u8 *)(*(u8 **)0x80349218 + 8))      /* 1 = player free */
@@ -28,7 +30,24 @@ typedef unsigned char u8;
 
 s32 pm_joe_pos(float *p);                               /* pm.c: Joe's position if he is out on this map */
 
-static struct { s32 target; float tx, tz; } Z;
+static struct { s32 target; float tx, ty, tz; float r; s32 alpha; float *apos[0x27]; } Z;
+#define ACTMGR     (*(u8 **)0x8034923C)
+#define CAM        (*(u8 **)0x8034922C)                 /* field camera: +0x1C yaw; it looks along (-sin, -cos) */
+/* villager actors (actor manager id 0xB000; one per character, out or not): +0x4C character id, +0x2C flags
+   (0x2000 set while the character is out on the current map), position at -0x24 (from valley dumps) */
+static void scan_actors(void)
+{
+    u8 *m = ACTMGR, *n, *c;
+    s32 k = 0, id;
+    for (id = 0; id < 0x27; id++) Z.apos[id] = 0;
+    if ((u32)m < 0x80000000u || (u32)m >= 0x81800000u) return;
+    for (n = *(u8 **)(m + 4); n != m + 0x14 && (u32)n >= 0x80000000u && (u32)n < 0x81800000u && k < 600; n = *(u8 **)(n + 4), k++) {
+        c = *(u8 **)(n + 0xC);
+        if ((u32)c < 0x80000000u || (u32)c >= 0x81800000u || *(u32 *)(c + 0x14) != 0xB000) continue;
+        id = *(s32 *)(c + 0x4C);
+        if (id >= 1 && id < 0x27 && (*(u32 *)(c + 0x2C) & 0x2000)) Z.apos[id] = (float *)(c - 0x24);
+    }
+}
 
 static s32 no_event(void)
 {
@@ -51,10 +70,15 @@ static s32 tpos(u8 *g, s32 id, s32 map, float *x, float *z)
         if (map != 1 || !pm_joe_pos(p)) return 0;
         *x = p[0]; *z = p[2]; return 1;
     }
-    if (SLOT_MAP(g, id) != map) return 0;
-    s = SLOT_POS(g, id);
-    if (s[0] == 0 && s[2] == 0) return 0;
+    s = Z.apos[id];                                      /* only characters that are out here */
+    if (!s || SLOT_MAP(g, id) != map) return 0;
     *x = s[0]; *z = s[2]; return 1;
+}
+static float theight(u8 *g, s32 id)
+{
+    float p[3];
+    if (id == ZT_JOE) { pm_joe_pos(p); return p[1]; }
+    return Z.apos[id] ? Z.apos[id][1] : SLOT_POS(g, 0)[1];
 }
 /* best target in front: switching = 1 skips the current one, widens the cone to 90 degrees and favours
    targets straight ahead (distance x0.6 ahead .. x1.0 at the side) */
@@ -77,12 +101,72 @@ static s32 pick(u8 *g, s32 map, s32 switching)
     return found;
 }
 static void release(void) { Z.target = 0; }
+static void reticle(u8 *g);
+
+/* ---- the reticle: 4 HUD quads (opguide.agc element 7, AGC_RET_Q) around the target's projected chest.
+   Camera *(0x8034922C): +0x50 view matrix (3 x 4 rows), +0x34 aspect, +0x38 vertical FOV in degrees (30.2;
+   checked against a screenshot). HUD units: 640 x 480, origin at the centre, y down. Closes in from 60 px
+   to 20 px, then breathes; light blue like OoT's people reticle; fades out on release. */
+#define AGC        (*(u8 **)0x80349110)
+#define RET_COL    0x9696FF00u
+#define RET_Y      0.85f                                /* aim this far above the target's feet */
+static float zsin(float x)                              /* x in -pi..pi */
+{
+    float x2;
+    while (x > 3.14159274f) x -= 6.28318548f;
+    while (x < -3.14159274f) x += 6.28318548f;
+    x2 = x * x;
+    return x * (1 - x2 / 6 * (1 - x2 / 20 * (1 - x2 / 42)));
+}
+static s32 rframe;
+static void quad(u8 *a, s32 k, s32 x0, s32 y0, s32 x1, s32 y1, const float *uv, u32 rgba)
+{
+    u8 *q = a + AGC_RET_Q + 0x2C * k;
+    s32 i;
+    *(u32 *)q = 4;
+    *(s16 *)(q + 4) = x0; *(s16 *)(q + 6) = y0; *(s16 *)(q + 8) = x1; *(s16 *)(q + 10) = y1;
+    for (i = 0; i < 4; i++) { *(u32 *)(q + 0xC + 4 * i) = rgba; *(float *)(q + 0x1C + 4 * i) = uv[i]; }
+}
+static void reticle(u8 *g)
+{
+    u8 *a = AGC, *c = CAM;
+    float *M, x, y, z, w, f, sx, sy, r;
+    s32 cx, cy, e7y, h = TRI_W / 2, k, ri;
+    u32 col;
+    if ((u32)a < 0x80000000u || (u32)a >= 0x81800000u) return;
+    if (*(u32 *)a != 0xC1C7C3C6u || *(u32 *)(a + AGC_E7_COUNT) != E7_COUNT) return;   /* our opguide.agc */
+    if (Z.target) { if (Z.alpha < 255) Z.alpha += 51; if (Z.alpha > 255) Z.alpha = 255; }
+    else { Z.alpha -= 64; if (Z.alpha < 0) Z.alpha = 0; Z.r = 60; }
+    if (!Z.alpha || (u32)c < 0x80000000u || (u32)c >= 0x81800000u) {
+        for (k = 0; k < 4; k++) quad(a, k, 0, 0, 0, 0, UV_TRI[k], 0xFFFFFF00u);
+        return;
+    }
+    M = (float *)(c + 0x50); x = Z.tx; y = Z.ty + RET_Y; z = Z.tz;
+    sx = M[0] * x + M[1] * y + M[2] * z + M[3];
+    sy = M[4] * x + M[5] * y + M[6] * z + M[7];
+    w = -(M[8] * x + M[9] * y + M[10] * z + M[11]);
+    if (w < 0.5f) { for (k = 0; k < 4; k++) quad(a, k, 0, 0, 0, 0, UV_TRI[k], 0xFFFFFF00u); return; }
+    f = *(float *)(c + 0x38) * (3.14159274f / 360.0f);  /* half the FOV, radians */
+    f = zsin(f) / zsin(f + 1.57079637f);                 /* tan */
+    cx = (s32)(sx / w / (f * *(float *)(c + 0x34)) * 320.0f);
+    cy = (s32)(-sy / w / f * 240.0f);
+    if (Z.r < 20.5f) Z.r = 20 + 2.0f * zsin((float)(rframe++ % 60) * (6.28318548f / 60.0f));
+    else Z.r += (20 - Z.r) * 0.3f;
+    r = Z.r; ri = (s32)r;
+    e7y = *(s16 *)(a + AGC_E7_Y); cx -= E7_X; cy -= e7y;
+    col = RET_COL | (u32)Z.alpha;
+    quad(a, 0, cx - h, cy - ri - TRI_W, cx + h, cy - ri, UV_TRI[0], col);        /* top, pointing down */
+    quad(a, 1, cx - h, cy + ri, cx + h, cy + ri + TRI_W, UV_TRI[1], col);        /* bottom, pointing up */
+    quad(a, 2, cx - ri - TRI_W, cy - h, cx - ri, cy + h, UV_TRI[3], col);        /* left, pointing right */
+    quad(a, 3, cx + ri, cy - h, cx + ri + TRI_W, cy + h, UV_TRI[2], col);        /* right, pointing left */
+}
 
 void zt_frame(u8 *g, s32 map, volatile u32 *held, volatile u32 *press)
 {
     u8 *f = FADER;
     s32 free = map >= 0 && CONTROL == 1 && no_event() && !(f && *(u8 *)(f + 0x60));
-    if (!free) { release(); return; }
+    if (!free) { release(); reticle(g); return; }
+    scan_actors();
     if (Z.target) {                                      /* let go when out of reach or gone */
         float *p = SLOT_POS(g, 0), dx, dz;
         if (!tpos(g, Z.target, map, &Z.tx, &Z.tz)) release();
@@ -95,14 +179,16 @@ void zt_frame(u8 *g, s32 map, volatile u32 *held, volatile u32 *press)
         *press &= ~0x10u; *held &= ~0x10u;
         if (!Z.target) {
             Z.target = pick(g, map, 0);
-            if (Z.target) { tpos(g, Z.target, map, &Z.tx, &Z.tz); sfx_play(*(u8 **)0x803491E4, SE_LOCK, 0); }
+            if (Z.target) { tpos(g, Z.target, map, &Z.tx, &Z.tz); Z.r = 60; sfx_play(*(u8 **)0x803491E4, SE_LOCK, 0); }
         } else {
             s32 next = pick(g, map, 1);
-            if (next) { Z.target = next; tpos(g, next, map, &Z.tx, &Z.tz); sfx_play(*(u8 **)0x803491E4, SE_LOCK, 0); }
+            if (next) { Z.target = next; tpos(g, next, map, &Z.tx, &Z.tz); Z.r = 60; sfx_play(*(u8 **)0x803491E4, SE_LOCK, 0); }
             else release();             /* test 1's release sound (4) was a looping drone: none now */
         }
     }
     *held &= ~0x10u;                                     /* holding Z never reaches the game either */
+    if (Z.target) Z.ty = theight(g, Z.target);
+    reticle(g);
 }
 
 /* atan2 (radians), polynomial: about 0.005 rad worst error, plenty for a camera */
@@ -118,7 +204,6 @@ static float zatan2(float y, float x)
 }
 #define ZT_TURN    0.35f                                /* facing: share of the way to the target per frame */
 #define ZT_CAMRATE 0.12f                                /* camera yaw: share of the way per frame */
-#define CAM        (*(u8 **)0x8034922C)                 /* field camera: +0x1C yaw; it looks along (-sin, -cos) */
 
 /* after the player's update (HOOK13): turn toward the target; swing the camera behind him, looking past him
    at the target (so stick-up also means toward the target, as in OoT) */

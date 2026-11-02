@@ -115,3 +115,17 @@ yaw, +0x30 = distance 12, +0x80 = the eye. It looks along (-sin yaw, -cos yaw): 
 player direction). Test 2 eases +0x1C 12 % a frame toward atan2(-dx, -dz) (dx, dz = player to target), so the
 camera swings behind him looking past him at the target, and stick-up walks toward the target (movement uses
 the camera yaw). pm.bin 7a3830ac.
+
+## Test 2 results -> test 3
+Test 2: much better, camera turns, but locking is hit and miss and there is no marker.
+- Hit and miss: the event slots also hold parked positions for characters that are not out (e.g. slots
+  35/36 at fixed points on map 1). Targets now come from the villager actors: actor manager
+  (*(0x8034923C), list via +4, end at mgr+0x14, node +0xC = component, component +0x14 = class id) class
+  0xB000, one per character whether out or not; component +0x4C = character id, +0x2C flags (0x2000 while the
+  character is out on this map), position at component -0x24. Checked on two valley dumps (29 matches).
+- Marker: 4 HUD quads appended to opguide.agc element 7 (now 33 quads; build_skill_hud.py RET_Q, with
+  `--onto` to put the new HUD files into the $JOE coin commonall a970336f; only opguide.tpl / opguide.agc
+  differ). Projection from the camera's view matrix (+0x50, 3x4), aspect +0x34, FOV +0x38 = 30.2 degrees:
+  the dump's player feet project 110 px below the centre, as in the user's screenshot. OoT-style close-in
+  (60 -> 20 px) then a slow breathe, light blue (150,150,255), fade out on release.
+- data/commonall.arc.clz 982dfad1, pm.bin 970bd3b5 (code ends 0x80367770; 10 KB left below the arena).
