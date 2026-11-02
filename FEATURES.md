@@ -36,7 +36,7 @@ a session's temporary folder; the ones still only there are marked.
 ## Data files
 | Feature | Files | Where |
 |---|---|---|
-| Joe model, 90 %, cigarette, bench clips, 1.2x walk, face 80 %, talk / sitting talk / pocket clips | gd/gd_0.arc, gd/gd_0.anm.arc | tools/joe/build/test8 |
+| Joe model, 90 %, cigarette, bench clips, 1.2x walk, face 80 %, talk / sitting talk / pocket clips | gd/gd_0.arc, gd/gd_0.anm.arc | tools/joe/build/test8 (+ test9: mouth frames RGB5A3, soft edges) |
 | Joe's lines (mukumuku.mes 38+), people.mes 35 = "Joe" | mukumuku.mes, people.mes | tools/joe/visit/data |
 | Trade/talk events 408/409, bench 407 (no cmd_10) | Common.arc | tools/joe/visit/data |
 | Villager paths: dig-site bridge, bench spot | PathData.arc | tools/paths |

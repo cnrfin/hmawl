@@ -228,18 +228,28 @@ def build_gpl():
     tail=len(m); m+=(NAME+'.tpl').encode()+b'\0\0\0'+(NAME[0].upper()+NAME[1:]+'_L:Layer1').encode()+b'\0'
     struct.pack_into('>IHBBII',m,uvo,uvd,len(uvs),0x3E,2,tail,0); struct.pack_into('>5I',m,0,0x1C,col,uvo,nro,mo); struct.pack_into('>II',m,0x14,0x01FF0000,0)
     return struct.pack('>7I',0x005BBC61,0,0,1,0x14,0x1C,len(m))+bytes(m)
-def frames_tpl(fr,n):
+def rgb5a3(im):
+    a=np.array(im.convert('RGBA')).astype(int); h,w=a.shape[:2]; out=bytearray()
+    for ty in range(0,h,4):
+        for tx in range(0,w,4):
+            for y in range(ty,ty+4):
+                for x in range(tx,tx+4):
+                    r,g,b,al_=a[y,x] if y<h and x<w else (0,0,0,0)
+                    v=0x8000|(r>>3)<<10|(g>>3)<<5|(b>>3) if al_>=0xE0 else (al_>>5)<<12|(r>>4)<<8|(g>>4)<<4|(b>>4)
+                    out+=struct.pack('>H',v)
+    return bytes(out)
+def frames_tpl(fr,n,fmt=14):
     ims=[fr.get(i,fr[0]) for i in range(n)]          # every slot filled: unknown expressions show the normal face
     blobs=[];ref=[]
     for im in ims:
-        bb=cmpr(im); k=next((j for j,(b2,s2) in enumerate(blobs) if b2==bb and s2==im.size),None)
+        bb=cmpr(im) if fmt==14 else rgb5a3(im); k=next((j for j,(b2,s2) in enumerate(blobs) if b2==bb and s2==im.size),None)
         if k is None: blobs.append((bb,im.size)); k=len(blobs)-1
         ref.append(k)
     out=bytearray(struct.pack('>III',0x0020AF30,n,0xC))
     for k in range(n): out+=struct.pack('>II',0xC+8*n+0x24*k,0)
     pos=(0xC+8*n+0x24*n+0x1F)&~0x1F; dp=[]
     for bb,_ in blobs: dp.append(pos); pos=(pos+len(bb)+0x1F)&~0x1F
-    for im,k in zip(ims,ref): out+=struct.pack('>HHIIIIIIBBBB',im.height,im.width,14,dp[k],1,1,1,1,0,0,0,0)[:0x24].ljust(0x24,b'\0')
+    for im,k in zip(ims,ref): out+=struct.pack('>HHIIIIIIBBBB',im.height,im.width,fmt,dp[k],1,1,1,1,0,0,0,0)[:0x24].ljust(0x24,b'\0')
     out=bytearray(al(bytes(out),0x20))
     for bb,_ in blobs: out+=al(bb,0x20)
     return bytes(out)
@@ -254,7 +264,7 @@ def build_act():
 if __name__=='__main__':
     for g in tris: check_strips(tris[g])
     gpl,skn,actb=build_gpl(),build_skn(),build_act()
-    b0=tpl([body,head]); f0e=frames_tpl(FR.eye_frames(),58); f0m=frames_tpl(FR.mouth_frames(),36)
+    b0=tpl([body,head]); f0e=frames_tpl(FR.eye_frames(),58); f0m=frames_tpl(FR.mouth_frames(),36,5 if FR.SOFT_MOUTH else 14)   # soft mouth: RGB5A3 (CMPR = 2 colours a 4x4 block)
     arc=u8([(NAME+'.act',actb),(NAME+'.gpl',gpl),(NAME+'.skn',skn),(NAME+'_b0.tpl',b0),(NAME+'_f0_e.tpl',f0e),(NAME+'_f0_m.tpl',f0m),('_tmp.txt',b'')])
     anims=[open(VAN+'anm%02d.bin'%a,'rb').read() for a in range(int(os.environ.get('JOE_ANIMS','6')))]   # only what Joe needs (Van's 0 idle, 1 walk, 2-5)
     import joe_anm

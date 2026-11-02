@@ -150,3 +150,9 @@ data/: Common.arc d40c7e13, Message.arc 70a46b73. pm.bin c019bebd, make_pm_dol.p
   centre 256, 269). Build: `JOE_SCALE=0.9 JOE_CIG=.../cig.json JOE_WALK=28 JOE_FACE=0.8 joe_game.py`;
   with JOE_FACE unset the build reproduces test 6 / test 7 exactly.
 - Files: data/Common.arc f8cdeca9, build/test8 gd_0.arc d0d845f6, gd_0.anm.arc 406beace; pm.bin ed25ecff.
+
+## Test 14: cleaner mouth edges
+Same mouth art. The mouth frames were CMPR (2 colours per 4x4 block, 1-bit alpha): the teeth / gums / skin
+mix turned into blocky specks and jagged outlines. Now (`JOE_SOFTMOUTH=1`, frames.py `soft`): the hard mask
+blurred at full size and area-averaged down (smooth edge, creases kept), stored as RGB5A3. gd_0.arc grows
+278 -> 387 KB (mouth tpl 38 -> 147 KB). build/test9 gd_0.arc (gd_0.anm.arc as test 13).

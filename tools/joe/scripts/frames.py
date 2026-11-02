@@ -1,4 +1,4 @@
-import sys, json, numpy as np
+import sys, os, json, numpy as np
 sys.path.insert(0,'.')
 from compose import *
 from PIL import Image, ImageFilter
@@ -16,7 +16,7 @@ def layers_eyes(spec):
     if ex.get('tears'):
         d=ImageDraw.Draw(out); tear(d,176,238,1,ex['tears']/100); tear(d,336,238,1,ex['tears']/100)
     return out
-def frame(layer,box,size):
+def frame(layer,box,size,soft=False):
     la=np.array(layer); hm=np.array(Image.fromarray(((np.array(BASE)[...,3]>128)*255).astype(np.uint8)).filter(ImageFilter.MinFilter(15)))>0
     la[~hm,3]=0; layer=Image.fromarray(la)
     img=BASE.copy(); img.alpha_composite(layer)
@@ -28,7 +28,11 @@ def frame(layer,box,size):
     white=feat&(sat<0.18)&(mx>110); rgb[white]=np.clip(rgb[white]*1.18+18,0,250)
     pupil=feat&(mx<45); rgb[pupil]=(10,8,8); arr[...,:3]=rgb; img=Image.fromarray(arr.astype(np.uint8))
     c=img.crop(box).resize(size,Image.LANCZOS); mk=np.array(m.crop(box).resize(size,Image.BILINEAR))>60
-    c=np.array(c); c[...,3]=np.where(mk,255,0); return Image.fromarray(c)
+    c=np.array(c)
+    if soft:                                   # anti-aliased edge: the hard mask blurred at full size, area-averaged down
+        sm=m.filter(ImageFilter.GaussianBlur(1.5))     # same shape as the hard mask (creases stay opaque), smooth edge
+        c[...,3]=np.array(sm.crop(box).resize(size,Image.BOX)); return Image.fromarray(c)
+    c[...,3]=np.where(mk,255,0); return Image.fromarray(c)
 def blush_variant(spec,eyes):
     s=json.loads(json.dumps(spec)); s['eyes']['L']['src']=s['eyes']['R']['src']=eyes; return s
 E=dict(S['eyes'])
@@ -43,8 +47,9 @@ def eye_frames():
         spec=blush_variant(E[k[0]],k[1]) if isinstance(k,tuple) else E[k]
         out[i]=frame(layers_eyes(spec),EYE_BOX,EYE_SIZE)
     return out
+SOFT_MOUTH=os.environ.get('JOE_SOFTMOUTH')=='1'   # soft edges (stored uncompressed, see joe_game.py)
 def mouth_frames():
-    return {i:frame(part('mouth',M[k]),MOUTH_BOX,MOUTH_SIZE) for i,k in MOUTH_MAP.items()}
+    return {i:frame(part('mouth',M[k]),MOUTH_BOX,MOUTH_SIZE,SOFT_MOUTH) for i,k in MOUTH_MAP.items()}
 if __name__=='__main__':
     ef=eye_frames(); mf=mouth_frames()
     o=Image.new('RGBA',(70*len(ef),130),(200,215,225,255))
