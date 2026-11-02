@@ -196,6 +196,8 @@ void joe_dig_frame(void)
         if (r[8] >> ch & 1) others += dig_base[i] * 100;
     }
     float p = share[ch];
+    u8 *g = *(u8 **)0x803491CC;
+    if (g && *(s32 *)(g + 0x12194 + 46 * 4) >= 10) p *= 2.0f;   /* full friendship with Joe: twice the $JOE finds */
     *(u16 *)(DIG_TAB + 6) = (u16)((float)others * p / (1.0f - p) + 0.5f);
 }
 

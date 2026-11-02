@@ -408,7 +408,11 @@ s32 joe_visit_day(u32 day);
 #define JM_SITDOWN 6
 #define JM_SIT 7
 #define JM_STANDUP 8
-static s32 joe_forced, joe_here, joe_trading;
+static s32 joe_forced, joe_here, joe_trading, joe_talking;
+#define JOE_TALK_EVENT 409                 /* Common.arc node 109: talk while walking (build_joe_talk.py) */
+#define HELD_ITEM  (*(volatile unsigned short *)(g + 0x11CC6))
+/* event counters kept in the save: 45 met, 46 $JOE gifts (10 = full friendship), 47 day of the last gift + 1;
+   48 = the line for event 409 */
 #define JOE_ITEM   0x442
 #define JOE_EVENT  408                     /* Common.arc node 108: the bench trade (build_joe_trade.py) */
 #define JCNT(i)    (*(s32 *)(g + 0x12194 + (i) * 4))   /* event counters 41 request, 42 count, 44 held */
@@ -424,10 +428,10 @@ s32 joe_price_today(void);
    Postman's): eye on the player's side of Joe at a fixed distance, aimed at his face on the bench */
 #define JCAM_D     2.6f                    /* trade camera: eye this far from Joe, toward the player */
 #define JCAM_EYE_Y 1.35f                   /*   eye height above the ground (his face is ~0.95 up) */
-static void joe_cam(u8 *g)
+static void joe_cam(u8 *g, float tx, float tz, float ty)
 {
     s32 *c = (s32 *)(g + 0x12194 + 20 * 4);
-    float *p = (float *)(g + 0x29C78), tx = BENCH_X, tz = BENCH_Z, ty = S.pos.y + 0.95f;
+    float *p = (float *)(g + 0x29C78);
     float dx = p[0] - tx, dz = p[2] - tz, l2 = dx * dx + dz * dz, inv;
     if (l2 < 0.0001f) { dx = 1; dz = 0; l2 = 1; }       /* fallback: in front of the bench (+x) */
     inv = rsqrt(l2);
@@ -502,6 +506,10 @@ static s32 joe_frame(u8 *g, s32 map, u32 t)
         if (S.loaded && !S.actor) restore_names();
         return 1;
     }
+    if (joe_talking) {                        /* talking while walking: he waits, then carries on */
+        if (no_event()) joe_talking = 0;
+        else return 1;
+    }
     if (joe_trading) {                        /* our trade event: settle its requests */
         if (no_event()) { joe_trading = 0; JCNT(41) = 0; }
         else { joe_trade(g); return 1; }
@@ -539,8 +547,33 @@ static s32 joe_frame(u8 *g, s32 map, u32 t)
             JCNT(41) = 0; JCNT(42) = 0; JCNT(44) = item_count(g + 0x50, JOE_ITEM);
             if (MSGMGR) msg_number(MSGMGR, 0, joe_price_today());
             joe_trading = 1;
-            joe_cam(g);
+            joe_cam(g, BENCH_X, BENCH_Z, S.pos.y + 0.95f);
             event_start(EVMGR, JOE_EVENT, 0, 0);
+        }
+    }
+    /* A next to Joe while he walks or waits at the dig site: a line, or a $JOE gift (secret: never hinted at) */
+    else if (!joe_here && (tod < J_BENCH || tod >= J_GO) && (PAD_PRESS & 0x100) && !(PAD_HELD & 0x10) && CONTROL == 1
+             && !(FADER && *(u8 *)(FADER + 0x60))) {
+        float *p = (float *)(g + 0x29C78), *d = (float *)(g + 0x29F84);
+        float dx = S.pos.x - p[0], dz = S.pos.z - p[2], d2 = dx * dx + dz * dz;
+        if (d2 < 2.0f * 2.0f && d2 > 0.0001f && (dx * d[0] + dz * d[2]) * rsqrt(d2) > 0.3f) {
+            s32 kind, day1 = (s32)(t / T_DAY) + 1, season = (s32)(t / T_DAY / 10) % 4;
+            float inv = rsqrt(d2);
+            PAD_PRESS &= ~0x100u; PAD_HELD &= ~0x100u;
+            if (HELD_ITEM == JOE_ITEM) {
+                if (JCNT(47) == day1) kind = 7;
+                else { JCNT(47) = day1; if (JCNT(46) < 10) JCNT(46)++; kind = JCNT(46) == 10 ? 6 : 5; }
+            } else if (!JCNT(45)) { JCNT(45) = 1; kind = 1; }
+            else if (season == 2) kind = 4;
+            else if (tod >= J_DIG && tod < J_DIGEND) kind = 3;
+            else kind = 2;
+            JCNT(48) = kind;
+            S.dir.x = -dx * inv; S.dir.y = 0; S.dir.z = -dz * inv;   /* turns to the player */
+            actor_setdir(S.actor, &S.dir);
+            joe_motion(JM_IDLE);
+            joe_cam(g, S.pos.x, S.pos.z, S.pos.y + 1.1f);
+            joe_talking = 1;
+            event_start(EVMGR, JOE_TALK_EVENT, 0, 0);
         }
     }
     return 1;

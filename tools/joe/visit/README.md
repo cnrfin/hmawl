@@ -81,3 +81,15 @@ Postman's talk does. Re-sit check and slot writes removed. Common.arc 8d2db2a8, 
 Test 7 (eye at the player's head) was far too close: the player stands right by the bench. The eye is now
 2.6 from Joe toward the player, 1.35 up, aimed at his face (0.95 up); cmd_5A(0, 0) hides the player during
 the trade (cmd_A0 did that), cmd_5A(0, 1) shows him again. Common.arc e3022926, pm.bin 5ded727e.
+
+## Test 9: talking while he walks, secret $JOE gifts, friendship
+- `build_joe_talk.py`: event 409 (Common.arc node 109) + debug.mes 21-27 (input: the trade build ->
+  `talk/`, Common 44d710f7, debug 52b153f1). Camera from counters 20-25 (aimed at his face, 1.1 up), player
+  hidden. Line chosen by pm.c in counter 48: 1 intro + bench hint (first meeting), 2 bench hint, 3 dig site
+  (9:30-9:50), 4 fall (crypto winter), 5 gift, 6 tenth gift, 7 second gift the same day.
+- pm.c: A next to Joe while he walks or waits (not at the bench): he stops, turns to the player, idles
+  until the event ends, then carries on along the route. Holding a $JOE coin = a gift: once a visit
+  (counter 47 = day + 1), counter 46 counts them (10 = full friendship); the script takes the coin from the
+  hands (cmd_56). Counter 45 = met. Other held items: just his normal line.
+- joetv.c: full friendship (counter 46 >= 10) doubles the dig site's $JOE share.
+- pm.bin b9968e36 (ends 0x80366834).
