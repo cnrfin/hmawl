@@ -26,7 +26,8 @@ typedef short s16;
 #define ZT_LEASH   13.5f                                /* let go past this */
 #define ZT_COS60   0.5f
 #define ZT_JOE     100                                  /* target id for Joe (not an event slot) */
-#define SE_LOCK    3                                    /* cursor_ok */
+#define SE_LOCK    434                                  /* lock on: OoT-style rising flutter, game instrument EVENT02 p1 (tools/sound) */
+#define SE_FREE    435                                  /* lock off: the same notes reversed */
 
 s32 pm_joe_pos(float *p);                               /* pm.c: Joe's position if he is out on this map */
 
@@ -133,6 +134,7 @@ static s32 pick(u8 *g, s32 map, s32 switching)
     return found;
 }
 static void release(void) { Z.target = 0; }
+static void let_go(void) { if (Z.target) sfx_play(*(u8 **)0x803491E4, SE_FREE, 0); Z.target = 0; }
 static void reticle(u8 *g);
 
 /* ---- the reticle: 4 HUD quads (opguide.agc element 7, AGC_RET_Q) around the target's projected chest.
@@ -207,10 +209,10 @@ void zt_frame(u8 *g, s32 map, volatile u32 *held, volatile u32 *press)
     scan_actors();
     if (Z.target) {                                      /* let go when out of reach or gone */
         float *p = SLOT_POS(g, 0), dx, dz;
-        if (!tpos(g, Z.target, map, &Z.tx, &Z.tz)) release();
+        if (!tpos(g, Z.target, map, &Z.tx, &Z.tz)) let_go();
         else {
             dx = Z.tx - p[0]; dz = Z.tz - p[2];
-            if (dx * dx + dz * dz > ZT_LEASH * ZT_LEASH) release();
+            if (dx * dx + dz * dz > ZT_LEASH * ZT_LEASH) let_go();
         }
     }
     if (*press & 0x10) {                                 /* Z: ours now (no first-person look) */
@@ -221,7 +223,7 @@ void zt_frame(u8 *g, s32 map, volatile u32 *held, volatile u32 *press)
         } else {
             s32 next = pick(g, map, 1);
             if (next) { Z.target = next; tpos(g, next, map, &Z.tx, &Z.tz); Z.r = 60; sfx_play(*(u8 **)0x803491E4, SE_LOCK, 0); }
-            else release();             /* test 1's release sound (4) was a looping drone: none now */
+            else let_go();
         }
     }
     *held &= ~0x10u;                                     /* holding Z never reaches the game either */

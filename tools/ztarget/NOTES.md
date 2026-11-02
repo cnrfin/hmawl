@@ -142,3 +142,8 @@ spots, sometimes Z stops working while walking).
 - Debug block zt_dbg at 0x80367944 (magic 'ZTDB'): target, alpha, free, map, control, +0x58C, fade, Z
   presses, picks, candidates at the last pick, last pick, agc_ok (3 = HUD file found), reticle cx/cy, frames,
   not-free frames, depth w, ndc x/y. pm.bin 88366ec6.
+
+## Test 5: lock sounds
+Sound 434 (lock on, also on switching) and 435 (lock off: Z with nothing to switch to, target gone, or
+walked past 13.5) in GAME_ALL (tools/sound README). No sound when an event or menu ends the lock.
+pm.bin 44853104; zt_dbg moved to 0x8036799C.
