@@ -31,7 +31,8 @@ typedef short s16;
 
 s32 pm_joe_pos(float *p);                               /* pm.c: Joe's position if he is out on this map */
 
-static struct { s32 target; float tx, ty, tz; float r; s32 alpha; float *apos[0x27]; } Z;
+static struct { s32 target; float tx, ty, tz; float r; s32 alpha; float *apos[0x27]; u32 seen[0x27], now; } Z;
+#define ZT_PRESENT 30                                   /* frames a character counts as out after its flag was last seen */
 #define ACTMGR     (*(u8 **)0x8034923C)
 #define CAM        (*(u8 **)0x8034922C)                 /* field camera: +0x1C yaw; it looks along (-sin, -cos) */
 /* villager actors (actor manager id 0xB000; one per character, out or not): +0x4C character id, +0x2C flags
@@ -40,13 +41,15 @@ static void scan_actors(void)
 {
     u8 *m = ACTMGR, *n, *c;
     s32 k = 0, id;
-    for (id = 0; id < 0x27; id++) Z.apos[id] = 0;
+    Z.now++;
     if ((u32)m < 0x80000000u || (u32)m >= 0x81800000u) return;
     for (n = *(u8 **)(m + 4); n != m + 0x14 && (u32)n >= 0x80000000u && (u32)n < 0x81800000u && k < 600; n = *(u8 **)(n + 4), k++) {
         c = *(u8 **)(n + 0xC);
         if ((u32)c < 0x80000000u || (u32)c >= 0x81800000u || *(u32 *)(c + 0x14) != 0xB000) continue;
         id = *(s32 *)(c + 0x4C);
-        if (id >= 1 && id < 0x27 && (*(u32 *)(c + 0x2C) & 0x2000)) Z.apos[id] = (float *)(c - 0x24);
+        /* 0x2000 flickers (test 6: locks dropped a frame after locking, with both sounds): it looks like a
+           drawn-this-frame flag, so a character counts as out for ZT_PRESENT frames after it was last set */
+        if (id >= 1 && id < 0x27 && (*(u32 *)(c + 0x2C) & 0x2000)) { Z.apos[id] = (float *)(c - 0x24); Z.seen[id] = Z.now; }
     }
 }
 
@@ -74,8 +77,8 @@ static s32 tpos(u8 *g, s32 id, s32 map, float *x, float *z)
         if (map != 1 || !pm_joe_pos(p)) return 0;
         *x = p[0]; *z = p[2]; return 1;
     }
-    s = Z.apos[id];                                      /* only characters that are out here */
-    if (!s || SLOT_MAP(g, id) != map) return 0;
+    if (!Z.apos[id] || Z.now - Z.seen[id] > ZT_PRESENT || SLOT_MAP(g, id) != map) return 0;   /* out here, lately */
+    s = SLOT_POS(g, id);                                 /* the live position (event slot, every frame) */
     *x = s[0]; *z = s[2]; return 1;
 }
 static float ztan_half_fov(u8 *c)
@@ -87,7 +90,7 @@ static float theight(u8 *g, s32 id)
 {
     float p[3];
     if (id == ZT_JOE) { pm_joe_pos(p); return p[1]; }
-    return Z.apos[id] ? Z.apos[id][1] : SLOT_POS(g, 0)[1];
+    return SLOT_POS(g, id)[1];
 }
 /* best target in front: switching = 1 skips the current one, widens the cone to 90 degrees and favours
    targets straight ahead (distance x0.6 ahead .. x1.0 at the side) */

@@ -157,3 +157,10 @@ func_80085E40's save; test 6 doubles it while locked to see if it is the tilt), 
 +0x38 = 30.2 FOV, +0x3C 0.3. Eye in the dump: 0.92 above the aim point at 12 (4.4 degrees).
 Test 6: while locked, distance eases to 9.5 and +0x18 to 2x its value (10 % a frame); both ease back on
 release and then hand back the game's exact values. pm.bin 46246320, zt_dbg 0x80367B58.
+
+## Test 6 results -> test 7
+Test 6: locking got worse (sometimes 3 presses), both sounds heard on a lock. Reading: the lock was made,
+then let go a frame later (lock-off sound): the actor flag 0x2000 flickers, more with the camera moving
+(zoom), so it looks like a drawn-this-frame flag rather than "out here". Now a character counts as out for 30
+frames after the flag was last seen, and the target's position comes from its event slot (live every frame).
+pm.bin 5e1ca972, zt_dbg 0x80367B3C.
