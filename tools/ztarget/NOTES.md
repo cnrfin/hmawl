@@ -147,3 +147,13 @@ spots, sometimes Z stops working while walking).
 Sound 434 (lock on, also on switching) and 435 (lock off: Z with nothing to switch to, target gone, or
 walked past 13.5) in GAME_ALL (tools/sound README). No sound when an event or menu ends the lock.
 pm.bin 44853104; zt_dbg moved to 0x8036799C.
+
+## Test 4 dumps (Z1-Z3) -> test 6
+Dumps: locked on villagers 21 / 6, alpha 255, agc_ok 3, 1 candidate per pick, no not-free frames during the
+session (nfree stayed 1058, all from before). Camera yaw had counted on to -6.95: now wrapped.
+Camera +0x10 = 1.5 (aim height over the player, also added to the ground height under the eye in
+func_800859xx, so it cancels in the pitch there), +0x18 = -0.148 (not yet confirmed: copied with the others in
+func_80085E40's save; test 6 doubles it while locked to see if it is the tilt), +0x30 = 12 (distance),
++0x38 = 30.2 FOV, +0x3C 0.3. Eye in the dump: 0.92 above the aim point at 12 (4.4 degrees).
+Test 6: while locked, distance eases to 9.5 and +0x18 to 2x its value (10 % a frame); both ease back on
+release and then hand back the game's exact values. pm.bin 46246320, zt_dbg 0x80367B58.

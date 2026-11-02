@@ -245,13 +245,30 @@ static float zatan2(float y, float x)
 }
 #define ZT_TURN    0.35f                                /* facing: share of the way to the target per frame */
 #define ZT_CAMRATE 0.12f                                /* camera yaw: share of the way per frame */
+#define ZT_DIST    9.5f                                 /* lock-on zoom: camera distance (+0x30, normally 12) */
+#define ZT_TILT    2.0f                                 /* lock-on tilt: +0x18 (normally -0.148) x this (test) */
+#define ZT_ZRATE   0.10f
+static struct { s32 on; float dist0, tilt0; } ZC;      /* the camera's own values while we change them */
 
 /* after the player's update (HOOK13): turn toward the target; swing the camera behind him, looking past him
    at the target (so stick-up also means toward the target, as in OoT) */
+static void zoom(u8 *c, s32 locked)
+{
+    float *dist = (float *)(c + 0x30), *tilt = (float *)(c + 0x18), wd, wt;
+    if (locked && !ZC.on) { ZC.on = 1; ZC.dist0 = *dist; ZC.tilt0 = *tilt; }
+    if (!ZC.on) return;
+    wd = locked ? ZT_DIST : ZC.dist0; wt = locked ? ZC.tilt0 * ZT_TILT : ZC.tilt0;
+    *dist += (wd - *dist) * ZT_ZRATE; *tilt += (wt - *tilt) * ZT_ZRATE;
+    if (!locked && (*dist - wd) * (*dist - wd) < 0.0004f && (*tilt - wt) * (*tilt - wt) < 0.000001f) {
+        *dist = ZC.dist0; *tilt = ZC.tilt0; ZC.on = 0;    /* back to the game's own values */
+    }
+}
 void zt_post(u8 *pl)
 {
     float *pos, *face, dx, dz, d2, inv, fx, fz, want, *yaw, dy;
     u8 *c = CAM;
+    s32 cam_ok = (u32)c >= 0x80000000u && (u32)c < 0x81800000u;
+    if (cam_ok) zoom(c, Z.target && pl && *(s32 *)(pl + PL_STATE) == 1);
     if (!Z.target || !pl || *(s32 *)(pl + PL_STATE) != 1) return;
     pos = (float *)(pl + 0x4C); face = (float *)(pl + PL_FACE);
     dx = Z.tx - pos[0]; dz = Z.tz - pos[2]; d2 = dx * dx + dz * dz;
@@ -261,12 +278,14 @@ void zt_post(u8 *pl)
     d2 = fx * fx + fz * fz;
     if (d2 < 0.0001f) { fx = dx; fz = dz; d2 = 1; }          /* exactly opposite: go straight there */
     inv = rsq(d2); face[0] = fx * inv; face[1] = 0; face[2] = fz * inv;
-    if ((u32)c >= 0x80000000u && (u32)c < 0x81800000u) {
+    if (cam_ok) {
         yaw = (float *)(c + 0x1C);
         want = zatan2(-dx, -dz);
         dy = want - *yaw;
         while (dy > 3.14159274f) dy -= 6.28318548f;
         while (dy < -3.14159274f) dy += 6.28318548f;
         *yaw += dy * ZT_CAMRATE;
+        while (*yaw > 3.14159274f) *yaw -= 6.28318548f;      /* keep it in -pi..pi (it counted on: -6.95 in a dump) */
+        while (*yaw < -3.14159274f) *yaw += 6.28318548f;
     }
 }
