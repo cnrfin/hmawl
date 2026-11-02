@@ -47,7 +47,7 @@ JOE = 0x442
 REQ, CNT, HELD = 41, 42, 44
 V_ANS, V_N = 2, 3
 a = Asm(); L = a.new
-a.sys(0x10); a.num(37); a.sys(0xA0); a.sys(0x00)             # event start, NPC talk camera on character 37 (Joe; pm.c fills its slot)
+a.sys(0x10); a.num(37); a.sys(0xA0); a.num(1); a.sys(0xDD); a.sys(0x00)   # + cmd_DD(1): the money window (as the shops)             # event start, NPC talk camera on character 37 (Joe; pm.c fills its slot)
 done = L('done')
 def say(m):  a.wait_msg(FILE, m)
 def ask(m, no):                                              # yes/no: answer 0 = yes; anything else -> no
@@ -85,6 +85,7 @@ a.label(no_coins); say(18); a.jmp(done)
 a.label(bye); say(19)
 a.label(done)
 setc(REQ, 0)
+a.num(0); a.sys(0xDD)                                         # money window off
 a.emit('end'); a.emit('end')
 script = a.build()
 ins, ch = parse(script); assert len(ins) == len(a.ins)

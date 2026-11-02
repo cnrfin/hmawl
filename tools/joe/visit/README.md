@@ -60,3 +60,13 @@ pm.bin cca2dccd, make_pm_dol.py ce24f38c.
 - Bench (event 407): built without `cmd_10` (`BENCH_NOCAM=1`) to test whether that is the camera jump.
 - Common.arc a4646e86 (bench without cmd_10 + trade), debug.mes unchanged (6c1b2dbc). pm.bin 84f171ce.
 - Money window: not found yet (the shops draw it from their own REL code).
+
+## Test 6: money window, Joe stays seated, camera a little further
+- Money window: script cmd_DD(flag) = func_80109048(evmgr, flag), shows/hides the event system's gold
+  window (object 0x802F3A1C, drawn by func_80106D08 from the game's gold). Found by diffing two dumps
+  (window shown / closed). The trade turns it on after cmd_A0 and off at the end. Common.arc 411f77e3.
+- The event start stands character 37 up (actor +0x214 leaves state 4): during the trade pm.c restarts the
+  sitting loop when that happens.
+- Talk camera a little further: character 37's slot point is 0.4 behind the seat centre.
+- Test 5 results: first-person camera works (slightly too close), the bench jump is gone (cmd_10 removed),
+  the cash chime plays. pm.bin 1e2b5c33.

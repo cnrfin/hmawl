@@ -425,7 +425,7 @@ s32 joe_price_today(void);
 static void joe_char_slot(u8 *g)
 {
     float *p = (float *)(g + 0x29C78 + 37 * 12), *d = (float *)(g + 0x29F84 + 37 * 12);
-    p[0] = BENCH_X; p[1] = S.pos.y; p[2] = BENCH_Z;
+    p[0] = BENCH_X - 0.4f; p[1] = S.pos.y; p[2] = BENCH_Z;   /* a little behind the seat: the camera sits a bit further back */
     d[0] = 1; d[1] = 0; d[2] = 0;
 }
 /* the trade event asks through counter 41: 1 buy / 4 sell (count in 42); answer 2 bought, 3 short of gold, 5 sold */
@@ -496,7 +496,12 @@ static s32 joe_frame(u8 *g, s32 map, u32 t)
     }
     if (joe_trading) {                        /* our trade event: settle its requests */
         if (no_event()) { joe_trading = 0; JCNT(41) = 0; }
-        else { joe_char_slot(g); joe_trade(g); return 1; }
+        else {
+            joe_char_slot(g); joe_trade(g);
+            /* the event start stood him up (actor left the motion state 4): back to the sitting loop */
+            if (S.actor && tod >= J_SIT && tod < J_UP && *(s32 *)(S.actor + 0x214) != 4) { S.motion = -1; joe_motion(JM_SIT); }
+            return 1;
+        }
     }
     if (!no_event()) return 1;
     if (S.loaded && S.who != 2) { if (S.actor) despawn(); release_model(); }
