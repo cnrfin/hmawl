@@ -33,7 +33,7 @@ a session's temporary folder; the ones still only there are marked.
 | Joe's faces (blink, angry/happy/neutral per line), mouth flaps + talk gestures timed to the typing, gift take-and-pocket | pm.c joe_face / joe_talk_frame, joe_lines.h, counters 49/50 | visit/README.md test 13 |
 | Zelda-style Z targeting (tests 1-16): lock-on to villagers/Joe, switching, yellow bracket reticle, lock on/off sounds 434/435, follow camera with zoom + upward tilt, face the target, strafe left/right + walk-back clips 126-128 | zt.c (HOOK13-16, motion picks 0x80042D44/D98/DD0), opguide.agc reticle quads, boy_0.anm.arc clips | tools/ztarget (NOTES.md), tools/sound, tools/hud |
 | Field tile cursor in the Z-target bracket style, soft settle | tile.c (HOOK18 0x80091F58) | tools/ztarget NOTES.md |
-| Z-target tool swing (test 17): B while locked on swings clip 39 on the upper body only (legs keep walking/strafing), own speed | zt.c zt_bone / swing_frame (HOOK19 0x8019E5C4 -> pm_bone_stub +0x250) | tools/ztarget NOTES.md "layering"; no tool model or hits yet |
+| Z-target combo (tests 17-18): B while locked on = 3-hit one-handed combo (quick forehand, quick backhand, heavy overhead), consecutive B chains; upper body only (waist twist, legs keep walking/strafing) | zt.c zt_bone / sw_start / swing_frame (HOOK19 0x8019E5C4 -> pm_bone_stub +0x250), boy_0.anm.arc clips 129-131 | tools/ztarget/anim combo.py + make_attack_clips.py (authored from scratch: IK arm arcs, spine twist), NOTES.md; no weapon model or hits yet |
 | Test keys (Z+B, Z+D-Up, Z+X, Z+D-Left/Right/Down, Z+Y) and debug blocks: removed in Joe test 16; HOOK11 probe unhooked | pm.c, logs.c, skill.c, make_pm_dol.py | visit/README.md test 16 |
 
 ## Data files

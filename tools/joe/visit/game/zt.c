@@ -422,44 +422,54 @@ void zt_motion(u8 *slot, s32 var, s32 grp, s32 i1, s32 i2, s32 e, float rate)
 #define anim_blend F(0x8019FF8C, void, (u8 *, s32, u8 *, float))
 #define arc_anim   F(0x801A0A88, u8 *, (u8 *, s32, s32))
 #define ctl_init   F(0x8019FE08, void, (u8 *, u8 *, float))
-#define SW_CLIP    39                                   /* boy_0.anm.arc 39: a quick sideways slash (27 frames) */
-#define SW_RATE    1.35f                                /* clip frames per game frame (~20 frames a swing) */
-#define SW_IN      3.0f                                 /* weight fade in / out, clip frames */
-#define SW_OUT     7.0f
-#define SW_SPINE   18                                   /* bones 18-21 spine, 22-42 arms, 43-54 head; legs/pelvis below */
-static struct { float frame, rate; u32 loop; float len; u8 *anim, *next; float w; u32 pad; } SWC;
-static struct { s32 on; float w; u32 swings; } SW;
+#define SW_CLIP    129                                  /* combo hits 1-3 = boy_0.anm.arc 129 / 130 / 131 (tools/ztarget/anim combo.py) */
+#define SW_IN      2.0f                                 /* hit 1: weight fade in from the walk (frames) */
+#define SW_OUT     6.0f                                 /* last hit: fade out over its recovery */
+#define SW_XF      3.0f                                 /* chained hit: crossfade from the previous one */
+static const float sw_chain[2] = { 11.0f, 9.0f };       /* hit 1 / 2 frame from which a queued B starts the next */
+struct swctl { float frame, rate; u32 loop; float len; u8 *anim; struct swctl *next; float w; u32 pad; };
+static struct swctl SWC[2];
+static struct { s32 on, hit, queued, cur; float w, xf; u32 swings; } SW;
 static float smooth01(float x) { if (x <= 0.0f) return 0.0f; if (x >= 1.0f) return 1.0f; return x * x * (3.0f - 2.0f * x); }
+static s32 sw_start(s32 hit, s32 chained)
+{
+    u8 *tab, *arc, *a;
+    sw_dbg.tries++;
+    if (!sw_slot) { sw_dbg.fail = 1; return 0; }
+    tab = *(u8 **)(sw_slot + 0x88); arc = tab ? *(u8 **)tab : 0; sw_dbg.arc = (u32)arc;
+    if (!arc) { sw_dbg.fail = 2; return 0; }
+    if (*(u32 *)arc != 0x55AA382Du) { sw_dbg.fail = 3; return 0; }
+    /* U8: root node at +4, its +8 = node count; clip k is node k + 1 (ARCFastOpen leaves its output unset when out of range) */
+    if (*(u32 *)(arc + *(u32 *)(arc + 4) + 8) <= (u32)(SW_CLIP + hit + 1)) { sw_dbg.fail = 5; return 0; }   /* clips not on the disc */
+    if ((a = arc_anim(arc, 0, SW_CLIP + hit)) == 0) { sw_dbg.fail = 4; return 0; }
+    sw_dbg.anim = (u32)a; sw_dbg.fail = 0; sw_dbg.starts++;
+    if (chained) SW.cur ^= 1;
+    ctl_init((u8 *)&SWC[SW.cur], a, 0.0f); SWC[SW.cur].rate = 1.0f; SWC[SW.cur].next = 0;
+    SW.hit = hit; SW.queued = 0; SW.xf = chained ? SW_XF : 0.0f; SW.on = 1; SW.swings++;
+    return 1;
+}
 static void swing_frame(s32 bpress, s32 free)
 {
-    if (!free) { SW.on = 0; SW.w = 0.0f; return; }
+    struct swctl *c, *p;
     sw_dbg.magic = 0x53574442u; sw_dbg.slot = (u32)sw_slot;
-    if (bpress && !SW.on) {
-        sw_dbg.tries++;
-        if (!sw_slot) sw_dbg.fail = 1;
-        else {
-            u8 *tab = *(u8 **)(sw_slot + 0x88), *arc = tab ? *(u8 **)tab : 0, *a = 0;
-            sw_dbg.arc = (u32)arc;
-            if (!arc) sw_dbg.fail = 2;
-            else if (*(u32 *)arc != 0x55AA382Du) sw_dbg.fail = 3;
-            else if ((a = arc_anim(arc, 0, SW_CLIP)) == 0) sw_dbg.fail = 4;
-            else { sw_dbg.anim = (u32)a; sw_dbg.fail = 0; sw_dbg.starts++;
-                   ctl_init((u8 *)&SWC, a, 0.0f); SWC.rate = 1.0f; SWC.next = 0; SW.on = 1; SW.swings++; }
-        }
-    }
-    sw_dbg.w = SW.w; sw_dbg.frame = SWC.frame; sw_dbg.len = SWC.len;
+    if (!free) { SW.on = 0; SW.w = 0.0f; return; }
+    if (bpress) { if (!SW.on) sw_start(0, 0); else if (SW.hit < 2) SW.queued = 1; }
     if (!SW.on) { SW.w = 0.0f; return; }
-    SW.w = smooth01((SWC.frame + SW_RATE) / SW_IN) * smooth01((SWC.len - SWC.frame) / SW_OUT);
-    if (SWC.frame + SW_RATE >= SWC.len) { SW.on = 0; SW.w = 0.0f; return; }
-    SWC.frame += SW_RATE;
+    c = &SWC[SW.cur];
+    if (SW.queued && SW.hit < 2 && c->frame >= sw_chain[SW.hit]) { sw_start(SW.hit + 1, 1); c = &SWC[SW.cur]; }
+    p = &SWC[SW.cur ^ 1];
+    if (SW.xf > 0.0f) { c->next = p; c->w = smooth01(SW.xf / SW_XF); SW.xf -= 1.0f; } else c->next = 0;
+    SW.w = (SW.hit == 0 ? smooth01((c->frame + 1.0f) / SW_IN) : 1.0f) * smooth01((c->len - c->frame) / SW_OUT);
+    sw_dbg.w = SW.w; sw_dbg.frame = c->frame; sw_dbg.len = c->len;
+    if (p->frame + 1.0f < p->len) p->frame += 1.0f;
+    if (c->frame + 1.0f >= c->len) { SW.on = 0; SW.w = 0.0f; return; }
+    c->frame += 1.0f;
 }
 s32 zt_bone(u8 *ctl, s32 n, u8 *trs, u8 *inst)
 {
     s32 r = anim_eval(ctl, n, trs);
-    if (r && SW.w > 0.0f && n >= SW_SPINE && sw_slot && inst == *(u8 **)(sw_slot + 0x14)) {
-        float w = SW.w;
-        if (n == SW_SPINE) w *= 0.4f; else if (n == SW_SPINE + 1) w *= 0.7f;
-        anim_blend((u8 *)&SWC, n, trs, w); sw_dbg.bones++;
+    if (r && SW.w > 0.0f && n >= 18 && sw_slot && inst == *(u8 **)(sw_slot + 0x14)) {
+        anim_blend((u8 *)&SWC[SW.cur], n, trs, SW.w); sw_dbg.bones++;   /* the clips own the whole spine: full weight */
     }
     return r;
 }

@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Add the Z-targeting player clips to boy_0.anm.arc inside a mainchapterN.arc.clz (the always-loaded archive
 with every character's model and animations; the farmer's 126 clips are shared by all his chapter models).
-usage: add_player_clips.py mainchapterN.arc.clz OUT.arc.clz [anm126.bin anm127.bin anm128.bin]
-Clips 126 strafe left, 127 strafe right, 128 walk back (zt.c CLIP_*). Every other file keeps its bytes and
+usage: add_player_clips.py mainchapterN.arc.clz OUT.arc.clz [anm126.bin ... anm131.bin]
+Clips 126 strafe left, 127 strafe right, 128 walk back, 129-131 combo hits 1-3 (zt.c CLIP_* / SW_CLIP). Every other file keeps its bytes and
 order; run again on its own output and the three are replaced, not added twice."""
 import sys, os, struct, hashlib, types
 # bundled (no other files needed): CLZ from hmawl tools/logs/build_log_archives.py, U8 from u8arc.py
@@ -75,19 +75,20 @@ def u8(files):
 
 
 CLIPS = 126
+NEW = 6                                     # our clips 126..131 (replaced, not added twice, on a re-run)
 
 def main():
     a = sys.argv[1:]
-    if len(a) not in (2, 5): sys.exit(__doc__)
+    if len(a) not in (2, 2 + NEW): sys.exit(__doc__)
     here = os.path.dirname(os.path.abspath(__file__))
-    clips = [open(p, 'rb').read() for p in (a[2:5] if len(a) == 5 else [os.path.join(here, 'anm%d.bin' % k) for k in (126, 127, 128)])]
+    clips = [open(p, 'rb').read() for p in (a[2:] if len(a) > 2 else [os.path.join(here, 'anm%d.bin' % k) for k in range(126, 126 + NEW)])]
     d = clz_decompress(open(a[0], 'rb').read()); arc = u8arc.read(d); nm = u8arc.names(arc)
     if 'boy_0.anm.arc' not in nm:
         open(a[1], 'wb').write(open(a[0], 'rb').read()); print('%s: no boy_0.anm.arc, copied unchanged' % os.path.basename(a[0])); return
     k = nm['boy_0.anm.arc']; inner = arc['files'][k]
     ia = u8arc.read(inner); order = sorted(ia['files'], key=lambda j: ia['nodes'][j][1])
     files = [('@', ia['files'][j]) for j in order]
-    assert len(files) in (CLIPS, CLIPS + 3), 'boy_0.anm.arc has %d clips (expected 126 or 129)' % len(files)
+    assert CLIPS <= len(files) <= CLIPS + NEW, 'boy_0.anm.arc has %d clips (expected 126..%d)' % (len(files), CLIPS + NEW)
     files = files[:CLIPS] + [('@', c) for c in clips]
     nu_inner = u8(files); ib = u8arc.read(nu_inner)
     assert [ib['files'][j] for j in sorted(ib['files'], key=lambda j: ib['nodes'][j][1])] == [f for _, f in files]

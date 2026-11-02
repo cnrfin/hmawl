@@ -267,3 +267,16 @@ the swing clip, frame advanced by us at our own speed; w fades in/out. Legs/pelv
 - Clip 39 (sideways slash, 27 f) at 1.35 clip frames per frame, smoothstep weight in 3 / out 7 clip frames.
 - Player tool clip groups found (ready, raise, hold, swing, recover): 25-29, 30-34, 94-98, 114-118; 39 and 41 are
   single swings.
+
+## Test 18: 3-hit combo, clips authored from scratch
+- anim/combo.py: procedural, no existing clips. Per hit, keys of: right wrist target (shoulder-relative, in body axes
+  turned by the twist; the chest bone's own axes face backwards, so not W[20]), elbow pole, left wrist (guard / pull
+  back), twist (spread over spine 18/19/20 = 40/35/25 %, waist-led), lean. Wrist path = Catmull-Rom with per-segment
+  eases ('back' overshoot on strikes); two-bone IK (shoulder 33, elbow 35, wrist 36; left 22/24/25); arms lag the
+  body by one frame; head counter-turns 45 % of the twist.
+- Hits: 1 forehand (19 f), 2 backhand (17 f, starts at hit 1's frame 11 pose), 3 heavy overhead (30 f, starts at
+  hit 2's frame 9 pose). make_attack_clips.py encodes them as 129/130/131 (readback error < 1e-4).
+- zt.c: B starts hit 1; B during hit 1/2 queues the next, which starts at sw_chain (11 / 9) or at once if later, with
+  a 3-frame crossfade through the ctl's next/weight (the game's own chain). Full weight on bones 18+ (the clips own
+  the spine). Two ctls ping-pong. A disc without the clips is caught by the U8 node count (sw_dbg.fail 5).
+- add_player_clips.py now writes clips 126-131 (accepts 126..132 already there; idempotent).
