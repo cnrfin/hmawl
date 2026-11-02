@@ -36,3 +36,54 @@ moving, and the camera follows. The OoT decompilation is used as a behaviour ref
 3. Facing one way (A), then turned on the spot (B): the player's facing.
 4. Standing (A), then mid-walk with the stick held (B): speed and walk state.
 5. Standing next to a named villager: the villager actor list and positions.
+
+## OoT reference (zeldaret/oot, main): behaviour only, not code to copy
+How sure each item is: **[read]** = read in the source text; **[lead]** = from a summary of a part not read
+line by line, so check it before relying on it.
+
+**Target selection** (z_actor.c: Attention_FindActor, Attention_Update, Attention_Draw, sAttentionRanges)
+- [lead] Search order by category: boss, enemy, ..., NPC, item, chest, ..., door. A candidate must have
+  attention enabled, be in range, be roughly on screen (leeway 20 px sideways, 160 px vertically) and be in
+  line of sight.
+- [lead] Not locked: only actors within ~60 degrees of the player's facing count, scored by squared
+  distance. Locked (looking for the next target): within 90 degrees, with distance x 0.6 straight ahead
+  rising to x 1.0 at 90 degrees, so targets in front are preferred.
+- [lead] Ranges by type (range / release): 70/140, 170/255, 280, 350/525 (the default, type 3), 700/1050,
+  1000/1500, ... Release happens at roughly sqrt(range x leash), about 428 units for type 3.
+  OoT units: Link is about 50 tall, so convert by scale (AWL's player is about 1.6 units tall: OoT 350 ~
+  AWL 11).
+- [read] Holding back on the stick while locked stops it cycling to another target. The second-Z-press
+  cycling itself is in player code, not yet read.
+
+**Reticle and arrow** [read]
+- Colours: enemy yellow (255,255,0); NPC light blue (150,150,255); anything else green (0,255,0).
+- The reticle is 4 triangles rotated 90 degrees apart. It starts at radius 500, closes toward 80 with
+  step clamp((500 - r) x 3, 30, 100), then spins (3 steps/frame of 128 per turn) at radius 120. Faded
+  motion-blur copies show while it closes in. On release it fades (alpha -120/frame) and opens up
+  (+80/frame).
+- The arrow over the target sits 17 units above its focus point and spins about Y by 3000/65536 of a turn
+  per frame.
+- Sounds: a lock-on sound for enemies, a gentler one for people.
+- **For AWL:** the reticle can be a HUD sprite at the target's projected screen position (skill.c already
+  draws HUD art); the arrow could be a small spinning model (as the cmd_91 item model).
+
+**Player while locked** (z_player.c, z_player_lib.c)
+- [read] Locking on to an NPC = "friendly" focus, and the camera goes into its Z-target-friendly mode.
+- [lead] Stick: world direction = camera yaw + stick angle; a dead zone below 55 (of about 60); the
+  direction relative to the facing is sorted into 4 (forward / back / left / right), which picks walk,
+  backwalk, sidestep left or sidestep right. Animations: side_walk, side_walkL/R, back_walk.
+- [lead] Parallel Z (no target): keep the current facing, camera snaps behind.
+- Not yet read: speeds while locked, and the code that keeps him turned toward the target.
+
+**Camera** (z_camera.c)
+- [read] Smoothing is "step = difference x rate", snapping when close: offsets 0.05 a frame, look-at step
+  0.12 to 1.1 x, distance 1/20 and pitch 1/16 of the difference per frame. Pitch limits about +80 /
+  -30 to -50 degrees.
+- [read] Wall check: the eye is kept 8 units off walls and 1 unit above the floor.
+- [lead] KeepOn1 (people): look-at placed between player and target, pitch kept within about +-70 degrees,
+  a short swing in (~4 frames + extra). Battle1 (enemies): the closer the target, the more the yaw
+  swings to keep both in frame; FOV narrows slightly. Parallel1 (no target): turns behind the player over
+  4 frames.
+- **For AWL:** a simple version of KeepOn1. The eye sits behind the player on the line from the target
+  through the player, raised and a little to the side, looking at a point between the two, all eased
+  with the rates above.
