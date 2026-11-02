@@ -25,7 +25,6 @@ typedef unsigned char u8;
 #define ZT_COS60   0.5f
 #define ZT_JOE     100                                  /* target id for Joe (not an event slot) */
 #define SE_LOCK    3                                    /* cursor_ok */
-#define SE_FREE    4                                    /* cursor_cancel (guess; harmless if another blip) */
 
 s32 pm_joe_pos(float *p);                               /* pm.c: Joe's position if he is out on this map */
 
@@ -100,20 +99,48 @@ void zt_frame(u8 *g, s32 map, volatile u32 *held, volatile u32 *press)
         } else {
             s32 next = pick(g, map, 1);
             if (next) { Z.target = next; tpos(g, next, map, &Z.tx, &Z.tz); sfx_play(*(u8 **)0x803491E4, SE_LOCK, 0); }
-            else { release(); sfx_play(*(u8 **)0x803491E4, SE_FREE, 0); }
+            else release();             /* test 1's release sound (4) was a looping drone: none now */
         }
     }
     *held &= ~0x10u;                                     /* holding Z never reaches the game either */
 }
 
-/* after the player's update (HOOK13): face the target */
+/* atan2 (radians), polynomial: about 0.005 rad worst error, plenty for a camera */
+static float zatan2(float y, float x)
+{
+    float ax = x < 0 ? -x : x, ay = y < 0 ? -y : y, a, s, r;
+    if (ax < 1e-6f && ay < 1e-6f) return 0;
+    a = ax < ay ? ax / ay : ay / ax; s = a * a;
+    r = ((-0.0464964749f * s + 0.15931422f) * s - 0.327622764f) * s * a + a;
+    if (ay > ax) r = 1.57079637f - r;
+    if (x < 0) r = 3.14159274f - r;
+    return y < 0 ? -r : r;
+}
+#define ZT_TURN    0.35f                                /* facing: share of the way to the target per frame */
+#define ZT_CAMRATE 0.12f                                /* camera yaw: share of the way per frame */
+#define CAM        (*(u8 **)0x8034922C)                 /* field camera: +0x1C yaw; it looks along (-sin, -cos) */
+
+/* after the player's update (HOOK13): turn toward the target; swing the camera behind him, looking past him
+   at the target (so stick-up also means toward the target, as in OoT) */
 void zt_post(u8 *pl)
 {
-    float *pos, *face, dx, dz, d2, inv;
+    float *pos, *face, dx, dz, d2, inv, fx, fz, want, *yaw, dy;
+    u8 *c = CAM;
     if (!Z.target || !pl || *(s32 *)(pl + PL_STATE) != 1) return;
     pos = (float *)(pl + 0x4C); face = (float *)(pl + PL_FACE);
     dx = Z.tx - pos[0]; dz = Z.tz - pos[2]; d2 = dx * dx + dz * dz;
     if (d2 < 0.01f) return;
-    inv = rsq(d2);
-    face[0] = dx * inv; face[1] = 0; face[2] = dz * inv;
+    inv = rsq(d2); dx *= inv; dz *= inv;
+    fx = face[0] + (dx - face[0]) * ZT_TURN; fz = face[2] + (dz - face[2]) * ZT_TURN;
+    d2 = fx * fx + fz * fz;
+    if (d2 < 0.0001f) { fx = dx; fz = dz; d2 = 1; }          /* exactly opposite: go straight there */
+    inv = rsq(d2); face[0] = fx * inv; face[1] = 0; face[2] = fz * inv;
+    if ((u32)c >= 0x80000000u && (u32)c < 0x81800000u) {
+        yaw = (float *)(c + 0x1C);
+        want = zatan2(-dx, -dz);
+        dy = want - *yaw;
+        while (dy > 3.14159274f) dy -= 6.28318548f;
+        while (dy < -3.14159274f) dy += 6.28318548f;
+        *yaw += dy * ZT_CAMRATE;
+    }
 }

@@ -104,3 +104,14 @@ the nearest villager (ids 1..0x26, same map) or Joe within 10 units and 60 degre
 switches (90 degrees, ahead favoured) or lets go; out past 13.5 units = let go. HOOK13 (0x800313C4, original
 lwz r3,-0x57F4(r13) replayed in pm_zt_stub at pm.bin +0x1F4) calls zt_post(player): facing -> target.
 Sounds: 3 on lock, 4 on release (4 is a guess).
+
+## Test 1 results -> test 2
+Test 1 in game: locks on, turns him toward the villager while standing and walking, lets go when far: all
+right. Problems: a loud drone (release sound 4 is a looping sound: removed), jitter near several villagers
+(cause not found yet; the facing now turns 35 % of the way per frame instead of snapping), and the camera
+did not follow.
+Camera object *(0x8034922C) (from two valley dumps): +0x00 = the point it follows (player position), +0x1C =
+yaw, +0x30 = distance 12, +0x80 = the eye. It looks along (-sin yaw, -cos yaw): checked on both dumps (eye to
+player direction). Test 2 eases +0x1C 12 % a frame toward atan2(-dx, -dz) (dx, dz = player to target), so the
+camera swings behind him looking past him at the target, and stick-up walks toward the target (movement uses
+the camera yaw). pm.bin 7a3830ac.
