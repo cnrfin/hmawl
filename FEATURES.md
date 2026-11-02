@@ -28,7 +28,7 @@ a session's temporary folder; the ones still only there are marked.
 | Lumber item (0x51C) | make_pm_dol.py data patch | |
 | Van only on the 3rd and 7th | make_pm_dol.py (0x802952D4) | tools/van |
 | Bench "sit until evening/morning" (time skip, shipping, rest) | pm.c, Common.arc event 407 | tools/benchsit |
-| Script messages from mukumuku.mes use the name-plate window (HOOK12) | hook.s pm_msg_stub | tools/joe/visit test 11 |
+| Joe speaks as character 0x23 (Mukumuku's slot): name "Joe" in Message.arc people.mes, hearts from his gifts | events 408/409 speaker 0x23, pm.c joe_hearts | tools/joe/visit test 12 (HOOK12 stub unused, site restored) |
 | Joe's visit, trade, talk, gifts | pm.c joe_* , events 408/409 | tools/joe (DESIGN.md, visit/README.md) |
 | Z+B test key (clock to 22:00), Z+D-Up (Joe's next stage), Z+X (gd slot test), Z+D-Left/Right/Down (Postman tests) | pm.c | test keys |
 

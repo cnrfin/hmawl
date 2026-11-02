@@ -118,3 +118,13 @@ make_pm_dol.py 17653839.
 pm.c joe_hearts: before a talk or trade, character 0x23's villager record (func_8000DC24) +0xF =
 40 + 6 x gifts (cap 100), so the name-plate hearts (v03 hearts v7) follow his $JOE gifts: 0 gifts 1 grey,
 2 green, 4 blue, 6 red, 8 2 red, 10 3 red. pm.bin c019bebd (pm_msg_stub still at +0x1E4).
+
+## Test 12: the real fix for name and heart
+func_801020E4(mgr, mode, file, msg, speaker): mode 0 = the talk window (layout +0x314, white text), any
+other mode = the sign-post board (layout +0x34C, dark text). With mode 0: speaker -1 -> character from the
+file (table 0x80251A38), else the speaker is the character id itself; the name is drawn only if the
+character is in table 0x80251A90 (1..0x26). Test 10 passed speaker 0 (no such character -> no name); test 11's
+hook forced mode 1 (board). Now: speaker 0x23 in both events, HOOK12 site restored to the original bl
+(make_pm_dol.py update mode accepts the test 11 word). The name plate reads people.mes inside Message.arc
+(loaded at boot): `build_joe_message_arc.py` sets entry 35 to "Joe" (input: the $JOE coin build 3205b29b).
+data/: Common.arc d40c7e13, Message.arc 70a46b73. pm.bin c019bebd, make_pm_dol.py dff40754.
