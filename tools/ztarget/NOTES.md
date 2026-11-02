@@ -217,3 +217,7 @@ presets: no velocity-to-filter in the bank.)
   anim/add_player_clips.py appends them to boy_0.anm.arc in a mainchapterN.arc.clz (+52 KB unpacked;
   idempotent; mainchapter1 checked).
 - pm.bin 346b1401 (code ends 0x80368588).
+
+## Test 13: lock sounds louder
+Gains 0.40 / 0.30 (test 11: 0.196 / 0.146 too quiet, test 5: 0.89 too loud): loudest 100 ms -18.8 / -19.8 dBFS (wood hit -17.2). Bank b8d163da / 18982d7e.
+Reticle concepts (reticle/mockups.py): A petals, B brackets, C spinner, D arrow + ring; flat yellow (255,206,46), no outline.
