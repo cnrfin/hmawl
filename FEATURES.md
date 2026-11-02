@@ -43,5 +43,6 @@ a session's temporary folder; the ones still only there are marked.
 | Bench turned + collision, bridge walkway (wood footsteps) | mapobj/map files | tools/bench, hmawl repo |
 | $JOE coin item (model, texture, docs) | item/itemdoc03 etc. | tools/joecoin/coin |
 | Harvest Goddess model (+ jiggle tests) | gd files (earlier) | tools/goddess |
-| Muffy recolour, sound fixes, wood sounds, jingles (level up, field up, item-get fanfare), music SoundFont | various | scratchpad + /home/user zips (not yet in the repo) |
+| Sound bank: item-get fanfare (224), wood hit (432), Breeze level-up jingle G (433) | sound/GAME_ALL.arc + .samp | tools/sound (README: rebuild chain from vanilla; SoundFont script, not the 51 MB .sf2) |
+| Muffy recolour (pink hair, black dress, orange eyes): textures only, not built into her files yet | mumu_0.arc (future) | tools/muffy |
 | Skip intro | Chapter1.arc etc. | tools/skipintro |

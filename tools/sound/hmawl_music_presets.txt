@@ -1,0 +1,140 @@
+bank  0 prog 0  BOKUJYO01 p0        7 zones, keys   0-127
+bank  0 prog 1  BOKUJYO01 p1        4 zones, keys   0-120
+bank  0 prog 2  BOKUJYO01 p2 kit    8 zones, keys  72- 88  (also bank 128 prog 0)
+bank  0 prog 3  BOKUJYO01 p3        6 zones, keys   0-127
+bank  1 prog 0  BOKUJYO02 p0        5 zones, keys   0-127
+bank  1 prog 1  BOKUJYO02 p1        4 zones, keys   0-127
+bank  1 prog 2  BOKUJYO02 p2        4 zones, keys   0-127
+bank  1 prog 3  BOKUJYO02 p3 kit    6 zones, keys  54- 65  (also bank 128 prog 1)
+bank  2 prog 0  TITLE p0            6 zones, keys   0-127
+bank  2 prog 1  TITLE p1            4 zones, keys   0-127
+bank  2 prog 2  TITLE p2            7 zones, keys   0-127
+bank  2 prog 3  TITLE p3            5 zones, keys   0-127
+bank  2 prog 4  TITLE p4            1 zones, keys   0-127
+bank  2 prog 5  TITLE p5 kit        3 zones, keys  60- 86  (also bank 128 prog 2)
+bank  3 prog 0  NAME p0             4 zones, keys   0-127
+bank  3 prog 1  NAME p1             4 zones, keys   0-127
+bank  3 prog 2  NAME p2             4 zones, keys   0-127
+bank  3 prog 3  NAME p3             5 zones, keys   0-127
+bank  3 prog 4  NAME p4 kit        12 zones, keys  36- 59  (also bank 128 prog 3)
+bank  4 prog 0  EVENT01 p0          5 zones, keys   0-127
+bank  4 prog 1  EVENT01 p1          4 zones, keys   0-127
+bank  4 prog 2  EVENT01 p2          3 zones, keys   0-127
+bank  4 prog 3  EVENT01 p3          5 zones, keys   0-127
+bank  5 prog 0  EVENT02 p0          4 zones, keys   0-127
+bank  5 prog 1  EVENT02 p1          4 zones, keys   0-127
+bank  5 prog 2  EVENT02 p2          3 zones, keys   0-127
+bank  5 prog 3  EVENT02 p3 kit      4 zones, keys  61- 64  (also bank 128 prog 4)
+bank  6 prog 0  EVENT03 p0          6 zones, keys   0-127
+bank  6 prog 1  EVENT03 p1          6 zones, keys   0-127
+bank  6 prog 2  EVENT03 p2          5 zones, keys   0-127
+bank  6 prog 3  EVENT03 p3          5 zones, keys   0-127
+bank  6 prog 4  EVENT03 p4          4 zones, keys   0-127
+bank  6 prog 5  EVENT03 p5 kit     10 zones, keys  36- 56  (also bank 128 prog 5)
+bank  7 prog 0  EVENT04 p0          4 zones, keys   0-127
+bank  7 prog 1  EVENT04 p1          5 zones, keys   0-127
+bank  7 prog 2  EVENT04 p2          5 zones, keys   0-127
+bank  7 prog 3  EVENT04 p3          6 zones, keys   0-127
+bank  7 prog 4  EVENT04 p4          6 zones, keys   0-127
+bank  7 prog 5  EVENT04 p5          4 zones, keys   0-127
+bank  7 prog 6  EVENT04 p6 kit      5 zones, keys  28- 46  (also bank 128 prog 6)
+bank  8 prog 0  EVENT05 p0          5 zones, keys   0-127
+bank  8 prog 1  EVENT05 p1          3 zones, keys   0-127
+bank  8 prog 2  EVENT05 p2          5 zones, keys   0-127
+bank  8 prog 3  EVENT05 p3          3 zones, keys   0-127
+bank  8 prog 4  EVENT05 p4          5 zones, keys   0-127
+bank  8 prog 5  EVENT05 p5 kit      9 zones, keys  36- 55  (also bank 128 prog 7)
+bank  9 prog 0  EVENT06 p0          4 zones, keys   0-127
+bank  9 prog 1  EVENT06 p1          5 zones, keys   0-127
+bank  9 prog 2  EVENT06 p2          4 zones, keys   0-127
+bank  9 prog 3  EVENT06 p3          8 zones, keys   0- 80
+bank  9 prog 4  EVENT06 p4          1 zones, keys   0-127
+bank 10 prog 0  EVENT07 p0          5 zones, keys   0-127
+bank 10 prog 1  EVENT07 p1          4 zones, keys   0-127
+bank 10 prog 2  EVENT07 p2          6 zones, keys   0-127
+bank 10 prog 3  EVENT07 p3 kit      7 zones, keys  62- 81  (also bank 128 prog 8)
+bank 10 prog 4  EVENT07 p4          5 zones, keys   0-127
+bank 11 prog 0  EVENT08 p0          6 zones, keys   0-127
+bank 11 prog 1  EVENT08 p1          3 zones, keys   0-127
+bank 11 prog 2  EVENT08 p2          4 zones, keys   0-127
+bank 12 prog 0  RECORD01 p0         6 zones, keys   0-127
+bank 12 prog 1  RECORD01 p1         5 zones, keys   0-127
+bank 12 prog 2  RECORD01 p2         6 zones, keys   0-127
+bank 12 prog 3  RECORD01 p3         4 zones, keys   0-127
+bank 12 prog 4  RECORD01 p4         4 zones, keys   0-127
+bank 12 prog 5  RECORD01 p5 kit    10 zones, keys  36- 80  (also bank 128 prog 9)
+bank 13 prog 0  RECORD2 p0 kit      7 zones, keys  37- 53  (also bank 128 prog 10)
+bank 13 prog 1  RECORD2 p1          5 zones, keys   0-127
+bank 13 prog 2  RECORD2 p2          5 zones, keys   0-127
+bank 13 prog 3  RECORD2 p3 kit      2 zones, keys  60- 61  (also bank 128 prog 11)
+bank 13 prog 4  RECORD2 p4 kit      8 zones, keys  36- 60  (also bank 128 prog 12)
+bank 14 prog 0  RECORD03 p0         4 zones, keys   0-127
+bank 14 prog 1  RECORD03 p1 kit     2 zones, keys  60- 61  (also bank 128 prog 13)
+bank 14 prog 2  RECORD03 p2         3 zones, keys   0-127
+bank 14 prog 3  RECORD03 p3         3 zones, keys   0-127
+bank 14 prog 4  RECORD03 p4 kit     2 zones, keys  60- 61  (also bank 128 prog 14)
+bank 14 prog 5  RECORD03 p5         5 zones, keys  64-127
+bank 14 prog 6  RECORD03 p6         4 zones, keys   0-127
+bank 14 prog 7  RECORD03 p7 kit     5 zones, keys  35- 76  (also bank 128 prog 15)
+bank 15 prog 0  RECORD4 p0          5 zones, keys   0-127
+bank 15 prog 1  RECORD4 p1          4 zones, keys   0-127
+bank 15 prog 2  RECORD4 p2          5 zones, keys   0-127
+bank 15 prog 3  RECORD4 p3          5 zones, keys   0-127
+bank 15 prog 4  RECORD4 p4 kit      4 zones, keys  60- 63  (also bank 128 prog 16)
+bank 15 prog 5  RECORD4 p5 kit      7 zones, keys  60- 71  (also bank 128 prog 17)
+bank 16 prog 0  RECORD05 p0         8 zones, keys   0-127
+bank 17 prog 0  RECORD06 p0 kit     4 zones, keys  62- 69  (also bank 128 prog 18)
+bank 17 prog 1  RECORD06 p1         3 zones, keys   0-127
+bank 17 prog 2  RECORD06 p2         1 zones, keys   0-127
+bank 17 prog 3  RECORD06 p3         4 zones, keys   0-127
+bank 17 prog 4  RECORD06 p4         4 zones, keys   0-127
+bank 17 prog 5  RECORD06 p5         3 zones, keys   0-127
+bank 18 prog 0  RECORD07 p0         4 zones, keys   0-127
+bank 18 prog 1  RECORD07 p1         4 zones, keys   0-127
+bank 18 prog 2  RECORD07 p2         6 zones, keys   0-127
+bank 18 prog 3  RECORD07 p3         5 zones, keys   0-127
+bank 18 prog 4  RECORD07 p4         3 zones, keys   0-127
+bank 18 prog 5  RECORD07 p5 kit     4 zones, keys  36- 46  (also bank 128 prog 19)
+bank 19 prog 0  RECORD08 p0         5 zones, keys   0-127
+bank 19 prog 1  RECORD08 p1 kit     6 zones, keys  36- 76  (also bank 128 prog 20)
+bank 19 prog 2  RECORD08 p2         4 zones, keys   0-127
+bank 19 prog 3  RECORD08 p3         4 zones, keys   0-127
+bank 19 prog 4  RECORD08 p4         4 zones, keys   0-127
+bank 19 prog 5  RECORD08 p5         6 zones, keys   0-127
+bank 19 prog 6  RECORD08 p6         6 zones, keys   0-127
+bank 19 prog 7  RECORD08 p7         4 zones, keys   0-127
+bank 19 prog 8  RECORD08 p8         5 zones, keys   0-127
+bank 20 prog 0  RECORD09 p0         2 zones, keys   0-127
+bank 20 prog 1  RECORD09 p1         4 zones, keys   0-127
+bank 20 prog 2  RECORD09 p2         2 zones, keys   0-127
+bank 20 prog 3  RECORD09 p3         3 zones, keys   0-127
+bank 21 prog 0  RECORD10 p0         1 zones, keys   0-127
+bank 21 prog 1  RECORD10 p1         4 zones, keys   0-127
+bank 21 prog 2  RECORD10 p2         3 zones, keys   0-127
+bank 21 prog 3  RECORD10 p3         2 zones, keys   0-127
+bank 21 prog 4  RECORD10 p4         5 zones, keys   0-127
+bank 21 prog 5  RECORD10 p5         4 zones, keys   0-127
+bank 22 prog 0  Mini01 p0           3 zones, keys   0-127
+bank 22 prog 1  Mini01 p1           5 zones, keys   0-127
+bank 22 prog 2  Mini01 p2           3 zones, keys   0-127
+bank 22 prog 3  Mini01 p3           5 zones, keys   0-127
+bank 22 prog 4  Mini01 p4           4 zones, keys   0-127
+bank 22 prog 5  Mini01 p5 kit       8 zones, keys  36- 51  (also bank 128 prog 21)
+bank 23 prog 0  Mini02 p0           4 zones, keys   0-127
+bank 23 prog 1  Mini02 p1           4 zones, keys   0-127
+bank 23 prog 2  Mini02 p2           5 zones, keys   0-127
+bank 23 prog 3  Mini02 p3           4 zones, keys   0-127
+bank 23 prog 4  Mini02 p4 kit       8 zones, keys  36- 71  (also bank 128 prog 22)
+bank 24 prog 0  SUB p0              5 zones, keys   0-127
+bank 24 prog 1  SUB p1              4 zones, keys   0-127
+bank 24 prog 2  SUB p2              4 zones, keys   0-127
+bank 24 prog 3  SUB p3              4 zones, keys   0-127
+bank 24 prog 4  SUB p4              1 zones, keys   0-127
+bank 24 prog 5  SUB p5 kit          7 zones, keys  35- 52  (also bank 128 prog 23)
+bank 25 prog 0  ENDING p0           9 zones, keys   0-127
+bank 25 prog 1  ENDING p1           9 zones, keys   0-127
+bank 25 prog 2  ENDING p2          11 zones, keys   0-127
+bank 25 prog 3  ENDING p3           7 zones, keys   0-127
+bank 25 prog 4  ENDING p4 kit       4 zones, keys  39- 54  (also bank 128 prog 24)
+bank 25 prog 5  ENDING p5 kit       2 zones, keys  60- 61  (also bank 128 prog 25)
+165 presets, 645 samples
