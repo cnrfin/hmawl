@@ -157,22 +157,35 @@ static void reticle(u8 *g);
    checked against a screenshot). HUD units: 640 x 480, origin at the centre, y down. Closes in from 60 px
    to 20 px, then breathes; light blue like OoT's people reticle; fades out on release. */
 #define AGC        (*(u8 **)0x80349110)
-#define RET_COL    0x9696FF00u
+#define RET_COL    0xFFCE2E00u                          /* flat yellow (255, 206, 46) */
 #define RET_Y      0.85f                                /* aim this far above the target's feet */
-static s32 rframe;
+#define RET_H      30.0f                                /* bracket box half-width at RET_DEPTH (HUD px, 640 x 480) */
+#define RET_DEPTH  12.0f                                /* ... and it scales with 1 / depth (clamped) */
+#define RET_ARM    12                                   /* bracket arm length */
+#define RET_W      4                                    /* bracket thickness */
+#define RET_SNAP   9.0f                                 /* frames to snap in (ease-out-back, overshoot 2) */
 static void quad(u8 *a, s32 k, s32 x0, s32 y0, s32 x1, s32 y1, const float *uv, u32 rgba)
 {
     u8 *q = a + AGC_RET_Q + 0x2C * k;
-    s32 i;
+    s32 i, t;
+    if (x0 > x1) { t = x0; x0 = x1; x1 = t; }
+    if (y0 > y1) { t = y0; y0 = y1; y1 = t; }
     *(u32 *)q = 4;
     *(s16 *)(q + 4) = x0; *(s16 *)(q + 6) = y0; *(s16 *)(q + 8) = x1; *(s16 *)(q + 10) = y1;
     for (i = 0; i < 4; i++) { *(u32 *)(q + 0xC + 4 * i) = rgba; *(float *)(q + 0x1C + 4 * i) = uv[i]; }
 }
+static void ret_hide(u8 *a)
+{
+    s32 k;
+    for (k = 0; k < 8; k++) quad(a, k, 0, 0, 0, 0, UV_WHITE, 0xFFFFFF00u);
+}
+/* reticle B (chosen from four mock-ups, tools/ztarget/reticle): four flat yellow corner brackets round the
+   target's body; they snap in from twice the size with a little overshoot, then pulse gently */
 static void reticle(u8 *g)
 {
     u8 *a = AGC, *c = CAM;
-    float x, y, z, w, sx, sy, r;
-    s32 cx, cy, e7y, h = TRI_W / 2, k, ri;
+    float x, y, z, w, sx, sy, t, k, h, sc;
+    s32 cx, cy, e7y, hx, hy, sxn, syn, n = 0;
     u32 col;
     zt_dbg.agc_ok = 0;
     if ((u32)a < 0x80000000u || (u32)a >= 0x81800000u) return;
@@ -182,27 +195,32 @@ static void reticle(u8 *g)
     if (*(u32 *)(a + AGC_E7_COUNT) != E7_COUNT) return;   /* our opguide.agc */
     zt_dbg.agc_ok = 3;
     if (Z.target) { if (Z.alpha < 255) Z.alpha += 51; if (Z.alpha > 255) Z.alpha = 255; }
-    else { Z.alpha -= 64; if (Z.alpha < 0) Z.alpha = 0; Z.r = 60; }
-    if (!Z.alpha || (u32)c < 0x80000000u || (u32)c >= 0x81800000u) {
-        for (k = 0; k < 4; k++) quad(a, k, 0, 0, 0, 0, UV_TRI[k], 0xFFFFFF00u);
-        return;
-    }
+    else { Z.alpha -= 64; if (Z.alpha < 0) Z.alpha = 0; Z.r = -1; }
+    if (!Z.alpha || (u32)c < 0x80000000u || (u32)c >= 0x81800000u) { ret_hide(a); return; }
     x = Z.tx; y = Z.ty + RET_Y; z = Z.tz;
     w = proj(x, y, z, &sx, &sy);
     zt_dbg.w = w; zt_dbg.ndx = sx; zt_dbg.ndy = sy;
-    if (w <= 0) { for (k = 0; k < 4; k++) quad(a, k, 0, 0, 0, 0, UV_TRI[k], 0xFFFFFF00u); return; }
+    if (w <= 0) { ret_hide(a); return; }
     cx = (s32)(sx * 320.0f);
     cy = (s32)(-sy * 240.0f);
     zt_dbg.cx = cx; zt_dbg.cy = cy;
-    if (Z.r < 20.5f) Z.r = 20 + 2.0f * zsin((float)(rframe++ % 60) * (6.28318548f / 60.0f));
-    else Z.r += (20 - Z.r) * 0.3f;
-    r = Z.r; ri = (s32)r;
+    if (Z.r < 0) Z.r = 0;
+    t = Z.r; if (Z.r < 100000) Z.r += 1;
+    if (t < RET_SNAP) {                                  /* ease-out-back: 2x size -> 1x, overshooting a little */
+        float u = t / RET_SNAP - 1;
+        k = 1 + 3.0f * u * u * u + 2.0f * u * u;
+        h = 2.0f + (1.0f - 2.0f) * k;
+    } else h = 1.0f + 0.05f * zsin((t - RET_SNAP) * (6.28318548f / 42.0f));   /* gentle pulse, 1.4 s */
+    sc = RET_DEPTH / w; if (sc < 0.6f) sc = 0.6f; if (sc > 1.6f) sc = 1.6f;
+    hx = (s32)(RET_H * sc * h); hy = (s32)(RET_H * 1.15f * sc * h);
     e7y = *(s16 *)(a + AGC_E7_Y); cx -= E7_X; cy -= e7y;
     col = RET_COL | (u32)Z.alpha;
-    quad(a, 0, cx - h, cy - ri - TRI_W, cx + h, cy - ri, UV_TRI[0], col);        /* top, pointing down */
-    quad(a, 1, cx - h, cy + ri, cx + h, cy + ri + TRI_W, UV_TRI[1], col);        /* bottom, pointing up */
-    quad(a, 2, cx - ri - TRI_W, cy - h, cx - ri, cy + h, UV_TRI[3], col);        /* left, pointing right */
-    quad(a, 3, cx + ri, cy - h, cx + ri + TRI_W, cy + h, UV_TRI[2], col);        /* right, pointing left */
+    for (sxn = -1; sxn <= 1; sxn += 2)
+        for (syn = -1; syn <= 1; syn += 2) {
+            s32 x0 = cx + sxn * hx, y0 = cy + syn * hy;
+            quad(a, n++, x0, y0, x0 - sxn * RET_ARM, y0 - syn * RET_W, UV_WHITE, col);   /* horizontal arm */
+            quad(a, n++, x0, y0, x0 - sxn * RET_W, y0 - syn * RET_ARM, UV_WHITE, col);   /* vertical arm */
+        }
 }
 
 void zt_frame(u8 *g, s32 map, volatile u32 *held, volatile u32 *press)
@@ -246,11 +264,11 @@ void zt_frame(u8 *g, s32 map, volatile u32 *held, volatile u32 *press)
         zt_dbg.presses++;
         if (!Z.target) {
             Z.target = pick(g, map, 0);
-            if (Z.target) { zlog(2, Z.target, zt_dbg.cands); tpos(g, Z.target, map, &Z.tx, &Z.tz); Z.r = 60; sfx_play(*(u8 **)0x803491E4, SE_LOCK, 0); }
+            if (Z.target) { zlog(2, Z.target, zt_dbg.cands); tpos(g, Z.target, map, &Z.tx, &Z.tz); Z.r = -1; sfx_play(*(u8 **)0x803491E4, SE_LOCK, 0); }
             else zlog(8, 0, zt_dbg.cands);
         } else {
             s32 next = pick(g, map, 1);
-            if (next) { zlog(3, next, zt_dbg.cands); Z.target = next; tpos(g, next, map, &Z.tx, &Z.tz); Z.r = 60; sfx_play(*(u8 **)0x803491E4, SE_LOCK, 0); }
+            if (next) { zlog(3, next, zt_dbg.cands); Z.target = next; tpos(g, next, map, &Z.tx, &Z.tz); Z.r = -1; sfx_play(*(u8 **)0x803491E4, SE_LOCK, 0); }
             else let_go_why(4);
         }
     }

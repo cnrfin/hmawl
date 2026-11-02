@@ -221,3 +221,10 @@ presets: no velocity-to-filter in the bank.)
 ## Test 13: lock sounds louder
 Gains 0.40 / 0.30 (test 11: 0.196 / 0.146 too quiet, test 5: 0.89 too loud): loudest 100 ms -18.8 / -19.8 dBFS (wood hit -17.2). Bank b8d163da / 18982d7e.
 Reticle concepts (reticle/mockups.py): A petals, B brackets, C spinner, D arrow + ring; flat yellow (255,206,46), no outline.
+
+## Test 14: reticle B (brackets)
+Chosen from the four mock-ups: four flat yellow (255,206,46) corner brackets, 8 HUD quads (RET_Q 8, element 7
+now 37 quads) drawn from a 6x6 white patch added to the HUD atlas (UV_WHITE, inner part) and tinted. Box
+half-size 30 x 34.5 px at depth 12, scaled by 12 / depth (0.6-1.6); snaps in from 2x over 9 frames
+(ease-out-back, overshoot 2), then pulses +-5 % every 42 frames. commonall 5d7ab970 (on the $JOE coin build),
+pm.bin c0e945fc.

@@ -21,7 +21,7 @@ from build_log_archives import clz_decompress, clz_compress
 
 GLYPH = '/tmp/claude-0/-home-user/93ad7071-c0f2-50fe-8edf-5fd70c4d5f13/scratchpad/font/glyph_meta.json'
 ELEM7, NAME_Q = 7, 12
-ROW_Q, POP_Q, RET_Q = 6, 11, 4      # RET_Q: the Z-target reticle (4 triangles, zt.c)
+ROW_Q, POP_Q, RET_Q = 6, 11, 8      # RET_Q: the Z-target reticle (4 corner brackets x 2 bars, zt.c)
 AW, AH = 128, 64
 be = lambda b, o: struct.unpack_from('>I', b, o)[0]
 
@@ -69,9 +69,9 @@ def main():
     kt, ka = nm['opguide.tpl'], nm['opguide.agc']
     tpl, agc = arc['files'][kt], bytearray(arc['files'][ka])
     T = tpltool.read(tpl); assert len(T) == 4, 'expected the HUD build with textures 0-3'
-    parts = art(tpl, open(ruck, 'rb').read()); parts.update(triangles())
+    parts = art(tpl, open(ruck, 'rb').read()); parts.update(triangles()); parts['white'] = Image.new('RGBA', (6, 6), (255, 255, 255, 255))
     place = {'hoe': (0, 0), 'can': (32, 0), 'gemY': (64, 0), 'gemE': (84, 0), 'excl': (104, 0),
-             'triD': (0, 40), 'triU': (16, 40), 'triL': (32, 40), 'triR': (48, 40)}
+             'triD': (0, 40), 'triU': (16, 40), 'triL': (32, 40), 'triR': (48, 40), 'white': (64, 40)}
     atlas = Image.new('RGBA', (AW, AH), (0, 0, 0, 0)); rect = {}
     for k, (x, y) in place.items():
         atlas.alpha_composite(parts[k].convert('RGBA'), (x, y)); rect[k] = (x, y, parts[k].width, parts[k].height)
@@ -92,7 +92,8 @@ def main():
     for k in range(5):
         gx, gy = rel(GEM0 + GEM_DX * k, GEM_Y); row.append(quad(4, gx, gy, gx + 16, gy + 16, 0xFFFFFF00, uv('gemE')))
     pop = [quad(3, 0, 0, 0, 0, 0xFFFFFF00, (0, 0, 0, 0))] * POP_Q
-    ret = [quad(4, 0, 0, 0, 0, 0xFFFFFF00, uv('triD'))] * RET_Q
+    uvw = ((64 + 1.5) / AW, (40 + 1.5) / AH, (64 + 4.5) / AW, (40 + 4.5) / AH)   # inside the white patch (no edge bleed)
+    ret = [quad(4, 0, 0, 0, 0, 0xFFFFFF00, uvw)] * RET_Q
     q0 = len(agc); agc += b''.join(row + pop + ret)
     struct.pack_into('>I', agc, ep + 12 * ELEM7, NAME_Q + ROW_Q + POP_Q + RET_Q)
     agc = bytes(agc)
@@ -126,6 +127,7 @@ def main():
          '#define AGC_RET_Q      0x%X   /* %d Z-target reticle quads (zt.c) */' % (q0 + 0x2C * (ROW_Q + POP_Q), RET_Q),
          'static const float UV_TRI[4][4] = {%s};  /* down, up, left, right */' % ', '.join('{%ff, %ff, %ff, %ff}' % uv(k) for k in ('triD', 'triU', 'triL', 'triR')),
          '#define TRI_W %d' % rect['triD'][2],
+         'static const float UV_WHITE[4] = {%ff, %ff, %ff, %ff};  /* solid white, tinted by the quad colour */' % uvw,
          'static const float UV_HOE[4] = {%ff, %ff, %ff, %ff};' % uv('hoe'),
          'static const float UV_CAN[4] = {%ff, %ff, %ff, %ff};' % uv('can'),
          'static const float UV_GEMY[4] = {%ff, %ff, %ff, %ff};' % uv('gemY'),
