@@ -223,6 +223,7 @@ static void reticle(u8 *g)
         }
 }
 
+static void swing_frame(s32 bpress, s32 free);
 void zt_frame(u8 *g, s32 map, volatile u32 *held, volatile u32 *press)
 {
     u8 *f = FADER;
@@ -238,7 +239,7 @@ void zt_frame(u8 *g, s32 map, volatile u32 *held, volatile u32 *press)
     if (!free) {                                         /* let go only if it lasts (events, menus, fades) */
         zt_dbg.nfree++;
         if (++notfree > 8) release();
-        reticle(g); return;
+        swing_frame(0, 0); reticle(g); return;
     }
     notfree = 0;
     scan_actors();
@@ -273,6 +274,13 @@ void zt_frame(u8 *g, s32 map, volatile u32 *held, volatile u32 *press)
         }
     }
     *held &= ~0x10u;                                     /* holding Z never reaches the game either */
+    {   /* B while locked on: the tool swing (ours; B does not reach the game while locked) */
+        static u32 blast;
+        u32 bdown = *(volatile u32 *)0x80341464 & 0x200;
+        s32 bpress = bdown && !blast; blast = bdown;
+        if (Z.target) { *press &= ~0x200u; *held &= ~0x200u; }
+        swing_frame(bpress && Z.target, 1);
+    }
     if (Z.target) Z.ty = theight(g, Z.target);
     reticle(g);
     zt_dbg.target = Z.target; zt_dbg.alpha = Z.alpha;
@@ -381,11 +389,13 @@ void zt_face(u8 *pl)
 #define CLIP_RIGHT 127
 #define CLIP_BACK  128
 static u32 zt_ent[3][6];
+static u8 *sw_slot;                                      /* the player's model slot (from his motion picks) */
 void zt_motion(u8 *slot, s32 var, s32 grp, s32 i1, s32 i2, s32 e, float rate)
 {
     u32 buf[4], *src;
     s32 k, which;
     float dot, crs;
+    sw_slot = slot;
     if (!Z.target || !Z.fvalid || var == 0 || Z.now - Z.movf > 1) { mot_pick(slot, var, grp, i1, i2, e, rate); return; }
     dot = Z.mx * Z.fx + Z.mz * Z.fz; crs = Z.fx * Z.mz - Z.fz * Z.mx;
     if (dot > 0.70710678f) { mot_pick(slot, var, grp, i1, i2, e, rate); return; }   /* forward: the game's own */
@@ -395,4 +405,47 @@ void zt_motion(u8 *slot, s32 var, s32 grp, s32 i1, s32 i2, s32 e, float rate)
     for (k = 0; k < 6; k++) zt_ent[which][k] = src[k];
     zt_ent[which][0] = (src[0] & ~0x3FFu) | (u32)(which == 0 ? CLIP_LEFT : which == 1 ? CLIP_RIGHT : CLIP_BACK);
     mot_play(slot, zt_ent[which], rate);
+}
+
+/* Tool swing while locked on, as an upper-body layer: the legs keep walking / strafing.
+   The pose build (func_8019E438) evaluates every bone with func_801A01F8(ctl, bone, trs); pm_bone_stub sends that
+   call here with the model instance. For the player we then blend our own anim controller (the game's 0x1C-byte
+   layout: frame, rate, loop, length, anim, next, weight) into the spine, arms and head with the game's own
+   blend (func_8019FF8C, the one its motion crossfades use). The clip comes from boy_0.anm.arc (set 0, at
+   slot +0x88 -> +0) through func_801A0A88; we advance its frame ourselves, at our own speed. */
+#define anim_eval  F(0x801A01F8, s32, (u8 *, s32, u8 *))
+#define anim_blend F(0x8019FF8C, void, (u8 *, s32, u8 *, float))
+#define arc_anim   F(0x801A0A88, u8 *, (u8 *, s32, s32))
+#define ctl_init   F(0x8019FE08, void, (u8 *, u8 *, float))
+#define SW_CLIP    39                                   /* boy_0.anm.arc 39: a quick sideways slash (27 frames) */
+#define SW_RATE    1.35f                                /* clip frames per game frame (~20 frames a swing) */
+#define SW_IN      3.0f                                 /* weight fade in / out, clip frames */
+#define SW_OUT     7.0f
+#define SW_SPINE   18                                   /* bones 18-21 spine, 22-42 arms, 43-54 head; legs/pelvis below */
+static struct { float frame, rate; u32 loop; float len; u8 *anim, *next; float w; u32 pad; } SWC;
+static struct { s32 on; float w; u32 swings; } SW;
+static float smooth01(float x) { if (x <= 0.0f) return 0.0f; if (x >= 1.0f) return 1.0f; return x * x * (3.0f - 2.0f * x); }
+static void swing_frame(s32 bpress, s32 free)
+{
+    if (!free) { SW.on = 0; SW.w = 0.0f; return; }
+    if (bpress && sw_slot && !SW.on) {
+        u8 *tab = *(u8 **)(sw_slot + 0x88), *arc = tab ? *(u8 **)tab : 0, *a;
+        if (arc && *(u32 *)arc == 0x55AA382Du && (a = arc_anim(arc, 0, SW_CLIP)) != 0) {
+            ctl_init((u8 *)&SWC, a, 0.0f); SWC.rate = 1.0f; SWC.next = 0; SW.on = 1; SW.swings++;
+        }
+    }
+    if (!SW.on) { SW.w = 0.0f; return; }
+    SW.w = smooth01((SWC.frame + SW_RATE) / SW_IN) * smooth01((SWC.len - SWC.frame) / SW_OUT);
+    if (SWC.frame + SW_RATE >= SWC.len) { SW.on = 0; SW.w = 0.0f; return; }
+    SWC.frame += SW_RATE;
+}
+s32 zt_bone(u8 *ctl, s32 n, u8 *trs, u8 *inst)
+{
+    s32 r = anim_eval(ctl, n, trs);
+    if (r && SW.w > 0.0f && n >= SW_SPINE && sw_slot && inst == *(u8 **)(sw_slot + 0x14)) {
+        float w = SW.w;
+        if (n == SW_SPINE) w *= 0.4f; else if (n == SW_SPINE + 1) w *= 0.7f;
+        anim_blend((u8 *)&SWC, n, trs, w);
+    }
+    return r;
 }

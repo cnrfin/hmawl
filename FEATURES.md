@@ -31,6 +31,9 @@ a session's temporary folder; the ones still only there are marked.
 | Joe speaks as character 0x23 (Mukumuku's slot): name "Joe" in Message.arc people.mes, hearts from his gifts | events 408/409 speaker 0x23, pm.c joe_hearts | tools/joe/visit test 12 (HOOK12 stub unused, site restored) |
 | Joe's visit, trade, talk, gifts | pm.c joe_* , events 408/409 | tools/joe (DESIGN.md, visit/README.md) |
 | Joe's faces (blink, angry/happy/neutral per line), mouth flaps + talk gestures timed to the typing, gift take-and-pocket | pm.c joe_face / joe_talk_frame, joe_lines.h, counters 49/50 | visit/README.md test 13 |
+| Zelda-style Z targeting (tests 1-16): lock-on to villagers/Joe, switching, yellow bracket reticle, lock on/off sounds 434/435, follow camera with zoom + upward tilt, face the target, strafe left/right + walk-back clips 126-128 | zt.c (HOOK13-16, motion picks 0x80042D44/D98/DD0), opguide.agc reticle quads, boy_0.anm.arc clips | tools/ztarget (NOTES.md), tools/sound, tools/hud |
+| Field tile cursor in the Z-target bracket style, soft settle | tile.c (HOOK18 0x80091F58) | tools/ztarget NOTES.md |
+| Z-target tool swing (test 17): B while locked on swings clip 39 on the upper body only (legs keep walking/strafing), own speed | zt.c zt_bone / swing_frame (HOOK19 0x8019E5C4 -> pm_bone_stub +0x250) | tools/ztarget NOTES.md "layering"; no tool model or hits yet |
 | Test keys (Z+B, Z+D-Up, Z+X, Z+D-Left/Right/Down, Z+Y) and debug blocks: removed in Joe test 16; HOOK11 probe unhooked | pm.c, logs.c, skill.c, make_pm_dol.py | visit/README.md test 16 |
 
 ## Data files
@@ -50,4 +53,4 @@ a session's temporary folder; the ones still only there are marked.
 ## Ideas (not started)
 | Idea | Notes |
 |---|---|
-| Zelda-style Z targeting | Replaces Z's first-person view. Use the OoT decompilation (zeldaret/oot) as a behaviour reference only. Plan: 1) Z locks the nearest villager or animal in range, with a marker, and the player keeps facing them while walking (existing walk animation); 2) a follow camera, which needs the field camera object found (RAM dumps); 3) new player clips for strafing left and right and walking backwards (to work on every chapter's look); 4) cycling targets, targetable objects, a release distance. Needs a hook in the player's movement update. |
+| Zelda-style Z targeting (now built, see pm.bin) + light combat | Next: tool model in hand during the swing, hit detection, wildlife as targets/enemies. Original idea: Replaces Z's first-person view. Use the OoT decompilation (zeldaret/oot) as a behaviour reference only. Plan: 1) Z locks the nearest villager or animal in range, with a marker, and the player keeps facing them while walking (existing walk animation); 2) a follow camera, which needs the field camera object found (RAM dumps); 3) new player clips for strafing left and right and walking backwards (to work on every chapter's look); 4) cycling targets, targetable objects, a release distance. Needs a hook in the player's movement update. |

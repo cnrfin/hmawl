@@ -236,3 +236,11 @@ pm_face_stub:
     .globl pm_tile_stub
 pm_tile_stub:
     b     zt_tile_cursor
+
+# Upper-body layer: func_8019E438 (every model's pose build, r24 = model instance) evaluates each bone with
+# bl func_801A01F8(anim ctl, bone, trs) at 0x8019E5C4; that bl comes here. zt_bone(ctl, bone, trs, inst) calls it,
+# then blends the Z-target tool swing into the player's spine / arms / head (tools/ztarget/NOTES.md).
+    .globl pm_bone_stub
+pm_bone_stub:
+    mr    r6, r24
+    b     zt_bone

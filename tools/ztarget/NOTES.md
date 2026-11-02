@@ -258,3 +258,12 @@ Anim controller (0x1C bytes): +0 frame f32, +4 rate, +8 loop, +0xC length, +0x10
 Plan: hook the bl at 0x8019E5C4 -> stub `mr r6,r24; b zt_bone`. zt_bone calls the original, then for the player instance
 and upper bones (18-54, spine at partial weight) calls `func_8019FF8C(&swing_ctl, n, trs, w)`. swing_ctl is our own ctl on
 the swing clip, frame advanced by us at our own speed; w fades in/out. Legs/pelvis keep the walk/strafe clip.
+
+## Test 17: tool swing as an upper-body layer
+- HOOK19 0x8019E5C4 (bl func_801A01F8 in the pose build) -> pm_bone_stub (+0x250: mr r6,r24; b zt_bone).
+- zt_bone: original eval, then for the player instance (sw_slot+0x14, slot saved by zt_motion) and bones >= 18
+  blends our ctl (SWC) with func_8019FF8C at SW.w (spine 18 x0.4, 19 x0.7).
+- B (0x200 edge from the master pad record) while locked on starts it; B is kept from the game while locked.
+- Clip 39 (sideways slash, 27 f) at 1.35 clip frames per frame, smoothstep weight in 3 / out 7 clip frames.
+- Player tool clip groups found (ready, raise, hold, swing, recover): 25-29, 30-34, 94-98, 114-118; 39 and 41 are
+  single swings.
