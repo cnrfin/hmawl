@@ -197,6 +197,7 @@ void zt_frame(u8 *g, s32 map, volatile u32 *held, volatile u32 *press)
 {
     u8 *f = FADER;
     u8 *ev = EVMGR;
+    s32 zpress;
     /* free: no script event running (+0x680 == -1). Not +0x58C: test 3 lost the lock near several villagers,
        which looks like their own goings-on setting it (see zt_dbg.noev in a dump) */
     s32 free = map >= 0 && CONTROL == 1 && ev && *(s32 *)(ev + 0x680) == -1 && !(f && *(u8 *)(f + 0x60));
@@ -218,8 +219,15 @@ void zt_frame(u8 *g, s32 map, volatile u32 *held, volatile u32 *press)
             if (dx * dx + dz * dz > ZT_LEASH * ZT_LEASH) let_go();
         }
     }
-    if (*press & 0x10) {                                 /* Z: ours now (no first-person look) */
-        *press &= ~0x10u; *held &= ~0x10u; zt_dbg.presses++;
+    {   /* Z press from our own record of the last frame: the game's "pressed" compares with a held word we
+           clear, so a Z held 2+ frames looked like a second press (test 7: lock + lock-off sounds together) */
+        static u32 zlast;
+        u32 zdown = *held & 0x10;
+        zpress = zdown && !zlast; zlast = zdown;
+    }
+    *press &= ~0x10u;
+    if (zpress) {                                        /* Z: ours now (no first-person look) */
+        zt_dbg.presses++;
         if (!Z.target) {
             Z.target = pick(g, map, 0);
             if (Z.target) { tpos(g, Z.target, map, &Z.tx, &Z.tz); Z.r = 60; sfx_play(*(u8 **)0x803491E4, SE_LOCK, 0); }
@@ -249,21 +257,22 @@ static float zatan2(float y, float x)
 #define ZT_TURN    0.35f                                /* facing: share of the way to the target per frame */
 #define ZT_CAMRATE 0.12f                                /* camera yaw: share of the way per frame */
 #define ZT_DIST    9.5f                                 /* lock-on zoom: camera distance (+0x30, normally 12) */
-#define ZT_TILT    2.0f                                 /* lock-on tilt: +0x18 (normally -0.148) x this (test) */
+#define ZT_HEIGHT  1.0f                                 /* lock-on: camera height (+0x10, normally 1.5; added to both the eye,
+                                                           which sits at the ground behind, and the aim point): lower = nearer the ground */
 #define ZT_ZRATE   0.10f
-static struct { s32 on; float dist0, tilt0; } ZC;      /* the camera's own values while we change them */
+static struct { s32 on; float dist0, h0; } ZC;      /* the camera's own values while we change them */
 
 /* after the player's update (HOOK13): turn toward the target; swing the camera behind him, looking past him
    at the target (so stick-up also means toward the target, as in OoT) */
 static void zoom(u8 *c, s32 locked)
 {
-    float *dist = (float *)(c + 0x30), *tilt = (float *)(c + 0x18), wd, wt;
-    if (locked && !ZC.on) { ZC.on = 1; ZC.dist0 = *dist; ZC.tilt0 = *tilt; }
+    float *dist = (float *)(c + 0x30), *ht = (float *)(c + 0x10), wd, wh;
+    if (locked && !ZC.on) { ZC.on = 1; ZC.dist0 = *dist; ZC.h0 = *ht; }
     if (!ZC.on) return;
-    wd = locked ? ZT_DIST : ZC.dist0; wt = locked ? ZC.tilt0 * ZT_TILT : ZC.tilt0;
-    *dist += (wd - *dist) * ZT_ZRATE; *tilt += (wt - *tilt) * ZT_ZRATE;
-    if (!locked && (*dist - wd) * (*dist - wd) < 0.0004f && (*tilt - wt) * (*tilt - wt) < 0.000001f) {
-        *dist = ZC.dist0; *tilt = ZC.tilt0; ZC.on = 0;    /* back to the game's own values */
+    wd = locked ? ZT_DIST : ZC.dist0; wh = locked ? ZT_HEIGHT : ZC.h0;
+    *dist += (wd - *dist) * ZT_ZRATE; *ht += (wh - *ht) * ZT_ZRATE;
+    if (!locked && (*dist - wd) * (*dist - wd) < 0.0004f && (*ht - wh) * (*ht - wh) < 0.0001f) {
+        *dist = ZC.dist0; *ht = ZC.h0; ZC.on = 0;         /* back to the game's own values */
     }
 }
 void zt_post(u8 *pl)

@@ -164,3 +164,13 @@ then let go a frame later (lock-off sound): the actor flag 0x2000 flickers, more
 (zoom), so it looks like a drawn-this-frame flag rather than "out here". Now a character counts as out for 30
 frames after the flag was last seen, and the target's position comes from its event slot (live every frame).
 pm.bin 5e1ca972, zt_dbg 0x80367B3C.
+
+## Test 7 results -> test 8
+- Still both sounds sometimes. Cause: zt_frame cleared Z from the pad copy's held word every frame, and the
+  pad update's "pressed" compares with the previous held, so Z held 2+ frames came back as a new press
+  (second press = switch or let go). Now the press is our own edge on the held bit (previous frame kept
+  in zt.c); press and held Z are still cleared for the game.
+- Tilt: +0x18 does nothing visible. From five dumps the eye sits at the ground height behind the player
+  (pitch varies 0.04-0.23 with the terrain) and +0x10 (1.5) is added to both eye and aim: test 8 eases +0x10
+  to 1.0 while locked (camera nearer the ground), with the zoom to 9.5.
+- pm.bin f91f513d, zt_dbg 0x80367B60.
