@@ -192,3 +192,9 @@ around the player (still looking at him), which is why changing +0x18 showed no 
 HOOK15 (0x8017B8F4), the instruction after each look-at, call zt_tilt(camera): for the field camera,
 V' = Rx(-t) V with t eased to 0.07 rad while locked. pm_tilt_stub +0x21C, pm_tilt2_stub +0x22C.
 pm.bin 685a508e; zt_log 0x80367E24, zt_dbg 0x80368030.
+
+## Test 11: softer lock sounds
+434/435 rebuilt on RECORD07 p4 (pizzicato), D3/G3, low-passed at 1.2 kHz, and quiet: add_sfx.py peak-normalises
+to --gain, so the first versions (0.89) played louder than the wood hit. Now gains 0.196 / 0.146: loudest 100 ms
+at -25 / -26 dBFS vs the wood hit's -17. Bank 5b73a9b6 / 9ed747af. (Velocity changes nothing in these
+presets: no velocity-to-filter in the bank.)
