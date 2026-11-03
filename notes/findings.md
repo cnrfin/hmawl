@@ -3192,3 +3192,25 @@ so, door fades are timed there, possibly per frame. Not traced yet.
 - Goddess test 6 (Dolphin): OK - she appears, all 10 Celia animations cycle repeatedly, no crash.
   Working pipeline: build_goddess.py -> gd/gd_0.arc (61 KB) + gd/gd_0.anm.arc on the disc, slot 37,
   own set-71 motion list, 256 KB pool-B spacer.
+
+### 7.40 Wildlife (static + 4 RAM dumps; research for enemies)
+
+- Five wild species, character ids 0x2C lizard, 0x2D mouse, 0x2E tanu (tanuki), 0x2F kame (turtle), 0x30 owl.
+  Model table lbl_8024A534: 24-byte rows {name, scale 1.0, f, f, 0, byte} for lizard.arc, mouse.arc, tanu.arc,
+  owl.arc (string at 0x80346A38), kame.arc (then cow0..cat rows of 8 bytes); anims: <name>.anm.arc,
+  <name>_subact.arc, <name>_subanm.arc. Each is a file of its own on the disc (not part of the map).
+- **One wild animal at a time.** g_system (lbl_80349194) +0x3F8 = today's species = 0x2C + rand() % 5
+  (lbl_803469D0 / lbl_803469D8 = 4; set at 0x800132CC and 0x80013B88). func_80159560 loads that species' model
+  (func_8002C74C → slot lbl_802ECA70 + i*0x44, 5 slots; the heap block is sized for the biggest, 0x8002BAC4).
+- **The object.** The field scene setup (func_80013F60 → 0x8001434C) allocates 0x2B0 bytes and builds it with
+  func_80159A28(obj, 1, species, func_801595E0(species) = 0x3D..0x41 → the base's character id); stored at
+  scene+0x44 (and in the manager at scene+0x40, its +0x4C). Base class func_80010904 (the villagers' base),
+  own vtable at +0x10 = lbl_802C618C (methods func_80159FF0, func_8015A22C..4AC, lbl_8015C7EC..850; class code
+  0x80159A28-0x8015C850).
+- **Runtime:** field scene = *(u32 *)0x80305FBC (same in all 4 dumps); animal = *(scene + 0x44);
+  +0x4C x, +0x50 y, +0x54 z (copy at +0xFC), +0x58 / +0x60 facing (sin, cos), +0x128 species. Not in the event
+  character slots (game+0x29C78), which is why Z targeting never saw it.
+- Dumps: turtle (Z2) at (77.5, -, 112.7), (75.0, -, 113.5); owl (winter) at (279, 27, 116); lizard (263, 19.6, 179).
+- Enemies plan: 1) zt.c: add the animal as a Z candidate (position above); 2) target_is_enemy = it; impacts +
+  a hit reaction (flinch/knockback via its position, HP in our own state); 3) more than one animal needs more
+  objects of this class (constructor above) or our own actor.
