@@ -75,3 +75,9 @@ python3 add_sfx.py 0_toan_03.wav v3/GAME_ALL.arc v3/GAME_ALL.samp v4 --id 443 --
 python3 add_sfx.py 0_toan_04.wav v4/GAME_ALL.arc v4/GAME_ALL.samp v5 --id 444 --template 305 --gain 0.75
 ```
 -> GAME_ALL.arc b201d0de / .samp 587c5656 (test 6). Test 7 pm.bin c4840574 (normal), 8960024c (WEAPONS_ALL test).
+
+## Swing 445 (weapons test 8): hits 1 / 2 use the game's own swoosh 196 (user pick), trimmed
+Sample 15 decoded, the first 0.505 s (silence) cut, 3 ms fade-in: 0.113 s. Not committed (game audio).
+`add_sfx.py swoosh196.wav v6/GAME_ALL.arc v6/GAME_ALL.samp v7 --id 445 --template 305 --gain 0.63` (196's own peak)
+-> GAME_ALL.arc 6b951b50 / .samp 5ec8239a. zt.c SE_SWING_L = 445 (436 stays in the bank, unused).
+pm.bin f0db3a78 (WEAPONS_ALL test), 7d947bd8 (normal). Impacts: none until enemies exist (test 7b).

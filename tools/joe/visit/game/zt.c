@@ -437,7 +437,7 @@ static struct { s32 on, hit, queued, cur; float w, xf; u32 swings; } SW;
 static float smooth01(float x) { if (x <= 0.0f) return 0.0f; if (x >= 1.0f) return 1.0f; return x * x * (3.0f - 2.0f * x); }
 /* Combo sounds (Dark Cloud battle sounds from the user's disc, sound bank 436-439, tools/sound): the swing as the
    strike snaps, the impact on the strike frame if the locked-on target is within the weapon's reach in front. */
-#define SE_SWING_L 436                                  /* hits 1 / 2 */
+#define SE_SWING_L 445                                  /* hits 1 / 2: the game's own swoosh 196, lead-in silence trimmed (user pick; 436 unused) */
 #define SE_SWING_H 437                                  /* hit 3 */
 #define SE_HIT_L   438
 #define SE_HIT_H   439
