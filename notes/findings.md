@@ -3339,3 +3339,8 @@ so, door fades are timed there, possibly per frame. Not traced yet.
 - memfix 14: mansion OK; still an invalid read on load (0x01F110AC at 0x801A0AF4): Grant's subact / subanm (644 / 192 B
   on the disc, unlike Kate's / Samantha's 0 B) were emptied; the load indexes them (func_801A0A88 -> 801A0AF4).
   memfix 15: they are kept.
+- memfix 15 dump a62a3006: same read at 0x801A0AF4. Path (traced): func_801A0A88(anim archive, 0, n) opens file n via
+  ARCInitHandle / func_80203BF0; when the archive has no such file the result is uninitialised stack (0x01F110A8, found
+  at an anim player's +0x10 in the dump: 0x80EF2BCC, 0x80FE66B0) -> func_8019FE08 -> func_801A0AF4. The load asks the
+  newcomers' animation archives for clips, so the 64-byte empty ones fail. memfix 16: their .anm.arc are kept (33 KB);
+  only the models are replaced (about 330 KB freed).

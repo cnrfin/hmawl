@@ -101,11 +101,14 @@ def iso_file(iso, path):
 # the load (memfix 13: invalid read from 0x14 at 0x801A40B4). Never empty a subact / subanm that is not already
 # empty on the disc (memfix 14: Grant's 644 / 192 B ones emptied -> invalid read at 0x801A0AF4 on load: the game
 # indexes them at load; func_801A0A88 returns the raw pointer when the file is not a U8 archive).
+# Nor the animations of a character whose model is opened: the load asks for animation n (func_801A0A88(arc, 0, n)
+# -> func_8019FE08); with no such file it returns stack garbage (memfix 15 dump: anim player +0x10 = 0x01F110A8)
+# and func_801A0AF4 reads through it. So Grant / Kate / Samantha keep their (small) original animations.
 EMPTY_U8 = struct.pack('>IIII', 0x55AA382D, 0x20, 13, 0x40) + bytes(0x10) + struct.pack(">III", 0x01000000, 0, 1) + bytes(0x14)
 assert len(EMPTY_U8) == 64
 
 def main():
-    a = sys.argv[1:]; ch = 0; drop = 'son_0.anm.arc,son_0_subact.arc,son_0_subanm.arc,gura_0.anm.arc,keit_0.anm.arc,keit_0_subact.arc,keit_0_subanm.arc,san_0.anm.arc,san_0_subact.arc,san_0_subanm.arc'
+    a = sys.argv[1:]; ch = 0; drop = 'son_0.anm.arc,son_0_subact.arc,son_0_subanm.arc,keit_0_subact.arc,keit_0_subanm.arc,san_0_subact.arc,san_0_subanm.arc'
     if '--chapter' in a: i = a.index('--chapter'); ch = int(a[i + 1]); del a[i:i + 2]
     if '--drop' in a: i = a.index('--drop'); drop = a[i + 1]; del a[i:i + 2]
     put = {}
