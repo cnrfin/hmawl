@@ -3236,3 +3236,9 @@ so, door fades are timed there, possibly per frame. Not traced yet.
   0x808326E0 in a healthy dump) -> func_80199F5C returned 0x808326DF (= the arc - 1: the file lookup failed) ->
   func_8019CD50 / func_8019D330 instanced it -> the recursion. So at that moment the sub-anim archive's entry 6
   was gone or corrupt. Lag in the field built up before it (the user: extreme lag, gone indoors).
+- Dump e996fcfb (enemy 1e NO_TVPIC; only running in and out of the house): "Unknown pointer 0x114000E0, PC 0x80188AB0,
+  LR 0x80187378", the same dispatcher as the first crash (0x80187F64): func_80186E28 is the message-text control
+  code interpreter (opcode byte 0..0x54, handlers call the text object's vtable +0xBC/+0xC0). Suspect: opguide.agc
+  element 7 (the farmer's name, 12 glyph quads in vanilla) was grown to 37 quads for the skill row / pop-up /
+  reticle; the game re-renders the name on HUD rebuilds (every map change). Test hudtest1: weapons3 commonall with
+  element 7's count back to 12 (our HUD extras then switch themselves off: E7_COUNT check), commonall 96ffdad7.
