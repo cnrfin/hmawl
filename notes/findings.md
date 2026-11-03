@@ -3278,3 +3278,9 @@ so, door fades are timed there, possibly per frame. Not traced yet.
   copy 1, copy 2). memfix 4: dup_sweep 60/180/300 frames after setup_model: any pool-B block with the live
   archive's size and header (+4..+0x40) that no RAM word points at (skipping only the record arrays
   0x802FC8C4-0x803154FC and pm.bin) is freed. Checked offline on the dump: finds exactly the orphan.
+- memfix 4 dumps joe1 / joe2 (rucksack opened and closed repeatedly with Joe around): 3, then 9 copies of Joe's
+  377 KB model (anims stay 1), dup_freed 0. Source: the event-actor constructor (0x8007F53C..0x8007F590) loads
+  character id < 0x27's model (func_8002D128) and sets the slot up (func_8007B8F8) whenever slot +0xC is 0,
+  without freeing the copy in the model entry; Joe's actor is made again after every menu. memfix 5: spawn()
+  unloads the old model first when the slot is torn down; dup_sweep runs every 60 frames while Joe is loaded as a
+  net; debug dup_dbg ('DUPS': sweeps, candidates, kept, freed, last reference address).

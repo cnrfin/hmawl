@@ -132,7 +132,7 @@ static struct {
     void *guard;                  /* spacer while our model is loaded (see setup_model) */
     u8 *own_model, *own_anims;    /* our two archives in memory (character 37's model entry +0x10, set 71 +0) */
     u8 *orphan[4];                /* our archives left behind by a scene change: freed once nothing uses them */
-    s32 sweep;                    /* frames to the duplicate sweeps after setup_model (300: sweeps at 240 and 0) */
+    s32 sweep;                    /* frames since the last duplicate sweep */
     Vec pos, dir;
 } S;
 
@@ -237,7 +237,7 @@ static void setup_model(void)
     }
     S.loaded = 1;
     S.own_model = MODEL37_ARC; S.own_anims = (u8 *)SET71_DATA[0];
-    S.sweep = 300;
+    S.sweep = 0;
 }
 
 static void joe_expr_patch(s32 on);
@@ -253,14 +253,15 @@ static void orphan(u8 *p)
    and they used to stay for the rest of the session (user dumps: two copies of each with Joe around). Free
    one as soon as neither character 37's model entry nor any animation set points at it. */
 /* any word in RAM pointing at p, other than the pools' own block records (0x802FC000-0x80320000) and pm.bin */
-u32 dup_freed;                             /* debug: duplicate archives freed */
+struct { u32 magic, sweeps, cands, refd, freed, last_ref; } dup_dbg;   /* debug ('DUPS'): sweeps run, duplicates seen, kept (referenced), freed, where the last reference was */
+static u32 ref_at;
 static s32 referenced(u8 *p)
 {
     u32 *w;
     for (w = (u32 *)0x80003100; w < (u32 *)0x81800000; w++) {
         if ((u32)w == 0x802FC8C4u) w = (u32 *)0x803154FC;       /* the two pools' record arrays (A 0x80 x 0x18, B 0x1000 x 0x18) */
         if ((u32)w == 0x8035EFA0u) w = (u32 *)0x80377000;
-        if (*w == (u32)p) return 1;
+        if (*w == (u32)p) { ref_at = (u32)w; return 1; }
     }
     return 0;
 }
@@ -277,12 +278,14 @@ static void free_orphans(void)
         S.orphan[i] = 0;
     }
 }
-/* Joe's model archive (377 KB) ended up in memory twice after every setup (user dumps; the two loads are not
-   both inside setup_model). Once loading has settled, any other pool-B block that is a copy of our live model or
+/* Joe's model archive (377 KB) ends up in memory more than once: twice after setup and once more every time a
+   menu (the rucksack) closes - the game reloads character 37's model and keeps only the new copy (user dumps:
+   2, then 3 copies; the slowdown and T-pose followed). Once loading has settled, any other pool-B block that is a copy of our live model or
    animation archive (same size, same header) and that nothing in RAM points at is freed. */
 static void dup_sweep(void)
 {
     u8 *live[2], *r; s32 j, k;
+    dup_dbg.magic = 0x44555053u; dup_dbg.sweeps++;
     live[0] = MODEL37_ARC; live[1] = (u8 *)SET71_DATA[0];
     for (j = 0; j < 2; j++) {
         u8 *L = live[j]; u32 lsz = 0;
@@ -296,7 +299,9 @@ static void dup_sweep(void)
             p = (u8 *)(*(u32 *)r - lsz);
             if (p == L || *(u32 *)p != 0x55AA382Du) continue;
             { s32 i, same = 1; for (i = 4; i < 0x40; i += 4) if (*(u32 *)(p + i) != *(u32 *)(L + i)) { same = 0; break; } if (!same) continue; }
-            if (!referenced(p)) { op_delete(p); dup_freed++; return; }   /* the record list changed: next sweep */
+            dup_dbg.cands++;
+            if (!referenced(p)) { op_delete(p); dup_dbg.freed++; return; }   /* the record list changed: next sweep */
+            dup_dbg.refd++; dup_dbg.last_ref = ref_at;
         }
     }
 }
@@ -335,9 +340,16 @@ static void release_model(void)
 
 static void spawn(void)
 {
-    u8 *a = op_new(0x2A8, pm_model, 1), *c;
+    u8 *a, *c, *slot = char_slot(CHARMGR, CHAR_ID, 0);
+    /* the actor constructor (0x8007F57C) loads character 37's model whenever its slot is not set up, without
+       freeing the copy already in the model entry: after every menu (the rucksack) Joe is made again and one
+       more 377 KB copy stayed (9 copies in a user dump). With the slot torn down nothing draws the old copy,
+       so free it first and let the constructor's load replace it. */
+    if (!slot[0xC] && MODEL37_ARC) { unload_model(CHAR_ID); S.own_model = 0; }
+    a = op_new(0x2A8, pm_model, 1);
     if (!a) return;
     actor_ctor(a, 1, CHAR_ID);
+    if (MODEL37_ARC) S.own_model = MODEL37_ARC;
     *(s32 *)(a + 0x64) = VALLEY;            /* map of the actor (read by the collider) */
     actor_add(ACTMGR, a + 0x70, 0xC000 + CHAR_ID);
     S.actor = a; S.talking = 0; S.motion = -1;
@@ -764,7 +776,7 @@ void pm_frame(void)
     if ((u32)g < 0x80000000u || (u32)g >= 0x81800000u || !*(u32 **)0x80349218) return;
     joe_seed_frame();                         /* joetv.c: the save's own $JOE market seed (first day of a new game) */
     free_orphans();                           /* our archives a scene change left behind */
-    if (S.sweep > 0 && S.loaded) { S.sweep--; if (S.sweep == 240 || S.sweep == 120 || S.sweep == 0) dup_sweep(); }
+    if (S.loaded && ++S.sweep >= 60) { S.sweep = 0; dup_sweep(); }   /* every second: the game reloads 37's model after menus */
     mem_gauge();                              /* debug: the gap between the two memory pools */
     t = CLOCK;
     day = (t / T_DAY) % 10;
