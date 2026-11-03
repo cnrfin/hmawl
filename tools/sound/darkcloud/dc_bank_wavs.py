@@ -3,7 +3,9 @@
 HD: 'IECS'-tagged chunks; Vagi (sample list) = {tag 8, u32 size, u32 max index, u32 offsets[max+1] (from the
 chunk start)} -> entries {u32 offset in .bd, u16 sample rate, u8 loop, u8 -}. BD: PS-ADPCM, 16-byte frames
 {shift|filter, flags, 14 data bytes}, flag bit 0 = end.
-usage: dc_bank_wavs.py BANK.hd OUT_DIR"""
+A .snd (e.g. sound/voice/voiceN.snd) is a 0x50-byte header {name, ..., at 0x40: u32 hd offset, hd size, bd offset}
+followed by the .hd and a .bd that has its own 0x50 header (at 0x40: u32 body offset, body size); it is split here.
+usage: dc_bank_wavs.py BANK.hd|BANK.snd OUT_DIR"""
 import sys, os, struct, wave
 K = [(0, 0), (60, 0), (115, -52), (98, -55), (122, -60)]
 def adpcm(bd, off):
@@ -24,7 +26,11 @@ def chunks(d):
         i += 4
     return res
 def main():
-    hd, out = sys.argv[1:3]; d = open(hd, 'rb').read(); bd = open(hd[:-3] + '.bd', 'rb').read()
+    hd, out = sys.argv[1:3]
+    if hd.endswith('.snd'):
+        f = open(hd, 'rb').read(); ho, hs, bo = struct.unpack_from('<3I', f, 0x40); b = f[bo:]; o2, s2 = struct.unpack_from('<2I', b, 0x40)
+        d, bd = f[ho:ho + hs], b[o2:o2 + s2]; hd = hd[:-4] + '.hd'
+    else: d = open(hd, 'rb').read(); bd = open(hd[:-3] + '.bd', 'rb').read()
     c = chunks(d)['Vagi']; mx = struct.unpack_from('<I', d, c + 12)[0]; os.makedirs(out, exist_ok=True); n = 0
     for k in range(mx + 1):
         eo = struct.unpack_from('<I', d, c + 16 + 4 * k)[0]
