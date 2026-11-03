@@ -33,3 +33,9 @@ swords delivered to the tool-shed cupboard: game+0x14D0 vtable +0x30, like the n
 - Farmer's Sword: crossguard curving up at the ends (Mesh.guard_z).
 - Textures 32x64 (Stick, Wooden Sword) / 64x64 (swords), appended to real.tpl / symbol.tpl with the image headers
   repointed (tpl_set). commonall 5d7ab970 -> 0a6ed437 (+23 KB unpacked). make_pm_dol.py as test 2.
+
+## Weapons test 4b: menu size
+- The rucksack / item views fit a symbol model with a per-model display box (func_800121C4: table lbl_8028E84C, 7 s16
+  per model in 1/16384: xmin ymin zmin xmax ymax zmax radius; only as long as the vanilla model list, so models
+  196+ read the data after it and came out huge; Lumber was fixed by editing model 11's box). HOOK24 0x80012200
+  (add r7,r5,r6, r6 = model * 14) -> pm_box_stub: models >= 196 use zt_sym_boxes (toolfix.c, from the icon meshes).

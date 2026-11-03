@@ -300,3 +300,18 @@ pm_arcanim_stub:
 arc_anim_orig:
     stwu  r1, -0x40(r1)
     b     arcanim_return            # 0x801A0A8C
+
+# Menu display boxes: func_800121C4 fits a symbol model in the rucksack / item views with a 7-halfword box per
+# model (table lbl_8028E84C, 14 bytes each, only as long as the vanilla model list). At 0x80012200 (add r7,r5,r6:
+# r6 = model * 14) this bl picks zt_sym_boxes (toolfix.c) for the weapon models 196+. Uses only r7 (r0 holds the
+# loop count); LR is saved by the function.
+    .globl pm_box_stub
+pm_box_stub:
+    cmplwi r6, 196 * 14
+    blt   1f
+    lis   r7, (zt_sym_boxes - 196 * 14)@ha
+    addi  r7, r7, (zt_sym_boxes - 196 * 14)@l
+    add   r7, r7, r6
+    blr
+1:  add   r7, r5, r6                # the replaced instruction
+    blr

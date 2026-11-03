@@ -111,3 +111,13 @@ void newgame_extra(u8 *g)
     item_pool_add(g + 0x50, 0x4EB, 1, -1);          /* H.M Murasama */
 #endif
 }
+
+/* Rucksack / menu display boxes for the weapon icon models (symbol.gpl 196-199), used by pm_box_stub in place of
+   the vanilla table (which ends at model 195): xmin, ymin, zmin, xmax, ymax, zmax, radius in 1/16384 units,
+   computed from the icon meshes (tools/weapons pack_weapons.symbolize), the same scale as the hoe / sickle boxes. */
+const short zt_sym_boxes[4][7] = {
+    { -9216, 512, 0, 7936, 1536, 768, 8600 },            /* 196 Stick */
+    { -12288, -768, -256, 4352, 2816, 1024, 8535 },      /* 197 Wooden Sword */
+    { -12544, -1536, -256, 4352, 3584, 1024, 8851 },     /* 198 Farmer's Sword */
+    { -12544, 512, -256, 4352, 2304, 1024, 8519 },       /* 199 H.M Murasama */
+};
