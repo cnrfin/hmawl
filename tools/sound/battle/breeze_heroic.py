@@ -9,7 +9,7 @@ import sys, mido, math, random
 BPM = 184
 LEAD = (10, 0)
 PATCH = {0: LEAD, 4: LEAD, 1: (20, 1), 2: (7, 5), 3: (18, 0), 9: (8, 5)}
-VOL = {0: 108, 4: 74, 1: 86, 2: 66, 3: 70, 9: 46}
+VOL = {0: 108, 4: 74, 1: 86, 2: 66, 3: 70, 9: 74}
 CH = {0: (0, 4, 7), 7: (7, 11, 2), 5: (5, 9, 0), 9: (9, 0, 4), 8: (8, 0, 3), 10: (10, 2, 5), 2: (2, 5, 9), 4: (4, 7, 11), 3: (3, 7, 10)}
 def read(f):
     m = mido.MidiFile(f); tpb = m.ticks_per_beat; t = 0; on = {}; out = []
@@ -41,7 +41,7 @@ def main():
             if x0 <= x <= x1:
                 u = (x - x0) / (x1 - x0); u = u * u * (3 - 2 * u); return y0 + (y1 - y0) * u
         return pts[-1][1]
-    TRIM = [4.2, 0.5, -0.7, 1.6, 0.3, 0.1, -0.2, 0.1, 0.1, 4.2, 5.4, 1.5, 0.4, 4.3, 5.8, 0.7, 0.6, 0.7, 0.5, 0.5, -0.2, -0.2, 0.1, 0.2, -0.6, -1.4, -0.7, -1.2, -1.1, -1.5, -1.1, 0.3]   # per-bar dB, calibrated: smooth level across the seam
+    TRIM = [3.3, 0.3, -0.7, 0.9, 0.2, 0.1, -0.2, -0.2, 0.1, 3.6, 4.6, 1.1, 0.5, 3.8, 5.2, 0.7, 0.8, 1.0, 0.7, 0.5, 0.1, 0.1, 0.4, 0.2, -0.3, -1.1, -0.4, -1.2, -0.8, -1.2, -0.9, 0.2]   # per-bar dB, calibrated: smooth level across the seam
     def trim(b): return 10 ** (TRIM[(b - B0) % 32] / 40) if b >= B0 else 10 ** (TRIM[0] / 40)
     ev = []
     for s, d, n, v in notes:                       # melody (as the v1 pick: top line), legato-ish, accented downbeats
@@ -66,12 +66,12 @@ def main():
             for k in range(8): ev.append((base + 2 + k * 0.25, 0.24, 2, tgt - 8 + [0, 2, 4, 5, 7, 9, 11, 12][k] - 4, 80))
         sb = max(bar, B0); dyn = sec(sb)
         if bar >= BSEC:                                                           # B: half time
-            ev.append((base + 2, 0.2, 9, 40, 124))
+            ev.append((base + 2, 0.2, 9, 40, 116))
             for k in range(8):
-                if k != 4: ev.append((base + k * 0.5, 0.1, 9, 40, 30 + (8 if k % 2 else 0)))
+                if k != 4: ev.append((base + k * 0.5, 0.1, 9, 40, 44 + (8 if k % 2 else 0)))
         else:                                                                     # A (and intro): OoT-style 16th drive
             for k in range(16):
-                ev.append((base + k * 0.25, 0.08, 9, 40, (74 if k % 4 == 0 else 40 + (6 if k % 2 else 0)) * (0.9 + 0.1 * (k in (4, 12)))))
+                ev.append((base + k * 0.25, 0.08, 9, 40, (100 if k % 4 == 0 else 64 + (8 if k % 2 else 0)) * (0.92 + 0.08 * (k in (4, 12)))))
         if bar >= B0 and (bar - B0) % 4 == 3:
             for k in range(8): ev.append((base + 2 + k * 0.25, 0.1, 9, 40, 60 + k * 7))   # roll into the phrase
         if bar >= BSEC: ev.append((base, 0.3, 9, 45, 108)); ev.append((base + 1.5, 0.3, 9, 45, 84))   # half-time toms: 1, and of 2
