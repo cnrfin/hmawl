@@ -122,7 +122,9 @@ def main():
     rep = {}; freed = 0
     for f in drop.split(','):
         if f not in names: sys.exit('%s: no %s' % (nm, f))
-        k = names[f]; rep[k] = EMPTY_U8 if f.endswith('.anm.arc') else b''
+        k = names[f]
+        if not arc['files'][k]: continue                  # already empty (e.g. the son on an earlier stripped disc): as is
+        rep[k] = EMPTY_U8 if f.endswith('.anm.arc') else b''
         freed += len(arc['files'][k]) - len(rep[k])
     for f, data in put.items():
         if f not in names: sys.exit('%s: no %s' % (nm, f))
