@@ -3301,3 +3301,7 @@ so, door fades are timed there, possibly per frame. Not traced yet.
   None of the old copies is referenced. The reloads come from yet another loader (func_8019A0EC has 19 callers).
   memfix 8: dup_sweep every 60 frames always; learns our archives' block sizes once; any other U8 block of
   exactly that size that is not the live one and is unreferenced in two sweeps in a row is freed.
+- memfix 8 dumps 6ffbeaab / fb1422d9: 9 / 10 extra copies of Joe's model (377 KB); no other character's model is
+  duplicated (only pair besides: the two 560 KB VI framebuffers, vanilla). 58 / 142 candidates all "referenced",
+  last from 0x803188B4: SDK driver data (0x80318838 render mode, 0x80318868 XFB, 0x803188A0 12-byte request table),
+  zero in the dumps, so a transient copy of the scanned pointer. memfix 9: referenced() skips 0x80318700-0x80318900.

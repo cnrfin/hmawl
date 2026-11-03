@@ -271,7 +271,10 @@ static s32 referenced(u8 *p)
     for (w = (u32 *)0x80003100; w < (u32 *)0x81800000; w++) {
         if ((u32)w == 0x802FC8C4u) w = (u32 *)0x803154FC;       /* the two pools' record arrays (A 0x80 x 0x18, B 0x1000 x 0x18) */
         if ((u32)w == 0x8035EFA0u) w = (u32 *)0x80377000;
-        if (*w == (u32)p && (u32)w != 0x8031887Cu) { ref_at = (u32)w; return 1; }   /* (0x8031887C: the last file read, not an owner) */
+        if ((u32)w == 0x80318700u) w = (u32 *)0x80318900;       /* SDK VI/driver data (render mode, XFB, request table 0x803188A0): it
+                                                                   holds a scanned pointer for a moment (memfix8: every copy "referenced"
+                                                                   from 0x803188B4, zero in the dumps), never an owner */
+        if (*w == (u32)p) { ref_at = (u32)w; return 1; }
     }
     return 0;
 }
