@@ -32,23 +32,40 @@ static u32 mseed(void)
 /* The seed is picked once per new game. Something can clear counter 52 again on day 1 (user test: day 1 showed
    37 G, then the seed changed and day 2 read -42 % from a different day 1), so the session keeps its own copy and
    puts it back; joe_seed_newgame (toolfix.c, at the new game's setup) forgets it. */
+#define SEED_BAK(g) (*(u32 *)((g) + 0x12194 + 4 * 53))   /* a mirror: counter 53, also unused */
 static u32 seed_keep;
+/* debug ring for RAM dumps (magic 'JSED'): every time counter 52 / 53 was found changed: clock, 52, 53, what we did */
+struct { u32 magic, n, last52, last53; struct { u32 clock, c52, c53, act; } e[16]; } joe_seed_log;
+static void slog(u8 *g, u32 act)
+{
+    u32 k = joe_seed_log.n++ & 15;
+    joe_seed_log.magic = 0x4A534544u;
+    joe_seed_log.e[k].clock = CLOCK; joe_seed_log.e[k].c52 = SEED_CNT(g); joe_seed_log.e[k].c53 = SEED_BAK(g); joe_seed_log.e[k].act = act;
+}
 void joe_seed_newgame(void)
 {
     u8 *g = GAME;
     seed_keep = 0;
-    if ((u32)g >= 0x80000000u && (u32)g < 0x81800000u) SEED_CNT(g) = 0;   /* not the last save's seed */
+    if ((u32)g >= 0x80000000u && (u32)g < 0x81800000u) { SEED_CNT(g) = 0; SEED_BAK(g) = 0; slog(g, 9); }
 }
 void joe_seed_frame(void)
 {
-    u8 *g = GAME; u32 tb, v;
+    u8 *g = GAME; u32 tb, v, b;
     if ((u32)g < 0x80000000u || (u32)g >= 0x81800000u || !*(u32 **)0x80349218) return;
-    if ((v = SEED_CNT(g)) != 0) { seed_keep = v; return; }   /* set (or a save with its own seed was loaded) */
-    if (CLOCK / T_DAY != 0) return;                     /* an old save past day 1: keeps 1890 */
-    if (seed_keep) { SEED_CNT(g) = seed_keep; return; }
-    __asm__ volatile ("mftb %0" : "=r"(tb));
-    v = (tb * 0x9E3779B1u) ^ ((u32)game_rand() << 16) ^ (u32)game_rand();
-    SEED_CNT(g) = seed_keep = v ? v : 1u;
+    v = SEED_CNT(g); b = SEED_BAK(g);
+    if (v != joe_seed_log.last52 || b != joe_seed_log.last53) slog(g, 0);   /* something changed them */
+    if (v && v == b) seed_keep = v;                                      /* normal */
+    else if (v && !b) { SEED_BAK(g) = v; seed_keep = v; slog(g, 1); }      /* a save from before the mirror */
+    else if (b && v != b) { SEED_CNT(g) = b; seed_keep = b; slog(g, 2); }  /* 52 lost or overwritten: restore */
+    else if (CLOCK / T_DAY == 0) {                                       /* both 0 on day 1: a new game */
+        if (!seed_keep) {
+            __asm__ volatile ("mftb %0" : "=r"(tb));
+            v = (tb * 0x9E3779B1u) ^ ((u32)game_rand() << 16) ^ (u32)game_rand();
+            seed_keep = v ? v : 1u; slog(g, 3);
+        } else slog(g, 4);
+        SEED_CNT(g) = SEED_BAK(g) = seed_keep;
+    }
+    joe_seed_log.last52 = SEED_CNT(g); joe_seed_log.last53 = SEED_BAK(g);
 }
 #define BASE_LN  3.91202300543f    /* ln 50 G */
 #define GROW_LN  0.55961578794f    /* ln 1.75 per year */
@@ -179,11 +196,16 @@ static void show_picture(s32 k)
     tpl = 0;                                        /* never trust a remembered address */
     for (u8 *p = (u8 *)0x80380000; p < (u8 *)0x81800000; p += 32)
         if (is_tv_tpl(p) && tv_live(p)) { tpl = p; break; }
+#ifdef NO_TVPIC
+    tpl = 0;                                        /* test build: the picture copy is off */
+#endif
     if (!tpl) return;
     /* copy every time: turning the TV off and on reloads the original pictures, often at the same address */
     u8 *src = pic(tpl, 14 + k);
+    if (!src) return;
     for (s32 j = 0; j < 4; j++) {
         u8 *d = pic(tpl, dst[j]); u32 *a = (u32 *)d, *b = (u32 *)src;
+        if (!d) continue;
         for (u32 i = 0; i < PIC_BYTES / 4; i++) a[i] = b[i];
         DCFlushRange(d, PIC_BYTES);
     }

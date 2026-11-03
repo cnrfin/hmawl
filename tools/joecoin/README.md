@@ -52,3 +52,7 @@ pm.bin 6454d5a3 (normal), 12b51625 (WEAPONS_ALL test).
 Fix (enemy test 1c): a new file showed 37 G on day 1 and -42 % on day 2 (the seed had been re-rolled during day 1,
 after the price was seen; dump 081dc2a6: seed 0x1C7114DF gives day 1 = 60, day 2 = 35). The session now keeps the
 seed and restores it if counter 52 is cleared on day 1; newgame_extra (new game setup) clears both.
+Enemy test 1d: the seed is mirrored in event counter 53; if 52 is lost or overwritten it is restored from 53,
+and every change seen in 52/53 is logged (pm.bin symbol joe_seed_log, magic 'JSED': clock, c52, c53, act
+0 seen changed / 1 mirrored / 2 restored / 3 new seed / 4 kept seed / 9 new game). The user saw 77 G then 62 G
+reported as +19 % on 1c. A NO_TVPIC test build (TV picture copy off) separates the TV from the HUD crash.
