@@ -51,3 +51,22 @@ Tools:
   not committed: rebuild with `SND_IN=<folder with the disc's sound/*.arc + *.samp>`); presets list in
   `hmawl_music_presets.txt`. Used to render `src/item_get_game.wav` from `src/item_get_game.mid`.
 - `jingles/`: the level-up / field-up candidates (MIDI); G was picked.
+
+## Voice (weapons test 6): Toan's voice from the user's Dark Cloud disc (sound\voice\voice0.snd = toan_s)
+Not committed. darkcloud/dc_bank_wavs.py decodes the .snd (voice0..6 = toan, syao, goro, ruby, unga, ozmd, turi).
+| Sound | Clip | Use |
+|---|---|---|
+| 440 | toan_01, gain 0.60 | voice, hit 1 (with the swing, zt.c SE_VOICE1 + hit) |
+| 441 | toan_02, gain 0.60 | voice, hit 2 |
+| 442 | toan_07, gain 0.70 | voice, hit 3 |
+| 443 | toan_03, gain 0.70 | hurt (not used yet) |
+| 444 | toan_04, gain 0.75 | dies (not used yet) |
+toan_06 = tired: to replace the game's own tired sound in place (fanfare_patch.py) once its id is known.
+```
+python3 add_sfx.py 0_toan_01.wav o4/GAME_ALL.arc o4/GAME_ALL.samp v1 --id 440 --template 305 --gain 0.60
+python3 add_sfx.py 0_toan_02.wav v1/GAME_ALL.arc v1/GAME_ALL.samp v2 --id 441 --template 305 --gain 0.60
+python3 add_sfx.py 0_toan_07.wav v2/GAME_ALL.arc v2/GAME_ALL.samp v3 --id 442 --template 305 --gain 0.70
+python3 add_sfx.py 0_toan_03.wav v3/GAME_ALL.arc v3/GAME_ALL.samp v4 --id 443 --template 305 --gain 0.70
+python3 add_sfx.py 0_toan_04.wav v4/GAME_ALL.arc v4/GAME_ALL.samp v5 --id 444 --template 305 --gain 0.75
+```
+-> GAME_ALL.arc b201d0de / .samp 587c5656. pm.bin 58520c9b (normal), 806233d4 (WEAPONS_ALL test).

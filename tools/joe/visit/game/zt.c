@@ -441,6 +441,7 @@ static float smooth01(float x) { if (x <= 0.0f) return 0.0f; if (x >= 1.0f) retu
 #define SE_SWING_H 437                                  /* hit 3 */
 #define SE_HIT_L   438
 #define SE_HIT_H   439
+#define SE_VOICE1  440                                  /* Toan's voice (Dark Cloud): hit 1, hit 2, hit 3; 443 hurt / 444 dies for later */
 static const float sw_snap[3] = { 5.0f, 3.0f, 10.0f }, sw_strike[3] = { 8.0f, 6.0f, 13.0f };
 static float weapon_reach(s32 item)
 {
@@ -450,7 +451,10 @@ static float weapon_reach(s32 item)
 static void swing_sounds(float f0, float f1)
 {
     s32 h = SW.hit;
-    if (f0 < sw_snap[h] && f1 >= sw_snap[h]) sfx_play(*(u8 **)0x803491E4, h == 2 ? SE_SWING_H : SE_SWING_L, 0);
+    if (f0 < sw_snap[h] && f1 >= sw_snap[h]) {
+        sfx_play(*(u8 **)0x803491E4, h == 2 ? SE_SWING_H : SE_SWING_L, 0);
+        sfx_play(*(u8 **)0x803491E4, SE_VOICE1 + h, 0);
+    }
     if (f0 < sw_strike[h] && f1 >= sw_strike[h] && Z.target && sw_g) {
         float *p = SLOT_POS(sw_g, 0), dx = Z.tx - p[0], dz = Z.tz - p[2], r = weapon_reach(sw_item) + 0.4f;
         if (dx * dx + dz * dz < r * r && dx * Z.fx + dz * Z.fz > 0.0f) {
