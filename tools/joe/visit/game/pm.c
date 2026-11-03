@@ -292,28 +292,35 @@ static void free_orphans(void)
    menu (the rucksack) closes - the game reloads character 37's model and keeps only the new copy (user dumps:
    2, then 3 copies; the slowdown and T-pose followed). Once loading has settled, any other pool-B block that is a copy of our live model or
    animation archive (same size, same header) and that nothing in RAM points at is freed. */
+static u32 model_size, anims_size;          /* block sizes of our two archives (pool-B records), learnt once */
+static u32 block_size(u8 *p)
+{
+    u8 *r; s32 k;
+    for (r = *(u8 **)(0x80315508 + 0x10), k = 0; r && k < 6000; r = *(u8 **)(r + 8), k++)
+        if (*(u32 *)(r + 0xC) == 2 && *(u32 *)r - *(u32 *)(r + 4) == (u32)p) return *(u32 *)(r + 4);
+    return 0;
+}
 static void dup_sweep(void)
 {
-    u8 *live[2], *r; s32 j, k;
+    static u8 *seen;
+    u8 *r, *live_m = MODEL37_ARC, *live_a = (u8 *)SET71_DATA[0], *seen_next = 0; s32 k;
     dup_dbg.magic = 0x44555053u; dup_dbg.sweeps++;
-    live[0] = MODEL37_ARC; live[1] = (u8 *)SET71_DATA[0];
-    for (j = 0; j < 2; j++) {
-        u8 *L = live[j]; u32 lsz = 0;
-        if ((u32)L < 0x80000000u || (u32)L >= 0x81800000u || *(u32 *)L != 0x55AA382Du) continue;
-        for (r = *(u8 **)(0x80315508 + 0x10), k = 0; r && k < 6000; r = *(u8 **)(r + 8), k++)
-            if (*(u32 *)(r + 0xC) == 2 && *(u32 *)r - *(u32 *)(r + 4) == (u32)L) { lsz = *(u32 *)(r + 4); break; }
-        if (!lsz) continue;
-        for (r = *(u8 **)(0x80315508 + 0x10), k = 0; r && k < 6000; r = *(u8 **)(r + 8), k++) {
-            u8 *p;
-            if (*(u32 *)(r + 0xC) != 2 || *(u32 *)(r + 4) != lsz) continue;
-            p = (u8 *)(*(u32 *)r - lsz);
-            if (p == L || *(u32 *)p != 0x55AA382Du) continue;
-            { s32 i, same = 1; for (i = 4; i < 0x40; i += 4) if (*(u32 *)(p + i) != *(u32 *)(L + i)) { same = 0; break; } if (!same) continue; }
-            dup_dbg.cands++;
-            if (!referenced(p)) { op_delete(p); dup_dbg.freed++; return; }   /* the record list changed: next sweep */
-            dup_dbg.refd++; dup_dbg.last_ref = ref_at;
-        }
+    if (S.loaded) {                                       /* learn the sizes while ours are the live ones */
+        if (!model_size && live_m == S.own_model && live_m) model_size = block_size(live_m);
+        if (!anims_size && live_a == S.own_anims && live_a) anims_size = block_size(live_a);
     }
+    if (!model_size && !anims_size) return;
+    for (r = *(u8 **)(0x80315508 + 0x10), k = 0; r && k < 6000; r = *(u8 **)(r + 8), k++) {
+        u32 sz = *(u32 *)(r + 4); u8 *p;
+        if (*(u32 *)(r + 0xC) != 2 || (sz != model_size && sz != anims_size)) continue;
+        p = (u8 *)(*(u32 *)r - sz);
+        if (p == live_m || p == live_a || p == S.own_model || p == S.own_anims || *(u32 *)p != 0x55AA382Du) continue;
+        dup_dbg.cands++;
+        if (referenced(p)) { dup_dbg.refd++; dup_dbg.last_ref = ref_at; continue; }
+        if (p == seen) { op_delete(p); dup_dbg.freed++; seen = 0; return; }   /* orphaned in two sweeps a second apart */
+        seen_next = p;                                          /* (a copy just loaded may not be linked in yet) */
+    }
+    seen = seen_next;
 }
 static void restore_names(void)
 {
@@ -789,7 +796,7 @@ void pm_frame(void)
     if ((u32)g < 0x80000000u || (u32)g >= 0x81800000u || !*(u32 **)0x80349218) return;
     joe_seed_frame();                         /* joetv.c: the save's own $JOE market seed (first day of a new game) */
     free_orphans();                           /* our archives a scene change left behind */
-    if (S.loaded && ++S.sweep >= 60) { S.sweep = 0; dup_sweep(); }   /* every second: the game reloads 37's model after menus */
+    if (++S.sweep >= 60) { S.sweep = 0; dup_sweep(); }   /* every second: the game reloads 37's model after menus */
     mem_gauge();                              /* debug: the gap between the two memory pools */
     t = CLOCK;
     day = (t / T_DAY) % 10;

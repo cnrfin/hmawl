@@ -3296,3 +3296,8 @@ so, door fades are timed there, possibly per frame. Not traced yet.
   free_orphans because 0x8031887C (the last file read) pointed at it. memfix 7: setup_model frees our previous
   archive right after load_model replaces it (the slot was torn down just before); referenced() ignores
   0x8031887C. Offline on joe7: the 10 old copies have no other references.
+- memfix 7 dump 0601e020 (right build): 5 copies, freed 0, 31 sweeps saw 1 candidate: two old copies' headers
+  (+4..+0x40) differ from the live one (rewritten in place after loading), and the sweep only ran while S.loaded.
+  None of the old copies is referenced. The reloads come from yet another loader (func_8019A0EC has 19 callers).
+  memfix 8: dup_sweep every 60 frames always; learns our archives' block sizes once; any other U8 block of
+  exactly that size that is not the live one and is unreferenced in two sweeps in a row is freed.
