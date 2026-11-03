@@ -199,6 +199,58 @@ static void place(float s, s32 back)
    over (goddess tests 4-5: 2-3 KB between the pools, vanilla 276 KB). A spacer taken first keeps
    them clear of it while they are loaded. */
 #define GUARD_SIZE 0x40000
+/* Pool A for Joe (memfix 18). The game runs two allocators over the same arena: pool A (0x802FD4D0) from the bottom
+   up - the chapter archive, then each area's code module (a building's REL: the inn's is 239 KB) - and pool B
+   (0x80315508, operator new) from the top down. Neither knows the other, so B must never put anything below
+   "chapter archive + the largest area module". Joe's model + animations (230 KB) in B, loaded last, pushed B's
+   bottom down by 230 KB, and every block the game allocated after him (never moved again) stayed that low: in a
+   building the module was loaded over them (memfix 17 dump 92afe3f3: 3 game blocks, 7 KB, inside the inn's
+   module). In the valley no module sits above the chapter archive, so Joe's archives go there, into pool A, and
+   are freed at every scene change (joe_free_now) before the next area's module is loaded. op_new / op_delete
+   are hooked (pm_new_stub / pm_del_stub in hook.s): while joe_to_a is set, a request of 64 KB or more goes to
+   pool A if it ends at least 64 KB below B's lowest block; otherwise to B as before. */
+s32 joe_to_a;
+static u8 *a_blk[8]; static u32 a_len[8];
+#define allocA  F(0x8017860C, void *, (u32, const char *, s32))
+#define freeA   F(0x80178660, void, (void *))
+static u32 pool_a_top(void)
+{
+    u8 *r; s32 k; u32 t = 0;
+    for (r = *(u8 **)(0x802FD4D0 + 0x10), k = 0; r && k < 300; r = *(u8 **)(r + 8), k++)
+        if (*(u32 *)(r + 0xC) == 2 && *(u32 *)r + *(u32 *)(r + 4) > t) t = *(u32 *)r + *(u32 *)(r + 4);
+    return t;
+}
+static u32 pool_b_low(void)
+{
+    u8 *r; s32 k; u32 lo = 0xFFFFFFFFu;
+    for (r = *(u8 **)(0x80315508 + 0x10), k = 0; r && k < 6000; r = *(u8 **)(r + 8), k++)
+        if (*(u32 *)(r + 0xC) == 2 && *(u32 *)r - *(u32 *)(r + 4) < lo) lo = *(u32 *)r - *(u32 *)(r + 4);
+    return lo;
+}
+u8 *pm_new_a(u32 size, const char *tag, s32 line)
+{
+    u8 *p; s32 i;
+    size = (size + 0x1F) & ~0x1Fu;
+    for (i = 0; i < 8 && a_blk[i]; i++) ;
+    if (i == 8 || pool_b_low() < pool_a_top() + size + 0x10000) return 0;
+    p = allocA(size, tag, line);
+    if (!p) return 0;
+    if ((u32)p + size + 0x10000 > pool_b_low()) { freeA(p); return 0; }   /* (placed higher than expected) */
+    a_blk[i] = p; a_len[i] = size;
+    return p;
+}
+s32 pm_del_a(u8 *p)
+{
+    s32 i;
+    for (i = 0; i < 8; i++) if (a_blk[i] == p) { freeA(p); a_blk[i] = 0; a_len[i] = 0; return 1; }
+    return 0;
+}
+static u32 a_size(u8 *p)
+{
+    s32 i;
+    for (i = 0; i < 8; i++) if (p && a_blk[i] == p) return a_len[i];
+    return 0;
+}
 static void orphan(u8 *p);
 struct dupdbg { u32 magic, sweeps, cands, refd, freed, last_ref, spawns, reloads; };
 extern struct dupdbg dup_dbg;
@@ -206,7 +258,7 @@ static void setup_model(void)
 {
     u8 *slot = char_slot(CHARMGR, CHAR_ID, 0);
     s32 i;
-    if (!S.guard) S.guard = op_new(GUARD_SIZE, pm_model, 1);
+    /* (no spacer any more: our archives go to pool A, see pm_new_a) */
     if (slot[0xC]) {                         /* the teddy (or an old copy) is set up: clear it */
         vcall(slot, 0, 2)(slot, 0);
         unload_model(CHAR_ID);
@@ -235,6 +287,7 @@ static void setup_model(void)
         }
         SET71_LIST = gd_list;
     }
+    joe_to_a = 1;
     load_animset(ANIMSET, 0);
     S.last_anims = (u8 *)SET71_DATA[0];
     {   /* Our previous model archive can still be in the model entry (restore_names after a menu only puts the names
@@ -248,8 +301,12 @@ static void setup_model(void)
     }
     {   u8 *first = MODEL37_ARC;
         slot_setup(slot, CHAR_ID, -1);           /* (this loads the model again: user dumps had two copies, 377 KB each) */
-        if (first && first != MODEL37_ARC) orphan(first);
+        if (first && first != MODEL37_ARC) {
+            if (a_size(first)) { op_delete(first); dup_dbg.freed++; }   /* replaced, nothing draws it: free now */
+            else orphan(first);
+        }
     }
+    joe_to_a = 0;
     S.loaded = 1;
     S.own_model = MODEL37_ARC; S.own_anims = (u8 *)SET71_DATA[0];
     S.sweep = 0;
@@ -302,6 +359,7 @@ static u32 model_size, anims_size;          /* block sizes of our two archives (
 static u32 block_size(u8 *p)
 {
     u8 *r; s32 k;
+    if (a_size(p)) return a_size(p);
     for (r = *(u8 **)(0x80315508 + 0x10), k = 0; r && k < 6000; r = *(u8 **)(r + 8), k++)
         if (*(u32 *)(r + 0xC) == 2 && *(u32 *)r - *(u32 *)(r + 4) == (u32)p) return *(u32 *)(r + 4);
     return 0;
@@ -332,6 +390,16 @@ static void dup_sweep(void)
             if (n < 8) now[n++] = p;                      /* (a copy just loaded may not be linked in yet) */
         }
     } while (again);
+    for (k = 0; k < 8; k++) {                             /* the same for our blocks in pool A */
+        p = a_blk[k];
+        if (!p || (a_len[k] != model_size && a_len[k] != anims_size)) continue;
+        if (p == live_m || p == live_a || p == S.own_model || p == S.own_anims || *(u32 *)p != 0x55AA382Du) continue;
+        dup_dbg.cands++;
+        if (referenced(p)) { dup_dbg.refd++; dup_dbg.last_ref = ref_at; continue; }
+        for (i = 0; i < 8; i++) if (seen[i] == p) break;
+        if (i < 8) { seen[i] = 0; op_delete(p); dup_dbg.freed++; continue; }
+        if (n < 8) now[n++] = p;
+    }
     for (i = 0; i < 8; i++) seen[i] = i < n ? now[i] : 0;
 }
 static void restore_names(void)
@@ -378,7 +446,7 @@ static void spawn(void)
     if (old) { unload_model(CHAR_ID); S.own_model = 0; }   /* (only closes the handle: the memory stays) */
     a = op_new(0x2A8, pm_model, 1);
     if (!a) return;
-    actor_ctor(a, 1, CHAR_ID);
+    joe_to_a = 1; actor_ctor(a, 1, CHAR_ID); joe_to_a = 0;
     if (MODEL37_ARC) S.own_model = MODEL37_ARC;
     dup_dbg.spawns++; if (old) dup_dbg.reloads++;
     if (old && MODEL37_ARC != old) { op_delete(old); dup_dbg.freed++; }   /* the new copy replaced it: free the old one now */

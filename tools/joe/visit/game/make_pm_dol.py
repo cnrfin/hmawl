@@ -65,6 +65,10 @@ HOOK23 = 0x801A0A88                                   # clip lookup func_801A0A8
 HOOK23_OFF = 0x2C4                                    # pm_arcanim_stub (b zt_arc_anim)
 HOOK24 = 0x80012200                                   # menu display box lookup (func_800121C4): add r7,r5,r6
 HOOK24_OFF = 0x2D0                                    # pm_box_stub (weapon icon models 196+)
+HOOK25 = 0x80178E88                                   # operator new entry (stwu r1,-0x20(r1))
+HOOK25_OFF = 0x2F0                                    # pm_new_stub: Joe's archives into pool A (memfix 18)
+HOOK26 = 0x80179168                                   # operator delete entry (stwu r1,-0x20(r1))
+HOOK26_OFF = 0x358                                    # pm_del_stub: our pool-A blocks back to pool A
 PREV = {0x8028DDE4: (0x02206E10,), 0x8028DE08: (0x02206F11,), 0x80113894: (0x4824B8F1,), 0x80060EF8: (0x482FE260,), 0x801B0EE4: (0x3C608036, 0x3C608037, 0x3C608038), 0x801B0EE8: (0x38636000, 0x3863A000, 0x38630000), 0x801B0F28: (0x3C608037, 0x3C608038), 0x801B0F2C: (0x38636000, 0x3863A000, 0x38630000)}   # earlier builds' words (update mode)
 PATCHES = [  # (RAM address, original word, new word, why)
     (0x801B0EE4, 0x80630030, 0x3C608037, 'OSInit: arena low = 0x80377000 (was BootInfo->arenaLo or __ArenaLo) ...'),
@@ -89,6 +93,8 @@ PATCHES = [  # (RAM address, original word, new word, why)
     (0x8028E8E8, 0x0000F1B9, 0x0000F800, '...'),
     (0x8028E8EC, 0x09EF0600, 0x0E001000, '...'),
     (0x8028E8F0, 0x0DFF11AB, 0x08001200, '...'),
+    (HOOK25, 0x9421FFE0, None, 'operator new -> pm_new_stub: Joe\'s model / animations (>= 64 KB) into pool A while he loads'),
+    (HOOK26, 0x9421FFE0, None, 'operator delete -> pm_del_stub: frees of those pool-A blocks go to pool A'),
     (HOOK7, 0x80610020, None, 'villager item pick (func_8011811C end) -> pm_nosell_stub: never the Cursed Axe'),
     (HOOK8, 0x9421FFE0, None, 'TV channel 3 caption (func_8008E298) -> pm_tv_stub: $JOE Coin Daily'),
     (HOOK9, 0x9421FFC0, None, 'villager talk line (func_80117B10) -> pm_talk_stub: villagers hate the $JOE coin'),
@@ -181,7 +187,7 @@ def main():
     if CODE_ADDR + len(code) > ARENA_LO: die('code does not fit below the new arena start')
     entry = CODE_ADDR                                   # pm_hook is the first thing in pm.bin
     if be32(code, HOOK2_OFF) != 0x9421FFE0: die('pm.bin does not have pm_hook2 at +0x14')
-    targets = {HOOK: entry, HOOK2: entry + HOOK2_OFF, HOOK3: entry + HOOK3_OFF, HOOK4: entry + HOOK4_OFF, HOOK5: entry + HOOK5_OFF, HOOK6: entry + HOOK6_OFF, HOOK7: entry + HOOK7_OFF, HOOK8: entry + HOOK8_OFF, HOOK9: entry + HOOK9_OFF, HOOK10: entry + HOOK10_OFF, HOOK11: entry + HOOK11_OFF, HOOK12: entry + HOOK12_OFF, HOOK13: entry + HOOK13_OFF, HOOK14: entry + HOOK14_OFF, HOOK15: entry + HOOK15_OFF, HOOK16: entry + HOOK16_OFF, HOOK18: entry + HOOK18_OFF, HOOK19: entry + HOOK19_OFF, HOOK20: entry + HOOK20_OFF, HOOK21: entry + HOOK21_OFF, HOOK22: entry + HOOK22_OFF, HOOK23: entry + HOOK23_OFF, HOOK24: entry + HOOK24_OFF}
+    targets = {HOOK: entry, HOOK2: entry + HOOK2_OFF, HOOK3: entry + HOOK3_OFF, HOOK4: entry + HOOK4_OFF, HOOK5: entry + HOOK5_OFF, HOOK6: entry + HOOK6_OFF, HOOK7: entry + HOOK7_OFF, HOOK8: entry + HOOK8_OFF, HOOK9: entry + HOOK9_OFF, HOOK10: entry + HOOK10_OFF, HOOK11: entry + HOOK11_OFF, HOOK12: entry + HOOK12_OFF, HOOK13: entry + HOOK13_OFF, HOOK14: entry + HOOK14_OFF, HOOK15: entry + HOOK15_OFF, HOOK16: entry + HOOK16_OFF, HOOK18: entry + HOOK18_OFF, HOOK19: entry + HOOK19_OFF, HOOK20: entry + HOOK20_OFF, HOOK21: entry + HOOK21_OFF, HOOK22: entry + HOOK22_OFF, HOOK23: entry + HOOK23_OFF, HOOK24: entry + HOOK24_OFF, HOOK25: entry + HOOK25_OFF, HOOK26: entry + HOOK26_OFF}
     for a_ in MOT_SITES: targets[a_] = entry + MOT_OFF
     if be32(code, HOOK3_OFF) >> 16 != 0x3D80: die('pm.bin does not have pm_player_stub at +0x58')
     if be32(code, HOOK4_OFF) != 0x9421FFF0: die('pm.bin does not have pm_label_stub at +0x68')
@@ -195,6 +201,8 @@ def main():
     if be32(code, HOOK12_OFF) != 0x2C050015: die('pm.bin does not have pm_msg_stub at +0x1E4')
     if be32(code, HOOK13_OFF) != 0x9421FFF0: die('pm.bin does not have pm_zt_stub at +0x1F4')
     if be32(code, HOOK24_OFF) != 0x28060AB8: die('pm.bin does not have pm_box_stub at +0x2D0')
+    if be32(code, HOOK25_OFF) >> 16 != 0x3D80: die('pm.bin does not have pm_new_stub at +0x2F0')
+    if be32(code, HOOK26_OFF) != 0x2C030000: die('pm.bin does not have pm_del_stub at +0x358')
     if be32(code, HOOK23_OFF) >> 26 != 18: die('pm.bin does not have pm_arcanim_stub at +0x2C4')
     if be32(code, HOOK22_OFF) != 0x38610008: die('pm.bin does not have pm_impact_stub at +0x2B0')
     if be32(code, HOOK21_OFF) != 0x9421FFF0: die('pm.bin does not have pm_newgame_stub at +0x27C')

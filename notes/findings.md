@@ -3356,3 +3356,20 @@ so, door fades are timed there, possibly per frame. Not traced yet.
   memfix 17: pm_scene_change -> joe_free_now(): entry 37 back to the unused state (zeros, vtable word +0x20 kept),
   set 71 back to orig_set, then op_delete model + anims + orphans before the next scene loads; orig_set never
   captured from our own archive (S.last_anims); MEMG every 4 frames.
+- memfix 17 dump 92afe3f3 (inn, read from 0x5 at 0x8001025C): Joe now freed (B free from 0x8091C140, 2.6 MB), but 3 game
+  blocks (6528 / 608 / 32 B, owned by a live object at 0x80FE9F0C and set 10) stay at 0x8091A540..0x8091C140, inside
+  the inn's pool-A block. They were allocated (slot set-up) while Joe's archives held B's bottom down.
+- Pool A is the game's module heap: SystemTask (0x80177B98..) loads each area's REL with DvdFile + allocA
+  (func_8017860C(size, file, line)) + OSLink; the inn's 0x3A660 block is its REL (header word 3 = module id). Both
+  pools span the whole arena (A hdr 80377000 / 0147D0A0), A bottom-up, B top-down, each blind to the other.
+  Invariant: B's lowest LIVE block must stay above chapter archive + the biggest area REL (+bss).
+  A alloc / free: func_8017860C / func_80178660; B: func_801786D4 / func_80178728 (op_new 0x80178E88 / op_delete
+  0x80179168 also B).
+- Original commonall (24c1e6b7, 5,410,544 B unpacked) vs ours: +182 KB (opguide.tpl +123 KB: three RGB5A3 HUD
+  textures, which must stay RGB5A3; symbol.tpl +27 KB, real.* +12 KB, mapobj.gpl +9 KB, symbol.gpl +6 KB).
+- memfix 18: Joe's archives go to POOL A while he is in the valley (no REL above the chapter archive there) and are
+  freed at every scene change before the next REL loads. op_new / op_delete hooked (HOOK25 0x80178E88 -> pm_new_stub
+  +0x2F0, HOOK26 0x80179168 -> pm_del_stub +0x358): with joe_to_a set (load_animset / load_model / slot_setup in
+  setup_model, actor_ctor in spawn) a request >= 64 KB goes to allocA if it ends >= 64 KB below B's lowest block
+  (else B as before); pm_del_a frees only blocks we put in A (8-entry list). No 256 KB spacer any more. A model
+  copy replaced by slot_setup is freed at once. make_pm_dol.py must be the new one (two more patch sites).

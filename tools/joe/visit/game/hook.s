@@ -315,3 +315,53 @@ pm_box_stub:
     blr
 1:  add   r7, r5, r6                # the replaced instruction
     blr
+
+# operator new (0x80178E88 entry, stwu r1,-0x20(r1)) -> pm_new_stub: while joe_to_a is set, requests of 64 KB or
+# more (Joe's model / animations) go to pool A via pm_new_a (pm.c), which returns 0 when they do not fit there.
+    .globl pm_new_stub
+pm_new_stub:
+    lis   r12, joe_to_a@ha
+    lwz   r12, joe_to_a@l(r12)
+    cmpwi r12, 0
+    beq   1f
+    srwi  r12, r3, 16               # < 64 KB: as before
+    cmpwi r12, 0
+    beq   1f
+    stwu  r1, -0x20(r1)
+    mflr  r0
+    stw   r0, 0x24(r1)
+    stw   r3, 0x8(r1)
+    stw   r4, 0xc(r1)
+    stw   r5, 0x10(r1)
+    bl    pm_new_a
+    lwz   r0, 0x24(r1)
+    mtlr  r0
+    cmpwi r3, 0
+    bne   2f
+    lwz   r3, 0x8(r1)
+    lwz   r4, 0xc(r1)
+    lwz   r5, 0x10(r1)
+    addi  r1, r1, 0x20
+1:  stwu  r1, -0x20(r1)             # the replaced instruction
+    b     new_return                # 0x80178E8C
+2:  addi  r1, r1, 0x20
+    blr
+
+# operator delete (0x80179168 entry, stwu r1,-0x20(r1)) -> pm_del_stub: our pool-A blocks go back to pool A.
+    .globl pm_del_stub
+pm_del_stub:
+    cmpwi r3, 0
+    beq   1f
+    stwu  r1, -0x20(r1)
+    mflr  r0
+    stw   r0, 0x24(r1)
+    stw   r3, 0x8(r1)
+    bl    pm_del_a
+    lwz   r0, 0x24(r1)
+    mtlr  r0
+    cmpwi r3, 0
+    lwz   r3, 0x8(r1)
+    addi  r1, r1, 0x20
+    bnelr
+1:  stwu  r1, -0x20(r1)             # the replaced instruction
+    b     del_return                # 0x8017916C
