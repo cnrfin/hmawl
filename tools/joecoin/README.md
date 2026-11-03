@@ -42,3 +42,10 @@ start 50 G, growth +75 %/year, volatility 60 %, daily jitter ±12 %, crypto-wint
 - TV test 5: test 4 still showed 'ä'. The US preload font replaces unused kanji in image 0 (the 24x24 font
   the text boxes draw from) with European letters (0x80FB-0x8107, 0x8432-0x8463); 0x80FD there is 'ä'.
   `build_preload.py` now draws '$' into image 0 too. preload.arc.clz SHA-1 47f843f8. Confirmed in game: `$` shows.
+
+## Per-save market (joeseed test 1)
+The price formula is unchanged but its seed is now per save: event counter 52 (game+0x12194+4*52, saved with the
+other event counters; unused by every script and by our code) gets a random value (time base x game rand) on day 1
+of a new game (joetv.c joe_seed_frame, called from pm_frame). A save whose counter is 0 (made before this) keeps
+seed 1890, so its price history doesn't change. Joe's visit days stay on 1890. joe_market.html previews seed 1890.
+pm.bin 6454d5a3 (normal), 12b51625 (WEAPONS_ALL test).
