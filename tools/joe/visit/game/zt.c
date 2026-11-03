@@ -224,7 +224,7 @@ static void reticle(u8 *g)
 }
 
 static void swing_frame(s32 bpress, s32 free);
-struct { u32 magic, n, lastm, bpress, tries, fail, starts, bones, slot, arc, anim; float w, frame, len; u32 ring[8][4]; } sw_dbg;   /* 'SWDB' (dump) */
+struct { u32 magic, n, lastm, bpress, tries, fail, starts, bones, slot, arc, anim; float w, frame, len; u32 ring[8][4]; u32 item, kids[4], kbone[4]; } sw_dbg;   /* 'SWDB' (dump) */
 void zt_frame(u8 *g, s32 map, volatile u32 *held, volatile u32 *press)
 {
     u8 *f = FADER;
@@ -283,8 +283,10 @@ void zt_frame(u8 *g, s32 map, volatile u32 *held, volatile u32 *press)
         if (mw != sw_dbg.lastm) { sw_dbg.lastm = mw; sw_dbg.ring[sw_dbg.n & 7][0] = mw; sw_dbg.ring[sw_dbg.n & 7][1] = *held;
                                   sw_dbg.ring[sw_dbg.n & 7][2] = *press; sw_dbg.ring[sw_dbg.n & 7][3] = (u32)Z.target; sw_dbg.n++; }
         if (bpress) sw_dbg.bpress++;
-        if (Z.target) { *press &= ~0x200u; *held &= ~0x200u; }
-        swing_frame(bpress && Z.target, 1);
+        s32 item = *(s32 *)(g + 0x11CC4), sickle = item >= 0x4E5 && item <= 0x4EB;   /* the 7 sickles: the combat tool */
+        sw_dbg.item = (u32)item;
+        if (Z.target && sickle) { *press &= ~0x200u; *held &= ~0x200u; }     /* else B is the game's (put the tool away) */
+        swing_frame(bpress && Z.target && sickle, 1);
     }
     if (Z.target) Z.ty = theight(g, Z.target);
     reticle(g);
@@ -452,6 +454,11 @@ static void swing_frame(s32 bpress, s32 free)
 {
     struct swctl *c, *p;
     sw_dbg.magic = 0x53574442u; sw_dbg.slot = (u32)sw_slot;
+    if (sw_slot) {                                       /* the held tool's model: child instances +0x15C, bone u16 +0x16C */
+        u8 *in = *(u8 **)(sw_slot + 0x14); s32 k;
+        if ((u32)in >= 0x80000000u && (u32)in < 0x81800000u)
+            for (k = 0; k < 4; k++) { sw_dbg.kids[k] = *(u32 *)(in + 0x15C + 4 * k); sw_dbg.kbone[k] = *(unsigned short *)(in + 0x16C + 2 * k); }
+    }
     if (!free) { SW.on = 0; SW.w = 0.0f; return; }
     if (bpress) { if (!SW.on) sw_start(0, 0); else if (SW.hit < 2) SW.queued = 1; }
     if (!SW.on) { SW.w = 0.0f; return; }
