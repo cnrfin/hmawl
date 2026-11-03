@@ -96,6 +96,12 @@ def iso_file(iso, path):
                 f.seek(off); return f.read(sz)
     sys.exit('%s not found on the disc' % path)
 
+# An animation archive with no animations, as on the original disc (pado_0.anm.arc, tei_0.anm.arc: 64 bytes):
+# a U8 header, the root node, an empty name. A 0-byte .anm.arc for a character whose model is opened crashes
+# the load (memfix 13: invalid read from 0x14 at 0x801A40B4).
+EMPTY_U8 = struct.pack('>IIII', 0x55AA382D, 0x20, 13, 0x40) + bytes(0x10) + struct.pack(">III", 0x01000000, 0, 1) + bytes(0x14)
+assert len(EMPTY_U8) == 64
+
 def main():
     a = sys.argv[1:]; ch = 0; drop = 'son_0.anm.arc,son_0_subact.arc,son_0_subanm.arc,gura_0.anm.arc,gura_0_subact.arc,gura_0_subanm.arc,keit_0.anm.arc,keit_0_subact.arc,keit_0_subanm.arc,san_0.anm.arc,san_0_subact.arc,san_0_subanm.arc'
     if '--chapter' in a: i = a.index('--chapter'); ch = int(a[i + 1]); del a[i:i + 2]
@@ -111,7 +117,8 @@ def main():
     rep = {}; freed = 0
     for f in drop.split(','):
         if f not in names: sys.exit('%s: no %s' % (nm, f))
-        k = names[f]; freed += len(arc['files'][k]); rep[k] = b''
+        k = names[f]; rep[k] = EMPTY_U8 if f.endswith('.anm.arc') else b''
+        freed += len(arc['files'][k]) - len(rep[k])
     for f, data in put.items():
         if f not in names: sys.exit('%s: no %s' % (nm, f))
         rep[names[f]] = data

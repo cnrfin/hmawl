@@ -3332,3 +3332,7 @@ so, door fades are timed there, possibly per frame. Not traced yet.
   blank body on Celia's skeleton, blank face frames; built from disc data, so only in the user's zip); their
   anims / subact / subanm stay empty (as pado_0.anm.arc on the original disc, whose model is opened too).
   strip_chapter.py --put name=file. Expected: ~364 KB freed for the three (instead of 414).
+- memfix 13 dumps fadefd5d / c232212a: models 14-16 now open (placeholders), but invalid read from 0x14 at 0x801A40B4
+  on load (and the mansion crash): their 0-byte .anm.arc. On the original disc an animation-less character has a
+  64-byte EMPTY U8 archive (pado_0.anm.arc, tei_0.anm.arc), not 0 bytes. memfix 14: strip_chapter.py writes that
+  64-byte archive for every dropped .anm.arc (subact / subanm stay 0 bytes, as keit / san / kuri on the original).
