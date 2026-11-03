@@ -22,7 +22,7 @@ a session's temporary folder; the ones still only there are marked.
 | Choppable logs (appear the day after rain) | logs.c | snow mapc build |
 | Tool skill on the HUD (gems, "Field/Animal up" chime) | skill.c, skill_hud.h | level every 500 points |
 | Goddess pond offerings | spring.c | |
-| $JOE Coin Daily on TV channel 3 | joetv.c (HOOK8) | price = f(seed 1890, day), tools/joecoin |
+| $JOE Coin Daily on TV channel 3; per-save market (joeseed test 1): each new game picks a random seed on day 1, kept in event counter 52 (saved); older saves keep seed 1890 | joetv.c (HOOK8, mseed / joe_seed_frame from pm_frame) | price = f(seed, day), tools/joecoin; Joe's visit days stay on 1890 |
 | $JOE coin: villagers hate it (HOOK9), never a wanted gift (HOOK10) | joetv.c | |
 | $JOE dig-site share 10 % halving per chapter; x2 at full Joe friendship | joetv.c joe_dig_frame | |
 | Lumber item (0x51C) | make_pm_dol.py data patch | |

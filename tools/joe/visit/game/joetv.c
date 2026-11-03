@@ -16,7 +16,28 @@ typedef unsigned char u8;
 #define CLOCK       (**(u32 **)0x80349218)        /* tenths of a second since the start */
 #define T_DAY       864000u
 
-#define SEED     1890u
+#define SEED     1890u     /* Joe's visit days; also the market of saves made before per-save seeds */
+/* Per-save market: event counter 52 (game+0x12194+4*52, kept in the save; no script or other code uses it)
+   holds the save's own seed, picked at random on the first day of a new game (joe_seed_frame, every frame).
+   0 = an older save: it keeps the 1890 market it already had. */
+#define GAME        (*(u8 **)0x803491CC)
+#define SEED_CNT(g) (*(u32 *)((g) + 0x12194 + 4 * 52))
+#define game_rand   F(0x8017D3E8, s32, (void))
+static u32 mseed(void)
+{
+    u8 *g = GAME; u32 v;
+    if ((u32)g < 0x80000000u || (u32)g >= 0x81800000u) return SEED;
+    v = SEED_CNT(g); return v ? v : SEED;
+}
+void joe_seed_frame(void)
+{
+    u8 *g = GAME; u32 tb, v;
+    if ((u32)g < 0x80000000u || (u32)g >= 0x81800000u || !*(u32 **)0x80349218) return;
+    if (SEED_CNT(g) || CLOCK / T_DAY != 0) return;      /* set already, or an old save past day 1 */
+    __asm__ volatile ("mftb %0" : "=r"(tb));
+    v = (tb * 0x9E3779B1u) ^ ((u32)game_rand() << 16) ^ (u32)game_rand();
+    SEED_CNT(g) = v ? v : 1u;
+}
 #define BASE_LN  3.91202300543f    /* ln 50 G */
 #define GROW_LN  0.55961578794f    /* ln 1.75 per year */
 #define VOL      0.60f
@@ -30,7 +51,7 @@ __attribute__((noinline)) static u32 h32(u32 a, u32 b)
     x ^= x >> 15; x *= 0x2C1B3C6Du; x ^= x >> 12; x *= 0x297A2D39u; x ^= x >> 15;
     return x;
 }
-__attribute__((noinline)) static float uni(u32 n, u32 k) { return (float)h32(SEED ^ (k * 0x632BE5ABu), n) * (1.0f / 4294967296.0f); }
+__attribute__((noinline)) static float uni(u32 n, u32 k) { return (float)h32(mseed() ^ (k * 0x632BE5ABu), n) * (1.0f / 4294967296.0f); }
 __attribute__((noinline)) static float vnoise(float x, u32 k)
 {
     u32 i = (u32)x; float f = x - (float)i, w = f * f * (3.0f - 2.0f * f);

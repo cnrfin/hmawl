@@ -639,6 +639,7 @@ void skill_frame(u8 *g, u32 pad_held, u32 pad_press);
 void spring_release(void);
 void spring_frame(u8 *g, s32 map, u32 pad_held, u32 pad_press);
 void joe_dig_frame(void);
+void joe_seed_frame(void);
 
 void pm_scene_change(void)
 {
@@ -665,6 +666,7 @@ void pm_frame(void)
     float s;
 
     if ((u32)g < 0x80000000u || (u32)g >= 0x81800000u || !*(u32 **)0x80349218) return;
+    joe_seed_frame();                         /* joetv.c: the save's own $JOE market seed (first day of a new game) */
     t = CLOCK;
     day = (t / T_DAY) % 10;
     tod = t % T_DAY;
