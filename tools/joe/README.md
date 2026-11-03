@@ -68,3 +68,12 @@ gd_0.anm.arc unchanged. Preview `previews/test6_shoes.png`.
 The game loops every clip, and in game the sit down / stand up ended before the code switched to the next
 clip (visible jump back). Clips 6 and 8 now end with 90 frames holding their last pose (lengths 149 / 130).
 gd_0.arc unchanged from test 6.
+
+## Test 11 (`build/test11/gd_0.arc`): textures at half size (memory)
+Joe's textures were 314 KB (body 512x256 CMPR 72 KB, 18 eye frames 112x96 CMPR 97 KB, 9 mouth frames 112x72
+RGB5A3 145 KB) against a villager's ~33 KB (body 128x256 + 128x64, 32x32 face frames). `JOE_TEX=0.5` halves the
+body atlas (UVs unchanged) and the eye / mouth frames (56x48 CMPR, 56x36 RGB5A3): gd_0.arc 386,720 -> 156,128 B.
+```
+JOE_TEX=0.5 JOE_SOFTMOUTH=1 JOE_SCALE=0.9 JOE_CIG=$PWD/../joegame/sit_out/cig.json JOE_WALK=28 JOE_FACE=0.9 python3 ../joegame/joe_game.py gd_0 OUT
+```
+(`JOE_TEX` unset rebuilds test 10 byte for byte.) gd_0.anm.arc unchanged (test 10).

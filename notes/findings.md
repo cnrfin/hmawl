@@ -3309,3 +3309,8 @@ so, door fades are timed there, possibly per frame. Not traced yet.
   In the dump the old copies are referenced only by pool-B block records (the next block's top); the live one by
   model entry 37 (+0/+0x1C/+0x24) and pm.bin. Whole-RAM scans see the scanned pointer left on stacks/SDK data by
   interrupts. memfix 10: referenced() checks only the game's static tables 0x802E0000-0x802F0000 (owners).
+- memfix 10 dumps 1527a09c / 302c2cef: leak fixed (no duplicate models; dup_dbg freed 1 / 11). Still gap -715 KB:
+  pool B uses 15.2 MB, pool A (chapter 1 archive, every villager's model and anims) 5.9 MB. Joe's model is the lowest
+  B block, inside A. Joe's textures 314 KB vs a villager's ~33 KB (body 128x256+128x64 CMPR, 32x32 CMPR face frames).
+  Joe test 11: JOE_TEX=0.5 -> gd_0.arc 156,128 B (-230 KB). Remaining deficit ~485 KB: next, strip characters
+  absent from chapter 1 / Murrey, compress the HUD additions in commonall.

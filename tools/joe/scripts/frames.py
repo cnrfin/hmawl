@@ -5,6 +5,8 @@ from PIL import Image, ImageFilter
 S=json.load(open('final_set.json'))
 EYE_BOX=(104,30,412,298); MOUTH_BOX=(72,222,504,508)
 EYE_SIZE=(112,96); MOUTH_SIZE=(112,72)
+TEX=float(os.environ.get('JOE_TEX','1'))          # 0.5: face frames at half size (memory: 314 KB of textures vs a villager's ~33 KB)
+if TEX!=1: EYE_SIZE=(int(112*TEX)//8*8,int(96*TEX)//8*8); MOUTH_SIZE=(int(112*TEX)//4*4,int(72*TEX)//4*4)
 def layers_eyes(spec):
     out=Image.new('RGBA',(512,512),(0,0,0,0)); ex=spec.get('extras',{})
     if ex.get('blush'):
@@ -45,9 +47,12 @@ def eye_frames():
     out={}
     for i,k in EYE_MAP.items():
         spec=blush_variant(E[k[0]],k[1]) if isinstance(k,tuple) else E[k]
-        out[i]=frame(layers_eyes(spec),EYE_BOX,EYE_SIZE)
+        if SOFT_EYES and i not in EYES_USED: continue      # never shown: the slot shows frame 0 (smaller file)
+        out[i]=frame(layers_eyes(spec),EYE_BOX,EYE_SIZE,SOFT_EYES)
     return out
-SOFT_MOUTH=os.environ.get('JOE_SOFTMOUTH')=='1'   # soft edges (stored uncompressed, see joe_game.py)
+SOFT_MOUTH=os.environ.get('JOE_SOFTMOUTH')=='1'
+SOFT_EYES=os.environ.get('JOE_SOFTEYES')=='1'    # soft eyes: only the blink frames Joe shows (normal 0-2, angry 6-8, sad 18-20), RGB5A3
+EYES_USED={0,1,2,6,7,8,18,19,20}   # soft edges (stored uncompressed, see joe_game.py)
 def mouth_frames():
     return {i:frame(part('mouth',M[k]),MOUTH_BOX,MOUTH_SIZE,SOFT_MOUTH) for i,k in MOUTH_MAP.items()}
 if __name__=='__main__':

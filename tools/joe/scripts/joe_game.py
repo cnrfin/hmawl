@@ -264,7 +264,8 @@ def build_act():
 if __name__=='__main__':
     for g in tris: check_strips(tris[g])
     gpl,skn,actb=build_gpl(),build_skn(),build_act()
-    b0=tpl([body,head]); f0e=frames_tpl(FR.eye_frames(),58); f0m=frames_tpl(FR.mouth_frames(),36,5 if FR.SOFT_MOUTH else 14)   # soft mouth: RGB5A3 (CMPR = 2 colours a 4x4 block)
+    if FR.TEX!=1: body=body.resize((int(512*FR.TEX),int(256*FR.TEX)),Image.LANCZOS)   # UVs are 0-1: same mapping
+    b0=tpl([body,head]); f0e=frames_tpl(FR.eye_frames(),58,5 if FR.SOFT_EYES else 14); f0m=frames_tpl(FR.mouth_frames(),36,5 if FR.SOFT_MOUTH else 14)   # soft mouth: RGB5A3 (CMPR = 2 colours a 4x4 block)
     arc=u8([(NAME+'.act',actb),(NAME+'.gpl',gpl),(NAME+'.skn',skn),(NAME+'_b0.tpl',b0),(NAME+'_f0_e.tpl',f0e),(NAME+'_f0_m.tpl',f0m),('_tmp.txt',b'')])
     anims=[open(VAN+'anm%02d.bin'%a,'rb').read() for a in range(int(os.environ.get('JOE_ANIMS','6')))]   # only what Joe needs (Van's 0 idle, 1 walk, 2-5)
     import joe_anm
