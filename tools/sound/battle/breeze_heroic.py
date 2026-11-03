@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Breeze, heroic / epic arrangement (battle theme take 6: OoT 16th snare drive in A, half-time drums in B, per-bar calibrated level so the loop seam is smooth): the Breeze melody (bars 4-35 of the MIDI, = the
+"""Breeze, heroic / epic arrangement (battle theme take 8: Pokemon-battle devices - pumping root-fifth 8th bass, 3-3-2 brass stabs in B, a rising chromatic 16th zig-zag intro over C - Ab - Bb, the 16th snare kept under the B half-time accent; take 6: OoT 16th snare drive in A, half-time drums in B, per-bar calibrated level so the loop seam is smooth): the Breeze melody (bars 4-35 of the MIDI, = the
 user's recording from 0:05) in C major at 184 bpm on EVENT07 p0 (bank 10 prog 0), doubled an octave down;
 strings in a heroic gallop (8th + two 16ths) on the chord tones, march bass (root / octave), horn pads with rising
 runs into each phrase, snare march (2 and 4, rolls into phrase ends), toms on downbeats, a cymbal on big arrivals;
@@ -21,7 +21,7 @@ def read(f):
     return sorted(out)
 def main():
     src, dst = sys.argv[1:3]; cycles = int(sys.argv[3]) if len(sys.argv) > 3 else 1
-    notes = read(src); B0, B1, INTRO = 4, 36, 2; BSEC = 20; rnd = random.Random(5)
+    notes = read(src); B0, B1, INTRO = 4, 36, 4; BSEC = 20; rnd = random.Random(5)
     lows = {}
     for s, d, n, v in notes:
         b = int(s // 4)
@@ -41,7 +41,7 @@ def main():
             if x0 <= x <= x1:
                 u = (x - x0) / (x1 - x0); u = u * u * (3 - 2 * u); return y0 + (y1 - y0) * u
         return pts[-1][1]
-    TRIM = [3.3, 0.3, -0.7, 0.9, 0.2, 0.1, -0.2, -0.2, 0.1, 3.6, 4.6, 1.1, 0.5, 3.8, 5.2, 0.7, 0.8, 1.0, 0.7, 0.5, 0.1, 0.1, 0.4, 0.2, -0.3, -1.1, -0.4, -1.2, -0.8, -1.2, -0.9, 0.2]   # per-bar dB, calibrated: smooth level across the seam
+    TRIM = [3.5, 0.5, -0.7, 0.9, 0.3, 0.3, -0.1, 0.0, 0.2, 4.3, 4.6, 1.2, 0.5, 5.1, 5.3, 0.7, 0.9, 1.0, 0.7, 0.5, 0.1, 0.1, 0.4, 0.2, -0.3, -1.1, -0.6, -1.2, -0.9, -1.5, -0.9, -0.0]   # per-bar dB, calibrated: smooth level across the seam
     def trim(b): return 10 ** (TRIM[(b - B0) % 32] / 40) if b >= B0 else 10 ** (TRIM[0] / 40)
     ev = []
     for s, d, n, v in notes:                       # melody (as the v1 pick: top line), legato-ish, accented downbeats
@@ -51,31 +51,41 @@ def main():
         vel = (100 if s % 1 < 0.1 else 88) + (n - 72) * 1.2 + min(d, 2) * 6      # contour: high and long notes speak up
         vel = vel * sec(b, (s % 4) / 4) + rnd.uniform(-5, 5)
         ev.append((beat, dur, 0, n, vel)); ev.append((beat, dur, 4, n - 12, vel - 22))
+    IROOT = [0, 0, 8, 10]                                     # intro: C pedal, then bVI - bVII into the melody
     for bar in range(B0 - INTRO, B1):
-        r = roots.get(max(bar, B0), 0); base = at(bar); t = CH.get(r, CH[0])
+        intro = bar < B0; B = bar >= BSEC
+        r = IROOT[bar - (B0 - INTRO)] if intro else roots.get(bar, 0); base = at(bar); t = CH.get(r, CH[0])
         lo = 36 + r if r <= 7 else 24 + r
-        for k, (o, d) in enumerate(((0, 1.5), (12, 0.5), (0, 1.5), (12, 0.5))):     # march bass
-            ev.append((base + k * 1.0, 0.9 if k % 2 == 0 else 0.45, 1, lo + o, 104 if k == 0 else 88))
+        for k in range(8):                                                        # pumping root-fifth 8ths
+            ev.append((base + k * 0.5, 0.42, 1, lo + (7 if k % 2 else 0), 104 if k == 0 else (92 if k % 2 == 0 else 80)))
         tones = [60 + (p if p >= 4 else p + 12) for p in t]
-        for beat in range(4):                                                     # gallop: 8th + 16th + 16th
-            for off, dd in ((0, 0.45), (0.5, 0.22), (0.75, 0.22)):
-                for n in tones[1:]: ev.append((base + beat + off, dd, 3, n, 70 + (14 if off == 0 else 0)))
-        for n in tones: ev.append((base, 3.9, 2, n - 12, 62))                    # horn pad
-        if bar >= B0 and (bar - B0) % 4 == 3:                                     # rising run into the next phrase
+        if intro:                                                                 # rising chromatic zig-zag in 16ths
+            for beat in range(4):
+                bb = 60 + (bar - (B0 - INTRO)) * 4 + beat
+                for k, o in enumerate((0, 2, 1, 3)): ev.append((base + beat + k * 0.25, 0.22, 3, bb + o, 78 + k * 3 + beat * 3))
+        else:
+            for beat in range(4):                                                 # gallop: 8th + 16th + 16th
+                for off, dd in ((0, 0.45), (0.5, 0.22), (0.75, 0.22)):
+                    for n in tones[1:]: ev.append((base + beat + off, dd, 3, n, 70 + (14 if off == 0 else 0)))
+        if intro or B:                                                            # brass stabs, 3-3-2
+            for off, dd, vv in ((0, 0.9, 100), (1.5, 0.9, 92), (3, 0.7, 96)):
+                for n in tones: ev.append((base + off, dd, 2, n - 12, vv))
+        else:
+            for n in tones: ev.append((base, 3.9, 2, n - 12, 62))                # horn pad
+        if not intro and (bar - B0) % 4 == 3:                                     # rising run into the next phrase
             nxt = CH.get(roots.get(bar + 1, 0), CH[0]); tgt = 60 + nxt[0] + 12
             for k in range(8): ev.append((base + 2 + k * 0.25, 0.24, 2, tgt - 8 + [0, 2, 4, 5, 7, 9, 11, 12][k] - 4, 80))
-        sb = max(bar, B0); dyn = sec(sb)
-        if bar >= BSEC:                                                           # B: half time
+        if B:                                                                     # B: half-time accent, 16th drive kept underneath
             ev.append((base + 2, 0.2, 9, 40, 116))
-            for k in range(8):
-                if k != 4: ev.append((base + k * 0.5, 0.1, 9, 40, 44 + (8 if k % 2 else 0)))
+            for k in range(16):
+                if k != 8: ev.append((base + k * 0.25, 0.08, 9, 40, (62 if k % 2 == 0 else 46) + (6 if k in (6, 7, 14, 15) else 0)))
+            ev.append((base, 0.3, 9, 41, 104)); ev.append((base + 3, 0.3, 9, 41, 88)); ev.append((base + 3.5, 0.3, 9, 41, 82))   # timpani-style tom: da -- da-da
         else:                                                                     # A (and intro): OoT-style 16th drive
             for k in range(16):
                 ev.append((base + k * 0.25, 0.08, 9, 40, (100 if k % 4 == 0 else 64 + (8 if k % 2 else 0)) * (0.92 + 0.08 * (k in (4, 12)))))
-        if bar >= B0 and (bar - B0) % 4 == 3:
+            ev.append((base, 0.3, 9, 45, 100)); ev.append((base + 2, 0.3, 9, 43, 80))
+        if (not intro and (bar - B0) % 4 == 3) or bar == B0 - 1:
             for k in range(8): ev.append((base + 2 + k * 0.25, 0.1, 9, 40, 60 + k * 7))   # roll into the phrase
-        if bar >= BSEC: ev.append((base, 0.3, 9, 45, 108)); ev.append((base + 1.5, 0.3, 9, 45, 84))   # half-time toms: 1, and of 2
-        else: ev.append((base, 0.3, 9, 45, 100)); ev.append((base + 2, 0.3, 9, 43, 80))
         if bar >= B0 and (bar - B0) % 8 == 0: ev.append((base, 1.0, 9, 49, 96))           # cymbal on arrivals
     # bar -> source bar for the section shape; scale accompaniment velocities, humanize everything
     def src_bar(beat): return int(beat // 4) - INTRO + B0
