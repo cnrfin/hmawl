@@ -3387,3 +3387,11 @@ so, door fades are timed there, possibly per frame. Not traced yet.
   memfix 18) Joe's archives fit in B's holes, so the spacer was the main reason B reached into the REL area.
   GUARD_TEST now instead asks pool A, 600 frames in, for a block reaching 64 KB into B's lowest block and frees it
   at once (records only): must give 0x0BAD00A0.
+- memfix 19 guard test 2 (dump 5356376c): fired as designed: MGRD overlaps 1, pool A, p 0x8091E760 (A top), size 0x164E80
+  (to 64 KB inside B), lr 0x80178650 (allocA wrapper), lr2 0x8035FDF4 (the test), other = B block 0x80A736E0
+  (0x23000), frame 600; freed at once, pools apart afterwards (gap 1363 KB at the title).
+- memfix 20: arena start 0x80377000 -> 0x8037C000 (lis 0x8038 / addi -0x4000): pm.bin room 118 KB (was 1.7 KB
+  free above its end 0x8037693C); costs the pools 20 KB (tightest gap 237 -> ~217 KB). PREV accepts the 0x7000 words.
+- TV "To be continued": not in tv-console2.tpl (21 pictures decoded from dump dfd76891: 0 vignette, 1-3 drama couple,
+  4-5 angel, 6 singer, 7 news, 8-13 weather / effects, 14-20 ours) nor in its agc; probably a drama caption line
+  (game text encoding). Waiting for a screenshot.
