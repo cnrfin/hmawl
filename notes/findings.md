@@ -3214,3 +3214,11 @@ so, door fades are timed there, possibly per frame. Not traced yet.
 - Enemies plan: 1) zt.c: add the animal as a Z candidate (position above); 2) target_is_enemy = it; impacts +
   a hit reaction (flinch/knockback via its position, HP in our own state); 3) more than one animal needs more
   objects of this class (constructor above) or our own actor.
+
+### 7.41 HUD clock garbage / crash (user dump 93470d41): the $JOE TV picture copy
+- Crash: PC 0x80187F64 (stw r0,4(r3), r3 = 0x02F0F140) in a ptmf dispatch (0x80187370); the HUD clock area showed
+  texture garbage, once blue clock text. joetv.c show_picture cached the tv-console2.tpl address; the house (wlp2)
+  loads that file with the house and frees it on leaving (0x1D420 zeroes its bss lbl_10000050 handle and
+  lbl_10000074 tpl pointer), but the freed copy keeps a valid header, so a later channel 3 copied 4 x 13.8 KB of
+  picture into reused memory. Fix: no cache; a tpl counts only if a word holds its address with a live handle
+  0x24 before it (the wlp2 bss pair; seen at 0x809C0574 in 7 house dumps, none outside).

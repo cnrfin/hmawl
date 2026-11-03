@@ -151,15 +151,23 @@ static s32 is_tv_tpl(u8 *t)
     return *(u32 *)t == 0xFFFFFFFFu && *(u32 *)(t + 4) == TPL_N && *(u32 *)(t + 8) == (u32)(t + 12)
         && pic(t, 6) && pic(t, 14) && pic(t, 20);
 }
+/* Is t the TV's file the game has loaded right now? wlp2 (the house) keeps its archive handle and this tpl's
+   pointer 0x24 apart in its bss (lbl_10000050 / lbl_10000074) and zeroes both when the house unloads (0x1D420).
+   A freed copy keeps a valid-looking header, and that memory gets reused (the HUD clock garbled, crashes), so a
+   tpl only counts while some word holds its address with a live handle 0x24 before it. */
+static s32 tv_live(u8 *t)
+{
+    for (u32 *w = (u32 *)0x80380024; w < (u32 *)0x81800000; w++)
+        if (*w == (u32)t && w[-9] >= 0x80000000u && w[-9] < 0x81800000u) return 1;
+    return 0;
+}
 static void show_picture(s32 k)
 {
     static const u8 dst[4] = { 1, 2, 3, 6 };
-    if (!tpl || !is_tv_tpl(tpl)) {                  /* the bound file: magic -> 0xFFFFFFFF, offsets -> pointers */
-        tpl = 0;
-        for (u8 *p = (u8 *)0x80364000; p < (u8 *)0x81800000; p += 32)
-            if (is_tv_tpl(p)) { tpl = p; break; }
-        if (!tpl) return;
-    }
+    tpl = 0;                                        /* never trust a remembered address */
+    for (u8 *p = (u8 *)0x80380000; p < (u8 *)0x81800000; p += 32)
+        if (is_tv_tpl(p) && tv_live(p)) { tpl = p; break; }
+    if (!tpl) return;
     /* copy every time: turning the TV off and on reloads the original pictures, often at the same address */
     u8 *src = pic(tpl, 14 + k);
     for (s32 j = 0; j < 4; j++) {
