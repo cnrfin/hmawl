@@ -254,6 +254,9 @@ static s32 sw_item; static u8 *sw_g;
 struct { u32 magic, n, lastm, bpress, tries, fail, starts, bones, slot, arc, anim; float w, frame, len; u32 ring[8][4]; u32 item, kids[4], kbone[4]; } sw_dbg;   /* 'SWDB' (dump) */
 void zt_frame(u8 *g, s32 map, volatile u32 *held, volatile u32 *press)
 {
+#ifdef NO_ZT
+    (void)g; (void)map; (void)held; (void)press; return;   /* test build: Z targeting, reticle and combos off */
+#endif
     u8 *f = FADER;
     u8 *ev = EVMGR;
     s32 zpress;
