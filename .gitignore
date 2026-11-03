@@ -34,3 +34,8 @@ GYWEE9/
 test/
 **/__pycache__/
 *.pyc
+
+# Dark Cloud audio extracted from the user disc: never committed
+tools/sound/darkcloud/out/
+tools/sound/darkcloud/*.zip
+tools/sound/darkcloud/*.wav
