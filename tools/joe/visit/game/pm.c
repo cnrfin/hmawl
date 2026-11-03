@@ -26,7 +26,7 @@ typedef struct { float x, y, z; } Vec;
 #define MODEL74_SIZE ((float *)0x8024A160)
 #define SET71_NAME  (*(const char **)0x802490CC)  /* animation set 71 */
 #define SET71_DATA  ((u32 *)(0x802EA714 + 71 * 0x30))   /* loaded set 71 (archive pointer at +0) */
-#define MODEL37_ARC (*(u8 **)(0x802EB4D4 + 37 * 0x44 + 0x10))   /* character 37's loaded model archive (func_8002D3B4 frees it) */
+#define MODEL37_ARC (*(u8 **)(0x802EB4D4 + 37 * 0x44))   /* character 37's loaded model archive: the entry's ARC handle +0 (func_8002D3B4 frees it) */
 
 /* ---- game functions */
 #define F(addr, ret, args) ((ret (*) args)(addr))
@@ -197,6 +197,7 @@ static void place(float s, s32 back)
    over (goddess tests 4-5: 2-3 KB between the pools, vanilla 276 KB). A spacer taken first keeps
    them clear of it while they are loaded. */
 #define GUARD_SIZE 0x40000
+static void orphan(u8 *p);
 static void setup_model(void)
 {
     u8 *slot = char_slot(CHARMGR, CHAR_ID, 0);
@@ -229,7 +230,10 @@ static void setup_model(void)
     }
     load_animset(ANIMSET, 0);
     load_model(CHAR_ID);
-    slot_setup(slot, CHAR_ID, -1);
+    {   u8 *first = MODEL37_ARC;
+        slot_setup(slot, CHAR_ID, -1);           /* (this loads the model again: user dumps had two copies, 377 KB each) */
+        if (first && first != MODEL37_ARC) orphan(first);
+    }
     S.loaded = 1;
     S.own_model = MODEL37_ARC; S.own_anims = (u8 *)SET71_DATA[0];
 }
@@ -246,6 +250,17 @@ static void orphan(u8 *p)
    or leaving the valley without the scene hook): each one is about 450 KB (model 377 KB + animations 73 KB)
    and they used to stay for the rest of the session (user dumps: two copies of each with Joe around). Free
    one as soon as neither character 37's model entry nor any animation set points at it. */
+/* any word in RAM pointing at p, other than the pools' own block records (0x802FC000-0x80320000) and pm.bin */
+static s32 referenced(u8 *p)
+{
+    u32 *w;
+    for (w = (u32 *)0x80003100; w < (u32 *)0x81800000; w++) {
+        if ((u32)w == 0x802FC000u) w = (u32 *)0x80320000;
+        if ((u32)w == 0x8035EFA0u) w = (u32 *)0x80377000;
+        if (*w == (u32)p) return 1;
+    }
+    return 0;
+}
 static void free_orphans(void)
 {
     s32 i, k, used;
@@ -254,8 +269,9 @@ static void free_orphans(void)
         if (!p) continue;
         used = MODEL37_ARC == p || p == S.own_model || p == S.own_anims;
         for (k = 0; k < 0x60 && !used; k++) if (*(u8 **)(0x802EA714 + k * 0x30) == p) used = 1;
-        if (!used && *(u32 *)p == 0x55AA382Du) op_delete(p);
-        if (!used) S.orphan[i] = 0;
+        if (used) continue;                                   /* still the live one: wait */
+        if (!referenced(p) && *(u32 *)p == 0x55AA382Du) op_delete(p);   /* else something else owns it: leave it */
+        S.orphan[i] = 0;
     }
 }
 static void restore_names(void)

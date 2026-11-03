@@ -3265,3 +3265,11 @@ so, door fades are timed there, possibly per frame. Not traced yet.
 - Chapter 1 = mainchapter0 (has hyu_0; mainchapter1 has hyu_1). The son's animations (son_0.anm.arc 384 KB +
   subact/subanm = 392 KB) are in it although he is born at the start of chapter 2. tools/memory/strip_chapter.py
   (run on the user's ISO) empties them: -382 KB. Next candidates: characters that never appear in a chapter.
+- memfix 2 dump abdbf0cb (son stripped: pool A block 0x5C03A0, -382 KB OK) still crashed (rucksack, Joe on the
+  map): pool B is top-down over the WHOLE arena (header: top 0x817F40A0, size = the arena); its lowest record is a
+  free block from the arena start up to its lowest used block, so B never "knows" about A: once B's usage reaches
+  down past A's top they overlap (here B reached 0x80882F40, A top 0x80937E40: -339 KB).
+- Joe's model archive (377 KB, 0x5E6A0) was in memory twice again: load_model(37) then slot_setup(slot, 37, -1)
+  loads it a second time and the character-37 model entry (0x802EB4D4 + 37*0x44, ARC handle: +0 = archive start;
+  memfix 1 wrongly read +0x10) keeps only the second. memfix 3: the first copy is freed once nothing in RAM points
+  at it (full-RAM scan, skipping the pools' records and pm.bin). Next: Joe's model is huge (377 KB) - shrink it.
