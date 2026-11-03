@@ -34,7 +34,7 @@ def main():
     def at(b): return (b - B0 + INTRO) * 4
     def sec(b, frac=0.0): return 1.0               # flat: one level throughout (no section build / swell)
     TRIM = [0.7, 0.2, -0.1, -0.7, 0.1, 0.2, 0.0, -0.8, -0.1, 0.8, 0.9, -0.4, -0.0, 0.8, 0.9, -0.9, 0.5, 0.3, -0.0, -0.7, 0.4, 0.4, 0.2, -0.4, -0.1, -0.4, 0.2, -0.2, -0.7, -1.0, -1.0, -1.5]   # per-bar dB, calibrated (K-weighted loudness): every bar the same
-    ITRIM = 2.6                                    # intro (dB), so it sits at the loop level
+    ITRIM = 1.6                                    # intro (dB), so it sits at the loop level
     def trim(b): return 10 ** (TRIM[(b - B0) % 32] / 40) if b >= B0 else 10 ** (ITRIM / 40)
     ev = []
     for s, d, n, v in notes:                       # melody (as the v1 pick: top line), legato-ish, accented downbeats
