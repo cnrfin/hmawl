@@ -18,6 +18,7 @@ tilt_return2 = 0x8017B8F8;
 face_return = 0x80030A5C;
 area_return = 0x80043910;
 item_pool_add = 0x8004FDA0;
+impact_return = 0x800332C4;
 SECTIONS {
   . = 0x8035EFA0;
   .pm : { *(.text.hook) *(.text*) *(.rodata*) *(.sdata*) *(.data*) *(.sbss*) *(.bss*) }

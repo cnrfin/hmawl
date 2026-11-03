@@ -70,3 +70,17 @@ Combo (zt.c) to accept these ids as well as the sickles.
 - Ledger: tool list lbl_8024ED84 (8 u32: 4DF 4E0 4E6 4E7 4ED 4EE 4FA 4FC), getter func_80053EE0, 8 rows max on the
   ledger screen (wlp1 0x26908), order bits u16 record+0x36, delivery 0x801348DC puts tools on the shelf.
 - Names: item.mes[id]; descriptions itemdocNN.mes (blocks of 0x14F: >= 0x3ED -> itemdoc03, index id - 0x3ED).
+
+## Toolfix 2 (with weapons test 1): the apply message, pasture grass, can W capacity
+- A tool use is two messages: the type-1 hit (A press) only sets the target pending (field tile state 3 sub 1,
+  lbl_8008F018 then refuses anything but 0x1C, which is why the neighbours looked "already tilled"); the tool state
+  0x79 impact frame (lbl_80033130, frame 30 / 60 for the can) sends type 0x1C to pl+0x1388 at 0x800332BC, which
+  applies the change (e.g. 8008F350 hoe: func_8009EBB8(record, 2) and the new kind's init rebuilds the look).
+- HOOK22 0x800332C0 -> pm_impact_stub -> tool_area_impact: the same 0x1C to the neighbours that accepted the hit.
+  tool_area now skips everything when the main hit was refused (no swing would follow).
+- Pasture grass: type-4 objects, ids 0x278..0x4B3 = 26 x 22 grid (id = 0x278 + ix*22 + iz, x 181.5+ix, z 128.5+iz);
+  record via func_8001075C(*0x80349230, id), obj = ifc + *(ifc+0x10) - 0xA8; +0x70 state, +0x72 grass index ->
+  game+0x14E84 + idx*8 (+4 growth, cuttable at >= 450). Same two phases (state 0 -> 1 on the hit, cut on 0x1C, +1
+  fodder each). tool_area checks type / position / ripeness for each neighbour.
+- Watering Can W capacity: item row +0x14 low half (0x8028DFA8) 1 -> 10.
+- Still not covered: case 0x12 (hoe on target kind 0x24, state 0xAD, per-frame 0x80037F04).

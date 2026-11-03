@@ -255,6 +255,7 @@ pm_area_stub:
     addi  r3, r1, 0x778
     mr    r4, r26
     mr    r5, r31
+    mr    r6, r22                   # the main send's result (0 = accepted)
     bl    tool_area
     mr    r3, r22
     lwz   r0, 0x1c(r1)              # the replaced instruction
@@ -277,3 +278,14 @@ pm_newgame_stub:
     mtlr  r0
     addi  r1, r1, 0x10
     blr
+
+# Area tools, part 2: tool state 0x79's impact frame (lbl_80033130) sends the type-0x1C "apply" message to the
+# target (pl+0x1388) at 0x800332BC (message at r1+0x8, r31 = player; LR saved in the prologue). tool_area_impact
+# sends it to the neighbours that took the hit too, so they really change and redraw.
+    .globl pm_impact_stub
+pm_impact_stub:
+    addi  r3, r1, 0x8
+    mr    r4, r31
+    bl    tool_area_impact
+    lis   r3, 0x8029                # the replaced instruction (lis r3, lbl_802971C8@ha)
+    b     impact_return             # 0x800332C4
