@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Breeze, heroic / epic arrangement (battle theme take 4): the Breeze melody (bars 4-35 of the MIDI, = the
+"""Breeze, heroic / epic arrangement (battle theme take 5: dynamics, B-section backbeat, loopable; take 4 base): the Breeze melody (bars 4-35 of the MIDI, = the
 user's recording from 0:05) in C major at 184 bpm on EVENT07 p0 (bank 10 prog 0), doubled an octave down;
 strings in a heroic gallop (8th + two 16ths) on the chord tones, march bass (root / octave), horn pads with rising
 runs into each phrase, snare march (2 and 4, rolls into phrase ends), toms on downbeats, a cymbal on big arrivals;
 the B section's Ab/Eb turn lifted to bVI - bVII - I (Ab - Bb - C).
-usage: breeze_heroic.py BREEZE.mid OUT.mid"""
-import sys, mido
+usage: breeze_heroic.py BREEZE.mid OUT.mid [cycles]"""
+import sys, mido, math, random
 BPM = 184
 LEAD = (10, 0)
 PATCH = {0: LEAD, 4: LEAD, 1: (20, 1), 2: (7, 5), 3: (18, 0), 9: (8, 5)}
@@ -20,7 +20,8 @@ def read(f):
             s, v = on.pop(x.note); out.append((s / tpb, (t - s) / tpb, x.note, v))
     return sorted(out)
 def main():
-    src, dst = sys.argv[1:3]; notes = read(src); B0, B1, INTRO = 4, 36, 2
+    src, dst = sys.argv[1:3]; cycles = int(sys.argv[3]) if len(sys.argv) > 3 else 1
+    notes = read(src); B0, B1, INTRO = 4, 36, 2; BSEC = 20; rnd = random.Random(5)
     lows = {}
     for s, d, n, v in notes:
         b = int(s // 4)
@@ -31,12 +32,19 @@ def main():
     roots = {b: root(b) for b in range(B0, B1)}
     roots[31] = 10                                 # bVII (Bb) after the Ab/Eb bars -> lift into the return
     def at(b): return (b - B0 + INTRO) * 4
+    def sec(b):                                   # section dynamics: A builds mf -> f, B f, the lift (28-31) ff, back down at 32
+        if b < B0: return 0.78
+        if b < BSEC: return 0.80 + 0.12 * (b - B0) / (BSEC - B0)
+        if 28 <= b < 32: return 1.0 + 0.04 * (b - 28)
+        return 0.95 if b < 32 else 0.92 - 0.06 * (b - 32) / 3
     ev = []
     for s, d, n, v in notes:                       # melody (as the v1 pick: top line), legato-ish, accented downbeats
         b = int(s // 4)
         if not (B0 <= b < B1) or n < 64 and not (n >= 63 and (s % 1) > 0.4) or n == lows.get(b): continue
-        beat = at(b) + s % 4; dur = min(d, 2.0) * 0.95; vel = 112 if s % 1 < 0.1 else 96
-        ev.append((beat, dur, 0, n, vel)); ev.append((beat, dur, 4, n - 12, vel - 24))
+        beat = at(b) + s % 4; dur = min(d, 2.0) * 0.95
+        vel = (100 if s % 1 < 0.1 else 88) + (n - 72) * 1.2 + min(d, 2) * 6      # contour: high and long notes speak up
+        vel = vel * sec(b) + rnd.uniform(-5, 5)
+        ev.append((beat, dur, 0, n, vel)); ev.append((beat, dur, 4, n - 12, vel - 22))
     for bar in range(B0 - INTRO, B1):
         r = roots.get(max(bar, B0), 0); base = at(bar); t = CH.get(r, CH[0])
         lo = 36 + r if r <= 7 else 24 + r
@@ -50,23 +58,48 @@ def main():
         if bar >= B0 and (bar - B0) % 4 == 3:                                     # rising run into the next phrase
             nxt = CH.get(roots.get(bar + 1, 0), CH[0]); tgt = 60 + nxt[0] + 12
             for k in range(8): ev.append((base + 2 + k * 0.25, 0.24, 2, tgt - 8 + [0, 2, 4, 5, 7, 9, 11, 12][k] - 4, 80))
-        for k in range(4):                                                        # snare march
-            if k in (1, 3): ev.append((base + k, 0.15, 9, 40, 92))
-            ev.append((base + k + 0.5, 0.1, 9, 40, 40))
+        sb = max(bar, B0); dyn = sec(sb)
+        for k in range(4):                                                        # snare: light march in A, backbeat in B
+            if bar >= BSEC:
+                if k in (1, 3): ev.append((base + k, 0.15, 9, 40, 122 * min(dyn, 1.04)))
+                ev.append((base + k + 0.5, 0.1, 9, 40, 34))
+            else:
+                if k in (1, 3): ev.append((base + k, 0.15, 9, 40, 70 * dyn))
+                ev.append((base + k + 0.5, 0.1, 9, 40, 30))
         if bar >= B0 and (bar - B0) % 4 == 3:
             for k in range(8): ev.append((base + 2 + k * 0.25, 0.1, 9, 40, 60 + k * 7))   # roll into the phrase
         ev.append((base, 0.3, 9, 45, 100)); ev.append((base + 2, 0.3, 9, 43, 80))         # toms
         if bar >= B0 and (bar - B0) % 8 == 0: ev.append((base, 1.0, 9, 49, 96))           # cymbal on arrivals
+    # bar -> source bar for the section shape; scale accompaniment velocities, humanize everything
+    def src_bar(beat): return int(beat // 4) - INTRO + B0
+    out = []
+    for beat, dur, ch, n, v in ev:
+        if ch not in (0, 4, 9): v = v * sec(max(src_bar(beat), B0 - 1))
+        out.append((max(0, beat + rnd.uniform(-0.012, 0.012) * (0 if ch == 9 and n == 40 and v > 100 else 1)), dur, ch, n, v + rnd.uniform(-4, 4)))
+    ev = out
+    LOOP = (B1 - B0) * 4; L0 = INTRO * 4
+    if cycles > 1: ev = ev + [(b + LOOP * c, d, ch, n, v) for c in range(1, cycles) for b, d, ch, n, v in ev if b >= L0]
+    END = L0 + LOOP * cycles
+    def expr(ch, beat):                           # CC11 curves: phrase swells (4 bars) and per-bar breathing
+        b = src_bar(beat if beat < L0 else L0 + (beat - L0) % LOOP); x = (beat % 16) / 16; y = (beat % 4) / 4
+        base = {0: 0.86, 4: 0.80, 1: 0.88, 2: 0.70, 3: 0.78}.get(ch, 1.0)
+        sw = 0.10 * math.sin(math.pi * x) + (0.08 * math.sin(math.pi * y) if ch in (2, 3) else 0.03 * math.sin(math.pi * y))
+        return max(0.3, min(1.0, (base + sw) * min(1.0, sec(max(b, B0 - 1)) + 0.1)))
     m = mido.MidiFile(ticks_per_beat=480); tr = mido.MidiTrack(); m.tracks.append(tr)
     tr.append(mido.MetaMessage('set_tempo', tempo=mido.bpm2tempo(BPM)))
     for ch, (bank, prog) in PATCH.items():
         tr += [mido.Message('control_change', channel=ch, control=0, value=bank), mido.Message('program_change', channel=ch, program=prog),
                mido.Message('control_change', channel=ch, control=7, value=VOL[ch])]
     msgs = []
+    for ch in (0, 4, 1, 2, 3):
+        beat = 0.0
+        while beat < END:
+            msgs.append((int(beat * 480), 0, mido.Message('control_change', channel=ch, control=11, value=int(127 * expr(ch, beat)))))
+            beat += 0.25
     for beat, dur, ch, n, v in ev:
-        msgs.append((int(beat * 480), 1, mido.Message('note_on', channel=ch, note=n, velocity=max(1, min(127, v)))))
+        msgs.append((int(beat * 480), 1, mido.Message('note_on', channel=ch, note=n, velocity=int(max(1, min(127, v))))))
         msgs.append((int((beat + dur) * 480), 0, mido.Message('note_off', channel=ch, note=n, velocity=0)))
     msgs.sort(key=lambda x: (x[0], x[1])); tt = 0
     for tick, _, msg in msgs: msg.time = tick - tt; tt = tick; tr.append(msg)
-    nb = B1 - B0 + INTRO; m.save(dst); print('%d bars, %.1f s' % (nb, nb * 4 * 60 / BPM))
+    m.save(dst); print('intro %.3f s, loop %.3f s (%d bars), %d cycles' % (L0 * 60 / BPM, LOOP * 60 / BPM, LOOP // 4, cycles))
 if __name__ == '__main__': main()
