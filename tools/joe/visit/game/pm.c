@@ -271,7 +271,9 @@ static s32 referenced(u8 *p)
        "referenced"): while it runs, interrupts and callbacks leave the scanned pointer on stacks and in SDK
        data (0x803188B4, 0x80317FB0), and the dumps show nothing else points at the old copies. */
     u32 *w;
-    for (w = (u32 *)0x802E0000; w < (u32 *)0x802F0000; w++) if (*w == (u32)p) { ref_at = (u32)w; return 1; }
+    /* An owner (ARC handle) holds the archive start AND its node table (start + 0x20); a word equal to the start
+       alone can be the END pointer of the block just below it (memfix 10 dump joe_4: set 10's +0x2C). */
+    for (w = (u32 *)0x802E0000; w < (u32 *)0x802F0000; w++) if (*w == (u32)p + 0x20) { ref_at = (u32)w; return 1; }
     return 0;
 }
 static void free_orphans(void)
@@ -301,25 +303,31 @@ static u32 block_size(u8 *p)
 }
 static void dup_sweep(void)
 {
-    static u8 *seen;
-    u8 *r, *live_m = MODEL37_ARC, *live_a = (u8 *)SET71_DATA[0], *seen_next = 0; s32 k;
+    static u8 *seen[8];                                   /* candidates of the previous sweep */
+    u8 *r, *live_m = MODEL37_ARC, *live_a = (u8 *)SET71_DATA[0], *now[8], *p; s32 k, i, n = 0, again;
     dup_dbg.magic = 0x44555053u; dup_dbg.sweeps++;
     if (S.loaded) {                                       /* learn the sizes while ours are the live ones */
         if (!model_size && live_m == S.own_model && live_m) model_size = block_size(live_m);
         if (!anims_size && live_a == S.own_anims && live_a) anims_size = block_size(live_a);
     }
     if (!model_size && !anims_size) return;
-    for (r = *(u8 **)(0x80315508 + 0x10), k = 0; r && k < 6000; r = *(u8 **)(r + 8), k++) {
-        u32 sz = *(u32 *)(r + 4); u8 *p;
-        if (*(u32 *)(r + 0xC) != 2 || (sz != model_size && sz != anims_size)) continue;
-        p = (u8 *)(*(u32 *)r - sz);
-        if (p == live_m || p == live_a || p == S.own_model || p == S.own_anims || *(u32 *)p != 0x55AA382Du) continue;
-        dup_dbg.cands++;
-        if (referenced(p)) { dup_dbg.refd++; dup_dbg.last_ref = ref_at; continue; }
-        if (p == seen) { op_delete(p); dup_dbg.freed++; seen = 0; return; }   /* orphaned in two sweeps a second apart */
-        seen_next = p;                                          /* (a copy just loaded may not be linked in yet) */
-    }
-    seen = seen_next;
+    do {                                                  /* restart the record walk after each free */
+        again = 0;
+        for (r = *(u8 **)(0x80315508 + 0x10), k = 0; r && k < 6000; r = *(u8 **)(r + 8), k++) {
+            u32 sz = *(u32 *)(r + 4);
+            if (*(u32 *)(r + 0xC) != 2 || (sz != model_size && sz != anims_size)) continue;
+            p = (u8 *)(*(u32 *)r - sz);
+            if (p == live_m || p == live_a || p == S.own_model || p == S.own_anims || *(u32 *)p != 0x55AA382Du) continue;
+            for (i = 0; i < n; i++) if (now[i] == p) break;
+            if (i < n) continue;                          /* already handled this sweep */
+            dup_dbg.cands++;
+            if (referenced(p)) { dup_dbg.refd++; dup_dbg.last_ref = ref_at; continue; }
+            for (i = 0; i < 8; i++) if (seen[i] == p) break;
+            if (i < 8) { seen[i] = 0; op_delete(p); dup_dbg.freed++; again = 1; break; }   /* orphaned two sweeps running */
+            if (n < 8) now[n++] = p;                      /* (a copy just loaded may not be linked in yet) */
+        }
+    } while (again);
+    for (i = 0; i < 8; i++) seen[i] = i < n ? now[i] : 0;
 }
 static void restore_names(void)
 {

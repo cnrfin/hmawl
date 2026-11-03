@@ -3314,3 +3314,12 @@ so, door fades are timed there, possibly per frame. Not traced yet.
   B block, inside A. Joe's textures 314 KB vs a villager's ~33 KB (body 128x256+128x64 CMPR, 32x32 CMPR face frames).
   Joe test 11: JOE_TEX=0.5 -> gd_0.arc 156,128 B (-230 KB). Remaining deficit ~485 KB: next, strip characters
   absent from chapter 1 / Murrey, compress the HUD additions in commonall.
+- memfix 11 dumps joe_3 (0a7466aa, error + garbled mouth texture as Joe loaded) / joe_4 (7afae3c4): joe_3 no leak but
+  gap -120 KB: Joe's model (0x8091B320..) lies above pool A's top 0x80937400, in A's per-frame scratch -> his mouth
+  texture overwritten. joe_4: 4 old copies kept: set 10 +0x2C (0x802EA920) = the END of set 10's 0x260-byte block,
+  which equals the next block's start. memfix 12: referenced() looks for start + 0x20 (an ARC handle holds the node
+  table pointer too: model entry +4); offline on joe_4 only the live copy is owned. dup_sweep frees every
+  confirmed copy in one sweep (8-entry seen list, restart after each free).
+- Chapter 1 also carries Grant (gura), Kate (keit), Samantha (san), Dr. Hardy (pado; ch-1 anims already empty on
+  the original disc), who move in in chapter 2 (body textures checked: villager_bodies.png). strip_chapter.py
+  default now empties them too: 573 KB more (pool A 5.75 MB -> ~5.2 MB). Risk: the chapter 1 -> 2 transition.
