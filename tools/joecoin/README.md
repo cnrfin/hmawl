@@ -49,3 +49,6 @@ other event counters; unused by every script and by our code) gets a random valu
 of a new game (joetv.c joe_seed_frame, called from pm_frame). A save whose counter is 0 (made before this) keeps
 seed 1890, so its price history doesn't change. Joe's visit days stay on 1890. joe_market.html previews seed 1890.
 pm.bin 6454d5a3 (normal), 12b51625 (WEAPONS_ALL test).
+Fix (enemy test 1c): a new file showed 37 G on day 1 and -42 % on day 2 (the seed had been re-rolled during day 1,
+after the price was seen; dump 081dc2a6: seed 0x1C7114DF gives day 1 = 60, day 2 = 35). The session now keeps the
+seed and restores it if counter 52 is cleared on day 1; newgame_extra (new game setup) clears both.

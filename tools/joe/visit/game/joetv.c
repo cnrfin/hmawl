@@ -29,14 +29,26 @@ static u32 mseed(void)
     if ((u32)g < 0x80000000u || (u32)g >= 0x81800000u) return SEED;
     v = SEED_CNT(g); return v ? v : SEED;
 }
+/* The seed is picked once per new game. Something can clear counter 52 again on day 1 (user test: day 1 showed
+   37 G, then the seed changed and day 2 read -42 % from a different day 1), so the session keeps its own copy and
+   puts it back; joe_seed_newgame (toolfix.c, at the new game's setup) forgets it. */
+static u32 seed_keep;
+void joe_seed_newgame(void)
+{
+    u8 *g = GAME;
+    seed_keep = 0;
+    if ((u32)g >= 0x80000000u && (u32)g < 0x81800000u) SEED_CNT(g) = 0;   /* not the last save's seed */
+}
 void joe_seed_frame(void)
 {
     u8 *g = GAME; u32 tb, v;
     if ((u32)g < 0x80000000u || (u32)g >= 0x81800000u || !*(u32 **)0x80349218) return;
-    if (SEED_CNT(g) || CLOCK / T_DAY != 0) return;      /* set already, or an old save past day 1 */
+    if ((v = SEED_CNT(g)) != 0) { seed_keep = v; return; }   /* set (or a save with its own seed was loaded) */
+    if (CLOCK / T_DAY != 0) return;                     /* an old save past day 1: keeps 1890 */
+    if (seed_keep) { SEED_CNT(g) = seed_keep; return; }
     __asm__ volatile ("mftb %0" : "=r"(tb));
     v = (tb * 0x9E3779B1u) ^ ((u32)game_rand() << 16) ^ (u32)game_rand();
-    SEED_CNT(g) = v ? v : 1u;
+    SEED_CNT(g) = seed_keep = v ? v : 1u;
 }
 #define BASE_LN  3.91202300543f    /* ln 50 G */
 #define GROW_LN  0.55961578794f    /* ln 1.75 per year */
