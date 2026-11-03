@@ -3336,3 +3336,6 @@ so, door fades are timed there, possibly per frame. Not traced yet.
   on load (and the mansion crash): their 0-byte .anm.arc. On the original disc an animation-less character has a
   64-byte EMPTY U8 archive (pado_0.anm.arc, tei_0.anm.arc), not 0 bytes. memfix 14: strip_chapter.py writes that
   64-byte archive for every dropped .anm.arc (subact / subanm stay 0 bytes, as keit / san / kuri on the original).
+- memfix 14: mansion OK; still an invalid read on load (0x01F110AC at 0x801A0AF4): Grant's subact / subanm (644 / 192 B
+  on the disc, unlike Kate's / Samantha's 0 B) were emptied; the load indexes them (func_801A0A88 -> 801A0AF4).
+  memfix 15: they are kept.
