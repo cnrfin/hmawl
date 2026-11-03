@@ -267,6 +267,9 @@ static u32 pool_b_low(void)
 u8 *pm_new_a(u32 size, const char *tag, s32 line)
 {
     u8 *p; s32 i;
+#ifdef GUARD_TEST
+    return 0;                                     /* guard test build: Joe stays in pool B (memfix 17 layout) */
+#endif
     size = (size + 0x1F) & ~0x1Fu;
     for (i = 0; i < 8 && a_blk[i]; i++) ;
     if (i == 8 || pool_b_low() < pool_a_top() + size + 0x10000) return 0;
