@@ -32,16 +32,8 @@ def main():
     roots = {b: root(b) for b in range(B0, B1)}
     roots[31] = 10                                 # bVII (Bb) after the Ab/Eb bars -> lift into the return
     def at(b): return (b - B0 + INTRO) * 4
-    def sec(b, frac=0.0):                         # section dynamics, continuous and periodic over the loop
-        x = (b - B0) + frac                         # bars into the loop (0..32); intro = the loop's start level
-        if x < 0: return 0.93
-        pts = [(0, 0.93), (16, 0.97), (28, 1.0), (32, 1.0)]                        # gentle build, no drop at the seam
-        if x >= 30: pts = [(30, 1.0), (32, 0.93)]                                  # ease home over the last 2 bars
-        for (x0, y0), (x1, y1) in zip(pts, pts[1:]):
-            if x0 <= x <= x1:
-                u = (x - x0) / (x1 - x0); u = u * u * (3 - 2 * u); return y0 + (y1 - y0) * u
-        return pts[-1][1]
-    TRIM = [3.5, 0.5, -0.7, 0.9, 0.3, 0.3, -0.1, 0.0, 0.2, 4.3, 4.6, 1.2, 0.5, 5.1, 5.3, 0.7, 0.9, 1.0, 0.7, 0.5, 0.1, 0.1, 0.4, 0.2, -0.3, -1.1, -0.6, -1.2, -0.9, -1.5, -0.9, -0.0]   # per-bar dB, calibrated: smooth level across the seam
+    def sec(b, frac=0.0): return 1.0               # flat: one level throughout (no section build / swell)
+    TRIM = [3.3, 0.1, -0.9, 0.9, 0.1, -0.0, -0.7, -0.7, -0.5, 3.9, 3.9, 0.8, -0.0, 4.3, 4.0, -0.4, -0.1, 0.1, 0.0, 0.1, -0.2, -0.2, 0.2, 0.0, -0.4, -0.9, -0.1, -0.5, -0.1, -0.8, -0.4, -0.2]   # per-bar dB, calibrated: every bar at the same loudness
     def trim(b): return 10 ** (TRIM[(b - B0) % 32] / 40) if b >= B0 else 10 ** (TRIM[0] / 40)
     ev = []
     for s, d, n, v in notes:                       # melody (as the v1 pick: top line), legato-ish, accented downbeats
@@ -102,7 +94,7 @@ def main():
         lb = beat if beat < L0 else L0 + (beat - L0) % LOOP
         b = src_bar(lb); fr = (lb % 4) / 4; x = ((lb - L0) % 32) / 32
         base = {0: 0.80, 4: 0.74, 1: 0.84, 2: 0.66, 3: 0.74}.get(ch, 1.0)
-        sw = 0.05 * (math.sin(math.pi * x) ** 2) if ch in (2, 3, 0, 4) else 0.0
+        sw = 0.0
         return max(0.3, min(1.0, (base * sec(b, fr) + sw) * trim(b)))
     m = mido.MidiFile(ticks_per_beat=480); tr = mido.MidiTrack(); m.tracks.append(tr)
     tr.append(mido.MetaMessage('set_tempo', tempo=mido.bpm2tempo(BPM)))
