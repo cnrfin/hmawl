@@ -49,3 +49,24 @@
 | H.M Murasama (pun on H.F. Murasama) | 0x4EB | special event (later) |
 Models: Stick can reuse a tool handle; the three swords need new models. 0x4F0 / 0x4F1 stay spare.
 Combo (zt.c) to accept these ids as well as the sickles.
+
+## Research round 2 (models, shed, ledger, new game) — correction: the "duplicate" ids are LIVE
+- Duplicates are alternate looks of the same tool: 4DF<->4E3, 4E0<->4E4, 4E6<->4EA, 4E7<->4EB, 4ED<->4F0, 4EE<->4F1,
+  4F6<->4F7, 4F8<->4F9, 4FC<->4FD. func_80013CEC (chapter start, lbl_8001307C, chapter < 5) converts real -> dup:
+  shed flag 0x10 (func_80057970), item pool (func_80050DF4, li r5 at 0x80050F74/FF8/0x8005107C/0x80051100), held item
+  (jump table lbl_802981C8). Back: func_800124FC (table lbl_80298068; blr stub 0x80012564), used by tool code.
+  Repurposing them needs those patched, and saves past a chapter change already hold them as real tools.
+- Models: item row +2 symbol.gpl model, +3 real.gpl model (0x1A none), +4/+6 symbol.tpl, +8/+A real.tpl
+  (commonall.arc real.gpl / real.tpl / symbol.gpl / symbol.tpl). func_80011F68 picks real if +3 != 0x1A.
+  Carry pose holder player+0x1454 uses the real model only for categories 1, 2, 4 and item 0x4FF (checks at
+  0x80031058 / 0x80031B80 / 0x80031C20). Hand attach func_8007C934 (right) / func_8007C958 (left). Existing pipeline
+  for appending models: scratchpad/commonall/gplmodel.py, make_axe.py, pack_axe*.py (findings 7.16).
+- Price = row +0xC x 10 (shipping x 5). 0x4E4 +0xC = 0x64 (1000 G); 0x4EA = 0x3C.
+- Shed: flags game+0x1558[22] (0x80 owned, 0x01 on shelf, 0x10 alt), ids lbl_8024EDA4 / alt lbl_8024EDFC, screen in
+  wlp1.rel (toolshelf.agc / .tpl, 22 slot positions, nav lbl_0004A240 23 nodes). No spare slots; a new row means
+  ~46 main.dol + 15 wlp1 bounds, new tables, save bytes (pm.bin reimplementation).
+- New game: lbl_8001361C: func_8004FDA0(game+0x50, 0x4F6, 1, -1) (pool), func_8005774C(game+0x1550, id) for
+  4DE / 4E5 / 4EC (shelf).
+- Ledger: tool list lbl_8024ED84 (8 u32: 4DF 4E0 4E6 4E7 4ED 4EE 4FA 4FC), getter func_80053EE0, 8 rows max on the
+  ledger screen (wlp1 0x26908), order bits u16 record+0x36, delivery 0x801348DC puts tools on the shelf.
+- Names: item.mes[id]; descriptions itemdocNN.mes (blocks of 0x14F: >= 0x3ED -> itemdoc03, index id - 0x3ED).
