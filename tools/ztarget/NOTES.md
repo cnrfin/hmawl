@@ -289,3 +289,17 @@ the swing clip, frame advanced by us at our own speed; w fades in/out. Legs/pelv
 - shrink_clips.py: per-track key reduction (Douglas-Peucker on frames, slerp / lerp, 0.35 deg / 0.0006),
   constant tracks as const. 70.6 KB -> 43.3 KB (test 17's working set was 52 KB), worst bone error 0.007.
 - Budget rule from here: keep our boy_0.anm.arc additions <= ~45 KB unless memory is found elsewhere.
+
+## Weapons test 4: the chapter archive overflow, clips moved into pm.bin
+- The new-game crash in weapons test 3 (PC 0x80017F54, scene teardown calling an object whose memory held float
+  data) and test 18's: the game heap (manager lbl_802FD4D0) hands the chapter archive (mainchapterN.arc.clz,
+  decompressed to the block at the arena start) a fixed 0x62A820-byte block; the next block follows right after.
+  In the field dump the archive ended at 0x8099B340, 27 KB past the block end 0x80994820: our clips overflowed it,
+  and whatever the game placed next got overwritten (test 17/18b/w1 only got lucky).
+- Fix: boy_0.anm.arc back to its 126 vanilla clips (add_player_clips.py now strips by default) and clips 126-131 in
+  pm.bin (clips.s, 43 KB). HOOK23 0x801A0A88 (func_801A0A88 = the clip lookup used by the motion player and our
+  swing) -> pm_arcanim_stub -> zt_arc_anim: for the player's anim archive (*(0x802EA714), set 0) and clip >= 126
+  returns our copy, relocating it once like the game does at archive load (+0 0x00AC7472 -> -1, track data
+  offset += clip address); else arc_anim_orig. Arena start 0x8036A000 -> 0x80380000 (pm.bin is now 87 KB).
+- Budget: anything added to a mainchapter archive must stay under the block (vanilla leaves ~15 KB); commonall is
+  not affected (it has grown ~186 KB over the project without trouble).

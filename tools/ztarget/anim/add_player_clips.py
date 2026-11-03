@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
 """Add the Z-targeting player clips to boy_0.anm.arc inside a mainchapterN.arc.clz (the always-loaded archive
 with every character's model and animations; the farmer's 126 clips are shared by all his chapter models).
-usage: add_player_clips.py mainchapterN.arc.clz OUT.arc.clz [anm126.bin ... anm131.bin]
-Clips 126 strafe left, 127 strafe right, 128 walk back, 129-131 combo hits 1-3 (zt.c CLIP_* / SW_CLIP). Every other file keeps its bytes and
+usage: add_player_clips.py mainchapterN.arc.clz OUT.arc.clz            (strip: back to the vanilla 126 clips)
+       add_player_clips.py mainchapterN.arc.clz OUT.arc.clz anm126.bin ... (old way: append clips)
+Since weapons test 4 the clips (126 strafe left, 127 strafe right, 128 walk back, 129-131 combo) live in pm.bin
+(zt_arc_anim): the chapter archive is decompressed into a fixed-size heap block and grew past it with them, so
+the default now strips any clips we added before. Every other file keeps its bytes and
 order; run again on its own output and the three are replaced, not added twice."""
 import sys, os, struct, hashlib, types
 # bundled (no other files needed): CLZ from hmawl tools/logs/build_log_archives.py, U8 from u8arc.py
@@ -79,9 +82,9 @@ NEW = 6                                     # our clips 126..131 (replaced, not 
 
 def main():
     a = sys.argv[1:]
-    if len(a) not in (2, 2 + NEW): sys.exit(__doc__)
+    if len(a) < 2: sys.exit(__doc__)
     here = os.path.dirname(os.path.abspath(__file__))
-    clips = [open(p, 'rb').read() for p in (a[2:] if len(a) > 2 else [os.path.join(here, 'anm%d.bin' % k) for k in range(126, 126 + NEW)])]
+    clips = [open(p, 'rb').read() for p in a[2:]]
     d = clz_decompress(open(a[0], 'rb').read()); arc = u8arc.read(d); nm = u8arc.names(arc)
     if 'boy_0.anm.arc' not in nm:
         open(a[1], 'wb').write(open(a[0], 'rb').read()); print('%s: no boy_0.anm.arc, copied unchanged' % os.path.basename(a[0])); return

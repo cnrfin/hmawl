@@ -19,6 +19,7 @@ face_return = 0x80030A5C;
 area_return = 0x80043910;
 item_pool_add = 0x8004FDA0;
 impact_return = 0x800332C4;
+arcanim_return = 0x801A0A8C;
 SECTIONS {
   . = 0x8035EFA0;
   .pm : { *(.text.hook) *(.text*) *(.rodata*) *(.sdata*) *(.data*) *(.sbss*) *(.bss*) }

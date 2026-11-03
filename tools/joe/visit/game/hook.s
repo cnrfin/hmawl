@@ -289,3 +289,14 @@ pm_impact_stub:
     bl    tool_area_impact
     lis   r3, 0x8029                # the replaced instruction (lis r3, lbl_802971C8@ha)
     b     impact_return             # 0x800332C4
+
+# Clip lookup: func_801A0A88(arc, 0, clip) entry (stwu r1,-0x40(r1)) -> pm_arcanim_stub -> zt_arc_anim (zt.c), which
+# serves the player's clips 126-131 from pm.bin and otherwise calls arc_anim_orig (the replaced instruction, then
+# the rest of the original at 0x801A0A8C).
+    .globl pm_arcanim_stub
+pm_arcanim_stub:
+    b     zt_arc_anim
+    .globl arc_anim_orig
+arc_anim_orig:
+    stwu  r1, -0x40(r1)
+    b     arcanim_return            # 0x801A0A8C

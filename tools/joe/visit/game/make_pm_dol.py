@@ -16,7 +16,7 @@ import os, struct, sys, hashlib
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 CODE_ADDR = 0x8035EFA0
-ARENA_LO = 0x8036A000
+ARENA_LO = 0x80380000
 AXE_STUB_OFF = 0x54                                    # pm_axe_stub in pm.bin (after pm_hook2)
 HOOK = 0x80213CFC
 HOOK2 = 0x8017755C
@@ -61,13 +61,15 @@ HOOK21 = 0x800136D8                                   # new game: bl func_8004FD
 HOOK21_OFF = 0x27C                                    # pm_newgame_stub
 HOOK22 = 0x800332C0                                   # tool state 0x79 impact, after the 0x1C send (area tools)
 HOOK22_OFF = 0x2B0                                    # pm_impact_stub
-PREV = {0x8028DDE4: (0x02206E10,), 0x8028DE08: (0x02206F11,), 0x80113894: (0x4824B8F1,), 0x80060EF8: (0x482FE260,), 0x801B0EE4: (0x3C608036,), 0x801B0EE8: (0x38636000,), 0x801B0F2C: (0x38636000,)}   # earlier builds' words (update mode)
+HOOK23 = 0x801A0A88                                   # clip lookup func_801A0A88 entry -> player clips 126-131 from pm.bin
+HOOK23_OFF = 0x2C4                                    # pm_arcanim_stub (b zt_arc_anim)
+PREV = {0x8028DDE4: (0x02206E10,), 0x8028DE08: (0x02206F11,), 0x80113894: (0x4824B8F1,), 0x80060EF8: (0x482FE260,), 0x801B0EE4: (0x3C608036, 0x3C608037), 0x801B0EE8: (0x38636000, 0x3863A000), 0x801B0F28: (0x3C608037,), 0x801B0F2C: (0x38636000, 0x3863A000)}   # earlier builds' words (update mode)
 PATCHES = [  # (RAM address, original word, new word, why)
-    (0x801B0EE4, 0x80630030, 0x3C608037, 'OSInit: arena low = 0x8036A000 (was BootInfo->arenaLo or __ArenaLo) ...'),
-    (0x801B0EE8, 0x28030000, 0x3863A000, '... - 0x6000'),
+    (0x801B0EE4, 0x80630030, 0x3C608038, 'OSInit: arena low = 0x80380000 (was BootInfo->arenaLo or __ArenaLo) ...'),
+    (0x801B0EE8, 0x28030000, 0x38630000, '... + 0'),
     (0x801B0EEC, 0x40820010, 0x48000010, '... then OSSetArenaLo'),
-    (0x801B0F28, 0x3C608036, 0x3C608037, 'OSInit debug path: arena low = 0x8036A000 (was _stack_addr) ...'),
-    (0x801B0F2C, 0x3863CFA0, 0x3863A000, '... - 0x6000'),
+    (0x801B0F28, 0x3C608036, 0x3C608038, 'OSInit debug path: arena low = 0x80380000 (was _stack_addr) ...'),
+    (0x801B0F2C, 0x3863CFA0, 0x38630000, '... + 0'),
     (HOOK, 0x80010014, None, 'pad update end -> Postman code'),
     (HOOK2, 0x9421FFF0, None, 'g_system update start -> scene-change check'),
     (HOOK3, 0x9421F5D0, None, 'field A handler start -> pm_player_stub (remember the player)'),
@@ -132,6 +134,7 @@ PATCHES = [  # (RAM address, original word, new word, why)
     (0x802A797C, 0x8004D71C, 0x8004D73C, 'usage counter read (func_8004D6E0): 4E4'),
     (0x802A79FC, 0x8004D8E0, 0x8004D8E8, 'usage (func_8004D8BC): 4E3 sickle case'),
     (0x802A7A00, 0x8004D8E0, 0x8004D8E8, 'usage (func_8004D8BC): 4E4 sickle case'),
+    (HOOK23, 0x9421FFC0, None, 'clip lookup (func_801A0A88) -> pm_arcanim_stub: player clips 126-131 served from pm.bin'),
     (HOOK22, 0x3C608029, None, 'tool impact (0x1C send) -> pm_impact_stub: area tools apply to the neighbours too'),
     (0x8028DFA8, 0x0A000001, 0x0A00000A, 'Watering Can W: holds 10 (was 1)'),
     (HOOK20, 0x8001001C, None, 'tool hit (func_80043120 case 0xF) -> pm_area_stub: Strange/Weird hoe + sickle, Watering Can W area shapes'),
@@ -175,7 +178,7 @@ def main():
     if CODE_ADDR + len(code) > ARENA_LO: die('code does not fit below the new arena start')
     entry = CODE_ADDR                                   # pm_hook is the first thing in pm.bin
     if be32(code, HOOK2_OFF) != 0x9421FFE0: die('pm.bin does not have pm_hook2 at +0x14')
-    targets = {HOOK: entry, HOOK2: entry + HOOK2_OFF, HOOK3: entry + HOOK3_OFF, HOOK4: entry + HOOK4_OFF, HOOK5: entry + HOOK5_OFF, HOOK6: entry + HOOK6_OFF, HOOK7: entry + HOOK7_OFF, HOOK8: entry + HOOK8_OFF, HOOK9: entry + HOOK9_OFF, HOOK10: entry + HOOK10_OFF, HOOK11: entry + HOOK11_OFF, HOOK12: entry + HOOK12_OFF, HOOK13: entry + HOOK13_OFF, HOOK14: entry + HOOK14_OFF, HOOK15: entry + HOOK15_OFF, HOOK16: entry + HOOK16_OFF, HOOK18: entry + HOOK18_OFF, HOOK19: entry + HOOK19_OFF, HOOK20: entry + HOOK20_OFF, HOOK21: entry + HOOK21_OFF, HOOK22: entry + HOOK22_OFF}
+    targets = {HOOK: entry, HOOK2: entry + HOOK2_OFF, HOOK3: entry + HOOK3_OFF, HOOK4: entry + HOOK4_OFF, HOOK5: entry + HOOK5_OFF, HOOK6: entry + HOOK6_OFF, HOOK7: entry + HOOK7_OFF, HOOK8: entry + HOOK8_OFF, HOOK9: entry + HOOK9_OFF, HOOK10: entry + HOOK10_OFF, HOOK11: entry + HOOK11_OFF, HOOK12: entry + HOOK12_OFF, HOOK13: entry + HOOK13_OFF, HOOK14: entry + HOOK14_OFF, HOOK15: entry + HOOK15_OFF, HOOK16: entry + HOOK16_OFF, HOOK18: entry + HOOK18_OFF, HOOK19: entry + HOOK19_OFF, HOOK20: entry + HOOK20_OFF, HOOK21: entry + HOOK21_OFF, HOOK22: entry + HOOK22_OFF, HOOK23: entry + HOOK23_OFF}
     for a_ in MOT_SITES: targets[a_] = entry + MOT_OFF
     if be32(code, HOOK3_OFF) >> 16 != 0x3D80: die('pm.bin does not have pm_player_stub at +0x58')
     if be32(code, HOOK4_OFF) != 0x9421FFF0: die('pm.bin does not have pm_label_stub at +0x68')
@@ -188,6 +191,7 @@ def main():
     if be32(code, HOOK11_OFF) != 0x9421FFE0: die('pm.bin does not have pm_van_stub at +0x1B8')
     if be32(code, HOOK12_OFF) != 0x2C050015: die('pm.bin does not have pm_msg_stub at +0x1E4')
     if be32(code, HOOK13_OFF) != 0x9421FFF0: die('pm.bin does not have pm_zt_stub at +0x1F4')
+    if be32(code, HOOK23_OFF) >> 26 != 18: die('pm.bin does not have pm_arcanim_stub at +0x2C4')
     if be32(code, HOOK22_OFF) != 0x38610008: die('pm.bin does not have pm_impact_stub at +0x2B0')
     if be32(code, HOOK21_OFF) != 0x9421FFF0: die('pm.bin does not have pm_newgame_stub at +0x27C')
     if be32(code, HOOK20_OFF) != 0x7C761B78: die('pm.bin does not have pm_area_stub at +0x258')

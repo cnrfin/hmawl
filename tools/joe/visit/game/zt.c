@@ -441,8 +441,6 @@ static s32 sw_start(s32 hit, s32 chained)
     tab = *(u8 **)(sw_slot + 0x88); arc = tab ? *(u8 **)tab : 0; sw_dbg.arc = (u32)arc;
     if (!arc) { sw_dbg.fail = 2; return 0; }
     if (*(u32 *)arc != 0x55AA382Du) { sw_dbg.fail = 3; return 0; }
-    /* U8: root node at +4, its +8 = node count; clip k is node k + 1 (ARCFastOpen leaves its output unset when out of range) */
-    if (*(u32 *)(arc + *(u32 *)(arc + 4) + 8) <= (u32)(SW_CLIP + hit + 1)) { sw_dbg.fail = 5; return 0; }   /* clips not on the disc */
     if ((a = arc_anim(arc, 0, SW_CLIP + hit)) == 0) { sw_dbg.fail = 4; return 0; }
     sw_dbg.anim = (u32)a; sw_dbg.fail = 0; sw_dbg.starts++;
     if (chained) SW.cur ^= 1;
@@ -479,4 +477,27 @@ s32 zt_bone(u8 *ctl, s32 n, u8 *trs, u8 *inst)
         anim_blend((u8 *)&SWC[SW.cur], n, trs, SW.w); sw_dbg.bones++;   /* the clips own the whole spine: full weight */
     }
     return r;
+}
+
+/* Player clips 126-131 live in pm.bin (clips.s), not in boy_0.anm.arc: the chapter archive is decompressed into a
+   fixed-size heap block (0x8036A000.. +0x62A820 in the dumps) and grew past it with the clips (tools/ztarget/NOTES.md).
+   func_801A0A88(arc, 0, clip), the game's clip lookup (motion player, our swing), is hooked: for the player's
+   animation archive (set 0 of his set table, 0x802EA714) and clip >= 126 it returns our copy. The game relocates
+   every clip of an archive at load (+0 0x00AC7472 -> -1, each track's data offset += clip address); ours are
+   relocated the first time they are asked for. */
+extern u8 zt_clip126[], zt_clip127[], zt_clip128[], zt_clip129[], zt_clip130[], zt_clip131[];
+static u8 *const zt_clips[6] = { zt_clip126, zt_clip127, zt_clip128, zt_clip129, zt_clip130, zt_clip131 };
+u8 *arc_anim_orig(u8 *arc, s32 z, s32 clip);            /* hook.s: the original, past the replaced first instruction */
+u8 *zt_arc_anim(u8 *arc, s32 z, s32 clip)
+{
+    if (clip >= 126 && clip < 132 && arc && arc == *(u8 **)0x802EA714) {
+        u8 *p = zt_clips[clip - 126];
+        if (*(u32 *)p != 0xFFFFFFFFu) {
+            s32 n = *(unsigned short *)(p + 4), k;
+            for (k = 0; k < n; k++) *(u32 *)(p + 8 + 16 * k + 4) += (u32)p;
+            *(u32 *)p = 0xFFFFFFFFu;
+        }
+        return p;
+    }
+    return arc_anim_orig(arc, z, clip);
 }
