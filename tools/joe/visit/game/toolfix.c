@@ -98,3 +98,16 @@ void tool_area_impact(u8 *msg, u8 *pl)          /* msg: the 0x1C the game just s
     *(s32 *)(msg + 0x10) = id;
     pend_n = 0; pend_main = -1;
 }
+
+/* New game (pm_newgame_stub, after the Milker is given): the Stick goes in the rucksack the same way.
+   A WEAPONS_ALL build (testing) gives the three swords as well. */
+#define item_pool_add F(0x8004FDA0, void, (u8 *, s32, s32, s32))
+void newgame_extra(u8 *g)
+{
+    item_pool_add(g + 0x50, 0x4E3, 1, -1);          /* Stick */
+#ifdef WEAPONS_ALL
+    item_pool_add(g + 0x50, 0x4E4, 1, -1);          /* Wooden Sword */
+    item_pool_add(g + 0x50, 0x4EA, 1, -1);          /* Farmer's Sword */
+    item_pool_add(g + 0x50, 0x4EB, 1, -1);          /* H.M Murasama */
+#endif
+}

@@ -269,11 +269,11 @@ pm_newgame_stub:
     mflr  r0
     stw   r0, 0x14(r1)
     bl    item_pool_add             # the replaced call (Milker)
-    addi  r3, r28, 0x50
-    li    r4, 0x4E3
-    li    r5, 1
-    li    r6, -1
-    bl    item_pool_add             # the Stick
+    mr    r3, r28
+    bl    newgame_extra             # toolfix.c: the Stick (all four weapons in a WEAPONS_ALL test build)
+    nop                             # (kept at 13 instructions so the stubs after it stay where they are)
+    nop
+    nop
     lwz   r0, 0x14(r1)
     mtlr  r0
     addi  r1, r1, 0x10
