@@ -3290,3 +3290,9 @@ so, door fades are timed there, possibly per frame. Not traced yet.
   remembers the old copy when slot 37 is torn down, lets the actor constructor load the new one, then
   op_delete()s the old one at once; dup_dbg.spawns / reloads count respawns. (The file registry at 0x80318608
   only lists the live copy.)
+- memfix 6 dumps joe6 / joe7: copies 3 -> 11 again; dup_dbg spawns 11, reloads 0: the respawn path never hit (slot
+  +0xC set). Real path: each menu runs restore_names (map changes) -> S.loaded 0 with our model still in the model
+  entry -> after the menu setup_model -> load_model replaces it unfreed; the orphan was then dropped by
+  free_orphans because 0x8031887C (the last file read) pointed at it. memfix 7: setup_model frees our previous
+  archive right after load_model replaces it (the slot was torn down just before); referenced() ignores
+  0x8031887C. Offline on joe7: the 10 old copies have no other references.

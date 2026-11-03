@@ -232,7 +232,15 @@ static void setup_model(void)
         SET71_LIST = gd_list;
     }
     load_animset(ANIMSET, 0);
-    load_model(CHAR_ID);
+    {   /* Our previous model archive can still be in the model entry (restore_names after a menu only puts the names
+           back): the load below replaces it without freeing it (+377 KB per menu, 11 copies in a user dump). The
+           slot was torn down above, so nothing draws it: free it as soon as the new copy is in. */
+        u8 *prev = MODEL37_ARC; s32 i, ours = 0;
+        for (i = 0; i < 4; i++) if (prev && S.orphan[i] == prev) { ours = 1; S.orphan[i] = 0; }
+        load_model(CHAR_ID);
+        if (ours && MODEL37_ARC != prev && *(u32 *)prev == 0x55AA382Du) { op_delete(prev); dup_dbg.freed++; }
+        else if (ours) orphan(prev);
+    }
     {   u8 *first = MODEL37_ARC;
         slot_setup(slot, CHAR_ID, -1);           /* (this loads the model again: user dumps had two copies, 377 KB each) */
         if (first && first != MODEL37_ARC) orphan(first);
@@ -263,7 +271,7 @@ static s32 referenced(u8 *p)
     for (w = (u32 *)0x80003100; w < (u32 *)0x81800000; w++) {
         if ((u32)w == 0x802FC8C4u) w = (u32 *)0x803154FC;       /* the two pools' record arrays (A 0x80 x 0x18, B 0x1000 x 0x18) */
         if ((u32)w == 0x8035EFA0u) w = (u32 *)0x80377000;
-        if (*w == (u32)p) { ref_at = (u32)w; return 1; }
+        if (*w == (u32)p && (u32)w != 0x8031887Cu) { ref_at = (u32)w; return 1; }   /* (0x8031887C: the last file read, not an owner) */
     }
     return 0;
 }
