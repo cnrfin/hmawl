@@ -33,7 +33,7 @@ def main():
     roots[31] = 10                                 # bVII (Bb) after the Ab/Eb bars -> lift into the return
     def at(b): return (b - B0 + INTRO) * 4
     def sec(b, frac=0.0): return 1.0               # flat: one level throughout (no section build / swell)
-    TRIM = [0.7, 0.2, -0.1, -0.7, 0.1, 0.2, 0.0, -0.9, -0.1, 0.9, 1.0, -0.4, -0.0, 0.8, 1.0, -0.9, 0.5, 0.3, -0.0, -0.7, 0.4, 0.4, 0.2, -0.4, -0.2, -0.5, 0.2, -0.3, -0.4, -0.8, -0.6, -1.2]   # per-bar dB, calibrated (K-weighted loudness): every bar the same
+    TRIM = [0.7, 0.2, -0.1, -0.7, 0.2, 0.2, -0.0, -0.9, -0.1, 0.9, 1.0, -0.3, -0.0, 0.8, 1.0, -0.4, 0.5, 0.4, 0.1, -0.6, 0.5, 0.4, 0.2, -0.2, -0.2, -0.5, 0.2, -0.4, -0.5, -0.8, -0.4, -1.6]   # per-bar dB, calibrated (K-weighted loudness): every bar the same
     ITRIM = 1.6                                    # intro (dB), so it sits at the loop level
     def trim(b): return 10 ** (TRIM[(b - B0) % 32] / 40) if b >= B0 else 10 ** (ITRIM / 40)
     ev = []
@@ -44,13 +44,24 @@ def main():
         vel = 104 if s % 1 < 0.1 else 98                                      # even: no contour, so no note jumps out
         ev.append((beat, dur, 0, n, vel)); ev.append((beat, dur, 4, n - 12, vel - 22))
     IROOT = [0, 0, 8, 10]                                     # intro: C pedal, then bVI - bVII into the melody
+    # Turnarounds into the next phrase: two chords per bar, the bass walking ((root, chord tones, bass) per half bar)
+    #   loop bars 6-8:   C | G/B | Am | C7/Bb | F/A ...   (bass C B A Bb A: down into F)
+    #   loop bars 27-31: Bb | F/A G/B | C D | C/E Ab | Bb G7   (bass climbs Bb A B C D E Ab Bb G -> C at the loop)
+    H = lambda r, t, b=None: (r, t, r if b is None else b)
+    HARM = {6: [H(0, CH[0]), H(7, CH[7], 11)], 7: [H(9, CH[9]), H(0, (0, 4, 10), 10)], 8: [H(5, CH[5], 9), H(5, CH[5])],
+            28: [H(5, CH[5], 9), H(7, CH[7], 11)], 29: [H(0, CH[0]), H(2, (2, 6, 9))],
+            30: [H(0, CH[0], 4), H(8, CH[8])], 31: [H(10, CH[10]), H(7, (7, 11, 5))]}
     for bar in range(B0 - INTRO, B1):
         intro = bar < B0; B = bar >= BSEC
         r = IROOT[bar - (B0 - INTRO)] if intro else roots.get(bar, 0); base = at(bar); t = CH.get(r, CH[0])
-        lo = 36 + r if r <= 7 else 24 + r
-        for k in range(8):                                                        # pumping root-fifth 8ths
-            ev.append((base + k * 0.5, 0.42, 1, lo + (7 if k % 2 else 0), 104 if k == 0 else (92 if k % 2 == 0 else 80)))
-        tones = [60 + (p if p >= 4 else p + 12) for p in t]
+        halves = HARM.get(bar - B0) if not intro else None
+        if not halves: halves = [H(r, t), H(r, t)]
+        def lo_of(p): return 36 + p if p <= 7 else 24 + p
+        for k in range(8):                                                        # pumping 8ths: root-fifth, or octaves on a slash bass
+            hr, ht, hb = halves[k // 4]; lo = lo_of(hb); up = 7 if hb == hr else 12
+            ev.append((base + k * 0.5, 0.42, 1, lo + (up if k % 2 else 0), 104 if k % 4 == 0 else (92 if k % 2 == 0 else 80)))
+        htones = [[60 + (p if p >= 4 else p + 12) for p in ht] for hr, ht, hb in halves]
+        tones = htones[0]
         if intro:                                                                 # rising chromatic zig-zag in 16ths
             for beat in range(4):
                 bb = 60 + (bar - (B0 - INTRO)) * 4 + beat
@@ -58,12 +69,16 @@ def main():
         else:
             for beat in range(4):                                                 # gallop: 8th + 16th + 16th
                 for off, dd in ((0, 0.45), (0.5, 0.22), (0.75, 0.22)):
-                    for n in tones[1:]: ev.append((base + beat + off, dd, 3, n, 70 + (14 if off == 0 else 0)))
+                    for n in htones[beat // 2][1:]: ev.append((base + beat + off, dd, 3, n, 70 + (14 if off == 0 else 0)))
         if intro or B:                                                            # brass stabs, 3-3-2
             for off, dd, vv in ((0, 0.9, 100), (1.5, 0.9, 92), (3, 0.7, 96)):
-                for n in tones: ev.append((base + off, dd, 2, n - 12, vv * 0.72))
+                for n in htones[int(off >= 2)]: ev.append((base + off, dd, 2, n - 12, vv * 0.72))
         else:
-            for n in tones: ev.append((base, 3.9, 2, n - 12, 88))                # horn pad
+            if halves[0] == halves[1]:
+                for n in tones: ev.append((base, 3.9, 2, n - 12, 88))            # horn pad
+            else:
+                for h in (0, 1):
+                    for n in htones[h]: ev.append((base + 2 * h, 1.9, 2, n - 12, 92))   # pad moves with the harmony
         if not intro and (bar - B0) % 4 == 3:                                     # rising run into the next phrase
             nxt = CH.get(roots.get(bar + 1, 0), CH[0]); tgt = 60 + nxt[0] + 12
             for k in range(8): ev.append((base + 2 + k * 0.25, 0.24, 2, tgt - 8 + [0, 2, 4, 5, 7, 9, 11, 12][k] - 4, 80))
