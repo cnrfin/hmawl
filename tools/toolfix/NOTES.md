@@ -39,3 +39,13 @@
   (case 0x17 at 0x80043BCC sends nothing), hoe on target kind 0x24 (case 0x12, message at r1+0x744).
 - No per-tool area logic exists anywhere (dead or alive); the Strange/Weird compares elsewhere are skill gain
   (func_8001216C), stamina (func_8004E3B4), text (func_80028988), dialogue, inventory swaps.
+
+## Weapons plan (user's design)
+| Weapon | Slot | Source |
+|---|---|---|
+| Stick | 0x4E3 | tool shed from a new game (like Heavy Hoe / Heavy Sickle / Watering Can S) |
+| Wooden Sword | 0x4E4 | ledger, 1000 G |
+| Farmer's Sword (iron) | 0x4EA | ledger, 3000 G |
+| H.M Murasama (pun on H.F. Murasama) | 0x4EB | special event (later) |
+Models: Stick can reuse a tool handle; the three swords need new models. 0x4F0 / 0x4F1 stay spare.
+Combo (zt.c) to accept these ids as well as the sickles.
