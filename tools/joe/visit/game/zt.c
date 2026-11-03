@@ -26,8 +26,8 @@ typedef short s16;
 #define ZT_LEASH   13.5f                                /* let go past this */
 #define ZT_COS60   0.5f
 #define ZT_JOE     100                                  /* target id for Joe (not an event slot) */
-#define SE_LOCK    434                                  /* lock on: OoT-style rising flutter, game instrument EVENT02 p1 (tools/sound) */
-#define SE_FREE    435                                  /* lock off: the same notes reversed */
+#define SE_LOCK    238                                  /* lock on: vanilla sound 238 (user pick; 434 = our OoT-style flutter, still in the bank) */
+#define SE_FREE    239                                  /* lock off: vanilla 239 (435 = ours) */
 
 s32 pm_joe_pos(float *p);                               /* pm.c: Joe's position if he is out on this map */
 

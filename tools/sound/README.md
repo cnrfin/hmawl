@@ -61,7 +61,12 @@ Not committed. darkcloud/dc_bank_wavs.py decodes the .snd (voice0..6 = toan, sya
 | 442 | toan_07, gain 0.70 | voice, hit 3 |
 | 443 | toan_03, gain 0.70 | hurt (not used yet) |
 | 444 | toan_04, gain 0.75 | dies (not used yet) |
-toan_06 = tired: to replace the game's own tired sound in place (fanfare_patch.py) once its id is known.
+Tired (weapons test 7): sound 304 (user-identified; macro 916, sample 878, used by 304 only) replaced in place with
+toan_06 trimmed to 0.62 s (5 ms fade) at the old level (gain 0.45: RMS -19.6 dB like the original):
+`fanfare_patch.py tired.wav v5/GAME_ALL.arc v5/GAME_ALL.samp v6 --sample 878 --gain 0.45` -> arc 4fd3b62f / samp cc2efc2c.
+Z-target lock on / off now use the game's own 238 / 239 (user pick); 434 / 435 stay in the bank, unused.
+Duplicates (vanilla): 250 samples, 228 distinct; 10 groups stored more than once (22 extra copies, 214 KB), e.g.
+376/377/378, 397/398/399, 332/333/335/336, and 10 copies under 307/326/327/347/348/410/411/415/416/417.
 ```
 python3 add_sfx.py 0_toan_01.wav o4/GAME_ALL.arc o4/GAME_ALL.samp v1 --id 440 --template 305 --gain 0.60
 python3 add_sfx.py 0_toan_02.wav v1/GAME_ALL.arc v1/GAME_ALL.samp v2 --id 441 --template 305 --gain 0.60
@@ -69,4 +74,4 @@ python3 add_sfx.py 0_toan_07.wav v2/GAME_ALL.arc v2/GAME_ALL.samp v3 --id 442 --
 python3 add_sfx.py 0_toan_03.wav v3/GAME_ALL.arc v3/GAME_ALL.samp v4 --id 443 --template 305 --gain 0.70
 python3 add_sfx.py 0_toan_04.wav v4/GAME_ALL.arc v4/GAME_ALL.samp v5 --id 444 --template 305 --gain 0.75
 ```
--> GAME_ALL.arc b201d0de / .samp 587c5656. pm.bin 58520c9b (normal), 806233d4 (WEAPONS_ALL test).
+-> GAME_ALL.arc b201d0de / .samp 587c5656 (test 6). Test 7 pm.bin c4840574 (normal), 8960024c (WEAPONS_ALL test).

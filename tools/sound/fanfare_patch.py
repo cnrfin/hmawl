@@ -1,5 +1,5 @@
 """Put a WAV in place of a MusyX sample (default: GAME_ALL sample 89 = sound 224 "fanfare").
-usage: fanfare_patch.py IN.wav GAME_ALL.arc GAME_ALL.samp OUTDIR [--sample 89] [--rate 44100|32000|22050]
+usage: fanfare_patch.py IN.wav GAME_ALL.arc GAME_ALL.samp OUTDIR [--sample 89] [--rate 44100|32000|22050] [--gain 0.89]
 The WAV is mixed to mono, resampled (ffmpeg) to the highest rate that fits the sample's slot in the
 .samp (sizes don't change, so both files go back on the disc in place), normalised to -1 dBFS and
 DSP-ADPCM encoded; the sample's sdir entry (length, rate, loop off, coefficients) is updated."""
@@ -9,7 +9,8 @@ from musyx import be16, be32, sdir, dsp_decode
 import dspenc
 
 def main():
-    a = sys.argv[1:]; sid = 89; force = None
+    a = sys.argv[1:]; sid = 89; force = None; gain = 0.89
+    if '--gain' in a: i = a.index('--gain'); gain = float(a[i + 1]); del a[i:i + 2]
     if '--sample' in a: i = a.index('--sample'); sid = int(a[i + 1]); del a[i:i + 2]
     if '--rate' in a: i = a.index('--rate'); force = int(a[i + 1]); del a[i:i + 2]
     wav_in, arc_in, samp_in, out = a
@@ -30,7 +31,7 @@ def main():
     raw = subprocess.run(['ffmpeg', '-v', 'error', '-i', wav_in, '-ac', '1', '-ar', str(rate), '-f', 's16le', '-'],
                          capture_output=True, check=True).stdout
     x = np.frombuffer(raw, np.int16).astype(float)[:max_n]
-    x *= (32767 * 0.89) / max(1.0, np.abs(x).max())                 # -1 dBFS
+    x *= (32767 * gain) / max(1.0, np.abs(x).max())                 # peak = gain x full scale (default -1 dBFS)
     pcm = np.round(x).astype(int)
     co = dspenc.fit_coefs(pcm); enc = dspenc.encode(pcm, co)
     assert len(enc) <= slot
