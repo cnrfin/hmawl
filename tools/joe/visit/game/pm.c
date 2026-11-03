@@ -267,9 +267,6 @@ static u32 pool_b_low(void)
 u8 *pm_new_a(u32 size, const char *tag, s32 line)
 {
     u8 *p; s32 i;
-#ifdef GUARD_TEST
-    return 0;                                     /* guard test build: Joe stays in pool B (memfix 17 layout) */
-#endif
     size = (size + 0x1F) & ~0x1Fu;
     for (i = 0; i < 8 && a_blk[i]; i++) ;
     if (i == 8 || pool_b_low() < pool_a_top() + size + 0x10000) return 0;
@@ -946,6 +943,14 @@ void pm_frame(void)
 
     if ((u32)g < 0x80000000u || (u32)g >= 0x81800000u || !*(u32 **)0x80349218) return;
     mg_frames++;
+#ifdef GUARD_TEST
+    if (mg_frames == 600) {                   /* guard test: 10 s in, ask pool A for a block reaching 64 KB into B's
+                                                 lowest block, release it at once (pool records live apart from the
+                                                 memory, nothing is written there): the guard must say 0x0BAD00A0 */
+        u32 at = pool_a_top(), lo = pool_b_low();
+        if (lo > at) { u8 *t = allocA(lo - at + 0x10000, pm_model, 9); if (t) freeA(t); }
+    }
+#endif
     joe_seed_frame();                         /* joetv.c: the save's own $JOE market seed (first day of a new game) */
     free_orphans();                           /* our archives a scene change left behind */
     if (++S.sweep >= 60) { S.sweep = 0; dup_sweep(); }   /* every second: the game reloads 37's model after menus */

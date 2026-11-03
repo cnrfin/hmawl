@@ -3381,3 +3381,9 @@ so, door fades are timed there, possibly per frame. Not traced yet.
   overlaps, signalled, b_low, b_low_min, b_low_min_lr, pool, p, size, lr, lr2, other_p, other_size, frame}; the
   first one reads 0x0BAD00A0 (A over B) / 0x0BAD00B0 (B over A): Dolphin's invalid-read box names it. Detection
   only (no memory to give back at that point). pm.bin now ends 0x8037693C (arena 0x80377000: 1.7 KB left).
+- memfix 19 dumps: 941a25d8 (m19t) MGRD n_a 69,443 / n_b 17,043, overlaps 0, B lowest ever 0x80959580 (470 KB above
+  the chapter archive's end 0x808E3D80; lowest-B caller 0x800FD0E8); MEMG gap min 237 KB (a building's REL loaded).
+  7eb2f3b2 (GUARD_TEST: Joe in pool B): overlaps 0, B lowest 0x809585C0 too: without the 256 KB spacer (gone in
+  memfix 18) Joe's archives fit in B's holes, so the spacer was the main reason B reached into the REL area.
+  GUARD_TEST now instead asks pool A, 600 frames in, for a block reaching 64 KB into B's lowest block and frees it
+  at once (records only): must give 0x0BAD00A0.
