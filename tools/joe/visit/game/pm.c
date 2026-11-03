@@ -266,16 +266,12 @@ static void orphan(u8 *p)
 struct dupdbg dup_dbg;   /* debug ('DUPS'): sweeps run, duplicates seen, kept (referenced), freed, where the last reference was */
 static u32 ref_at;
 static s32 referenced(u8 *p)
-{
+{   /* Owners only: the game's static character/animation tables (model entries 0x802EB4D4, animation sets
+       0x802EA714, actor tables) and our own data. A whole-RAM scan kept every copy (memfix 8/9: 121 of 121
+       "referenced"): while it runs, interrupts and callbacks leave the scanned pointer on stacks and in SDK
+       data (0x803188B4, 0x80317FB0), and the dumps show nothing else points at the old copies. */
     u32 *w;
-    for (w = (u32 *)0x80003100; w < (u32 *)0x81800000; w++) {
-        if ((u32)w == 0x802FC8C4u) w = (u32 *)0x803154FC;       /* the two pools' record arrays (A 0x80 x 0x18, B 0x1000 x 0x18) */
-        if ((u32)w == 0x8035EFA0u) w = (u32 *)0x80377000;
-        if ((u32)w == 0x80318700u) w = (u32 *)0x80318900;       /* SDK VI/driver data (render mode, XFB, request table 0x803188A0): it
-                                                                   holds a scanned pointer for a moment (memfix8: every copy "referenced"
-                                                                   from 0x803188B4, zero in the dumps), never an owner */
-        if (*w == (u32)p) { ref_at = (u32)w; return 1; }
-    }
+    for (w = (u32 *)0x802E0000; w < (u32 *)0x802F0000; w++) if (*w == (u32)p) { ref_at = (u32)w; return 1; }
     return 0;
 }
 static void free_orphans(void)

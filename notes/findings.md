@@ -3305,3 +3305,7 @@ so, door fades are timed there, possibly per frame. Not traced yet.
   duplicated (only pair besides: the two 560 KB VI framebuffers, vanilla). 58 / 142 candidates all "referenced",
   last from 0x803188B4: SDK driver data (0x80318838 render mode, 0x80318868 XFB, 0x803188A0 12-byte request table),
   zero in the dumps, so a transient copy of the scanned pointer. memfix 9: referenced() skips 0x80318700-0x80318900.
+- memfix 9 dump 483b2b7c: still 9 old copies, 121/121 candidates "referenced", last from 0x80317FB0 (a stack).
+  In the dump the old copies are referenced only by pool-B block records (the next block's top); the live one by
+  model entry 37 (+0/+0x1C/+0x24) and pm.bin. Whole-RAM scans see the scanned pointer left on stacks/SDK data by
+  interrupts. memfix 10: referenced() checks only the game's static tables 0x802E0000-0x802F0000 (owners).
