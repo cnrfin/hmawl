@@ -448,6 +448,9 @@ static float weapon_reach(s32 item)
     switch (item) { case 0x4E3: return 1.4f; case 0x4E4: return 1.5f; case 0x4EA: return 1.6f; case 0x4EB: return 2.1f; }
     return 1.4f;
 }
+/* Impacts only on enemies. There are none yet (villagers / Joe can be locked onto but are never hit), so this is 0
+   until enemies exist; then it checks the target's type. */
+static s32 target_is_enemy(void *t) { (void)t; return 0; }
 static void swing_sounds(float f0, float f1)
 {
     s32 h = SW.hit;
@@ -455,7 +458,7 @@ static void swing_sounds(float f0, float f1)
         sfx_play(*(u8 **)0x803491E4, h == 2 ? SE_SWING_H : SE_SWING_L, 0);
         sfx_play(*(u8 **)0x803491E4, SE_VOICE1 + h, 0);
     }
-    if (f0 < sw_strike[h] && f1 >= sw_strike[h] && Z.target && sw_g) {
+    if (f0 < sw_strike[h] && f1 >= sw_strike[h] && Z.target && sw_g && target_is_enemy((void *)Z.target)) {
         float *p = SLOT_POS(sw_g, 0), dx = Z.tx - p[0], dz = Z.tz - p[2], r = weapon_reach(sw_item) + 0.4f;
         if (dx * dx + dz * dz < r * r && dx * Z.fx + dz * Z.fz > 0.0f) {
             sfx_play(*(u8 **)0x803491E4, h == 2 ? SE_HIT_H : SE_HIT_L, 0); sw_dbg.n++;
