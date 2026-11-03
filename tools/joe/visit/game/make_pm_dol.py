@@ -61,7 +61,7 @@ HOOK21 = 0x800136D8                                   # new game: bl func_8004FD
 HOOK21_OFF = 0x27C                                    # pm_newgame_stub
 HOOK22 = 0x800332C0                                   # tool state 0x79 impact, after the 0x1C send (area tools)
 HOOK22_OFF = 0x2B0                                    # pm_impact_stub
-PREV = {0x80113894: (0x4824B8F1,), 0x80060EF8: (0x482FE260,), 0x801B0EE4: (0x3C608036,), 0x801B0EE8: (0x38636000,), 0x801B0F2C: (0x38636000,)}   # earlier builds' words (update mode)
+PREV = {0x8028DDE4: (0x02206E10,), 0x8028DE08: (0x02206F11,), 0x80113894: (0x4824B8F1,), 0x80060EF8: (0x482FE260,), 0x801B0EE4: (0x3C608036,), 0x801B0EE8: (0x38636000,), 0x801B0F2C: (0x38636000,)}   # earlier builds' words (update mode)
 PATCHES = [  # (RAM address, original word, new word, why)
     (0x801B0EE4, 0x80630030, 0x3C608037, 'OSInit: arena low = 0x8036A000 (was BootInfo->arenaLo or __ArenaLo) ...'),
     (0x801B0EE8, 0x28030000, 0x3863A000, '... - 0x6000'),
@@ -117,9 +117,11 @@ PATCHES = [  # (RAM address, original word, new word, why)
     (0x8029806C, 0x80012548, 0x80012564, 'func_800124FC: 4E4 maps to itself (was Light Hoe)'),
     (0x80298084, 0x80012530, 0x80012564, 'func_800124FC: 4EA maps to itself (was Sickle)'),
     (0x80298088, 0x80012538, 0x80012564, 'func_800124FC: 4EB maps to itself (was Light Sickle)'),
-    (0x8028DDE4, 0x01206E10, 0x02206E10, 'item 4E3 Stick: category 2 (sickle-type)'),
+    (0x8028DDE4, 0x01206E10, 0x0220C41B, 'item 4E3 Stick: category 2 (sickle-type), models symbol 196 / real 27 (weapons phase 2)'),
     (0x8028DE00, 0x00006001, 0x0000A001, 'item 4E3 Stick: sickle flags'),
-    (0x8028DE08, 0x01206F11, 0x02206F11, 'item 4E4 Wooden Sword: category 2'),
+    (0x8028DE08, 0x01206F11, 0x0220C51C, 'item 4E4 Wooden Sword: category 2, models symbol 197 / real 28'),
+    (0x8028DEE0, 0x02206108, 0x0220C61D, "item 4EA Farmer's Sword: models symbol 198 / real 29"),
+    (0x8028DF04, 0x02204609, 0x0220C71E, 'item 4EB H.M Murasama: models symbol 199 / real 30'),
     (0x8028DE24, 0x00006001, 0x0000A001, 'item 4E4 Wooden Sword: sickle flags'),
     (0x8028DEEC, 0x003C0000, 0x012C0000, "item 4EA Farmer's Sword: price 300 (3000 G)"),
     (0x802A7874, 0x8004D210, 0x8004D26C, 'usage counter (func_8004D1EC): 4E3 sickle case'),

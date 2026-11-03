@@ -15,3 +15,14 @@ sickle-type (category 2, flags 0xA001), moves their usage counters off the hoes'
 descriptions (itemdoc03.mes) on the disc's own files.
 Next: phase 2 models (commonall.arc real.gpl / symbol.gpl), phase 3 ledger (10-entry list, first 8 unowned shown,
 swords delivered to the tool-shed cupboard: game+0x14D0 vtable +0x30, like the new game's Tomato Seed B).
+
+## Phase 2: models (weapons test 2)
+- weapon_models.py: procedural meshes in real.gpl units (1/64, grip at 0, handle +y, edge +z) and swatch textures:
+  Stick (plain octagonal handle), Wooden Sword (Kokiri-style practice sword), Farmer's Sword (iron guard + pommel,
+  leather grip, steel blade with fuller), H.M Murasama (H.F. Murasama look: slightly curved katana, red edge, gold
+  habaki, black round tsuba, red/black diamond-wrapped tsuka). enc_cmpr: CMPR encoder (inverse of tpltool.decode).
+- pack_weapons.py commonall.arc.clz OUT: real.gpl models 27-30 and symbol.gpl 196-199 (4 table entries = 0x20, so
+  all models keep their 0x20 alignment), textures redrawn in place in real.tpl 0x1F/0x20/0x1C/0x1D and symbol.tpl
+  0xDB/0xDC/0xD8/0xD9 (only the old duplicate ids used them). Base 5d7ab970 -> cdc4172d (+9.6 KB unpacked).
+- make_pm_dol.py: item rows 4E3/4E4/4EA/4EB bytes +2 / +3 -> the new models.
+- preview.py (scratchpad renderer): front / 3/4 / side previews with the decoded CMPR textures.
