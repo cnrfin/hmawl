@@ -3222,3 +3222,17 @@ so, door fades are timed there, possibly per frame. Not traced yet.
   lbl_10000074 tpl pointer), but the freed copy keeps a valid header, so a later channel 3 copied 4 x 13.8 KB of
   picture into reused memory. Fix: no cache; a tpl counts only if a word holds its address with a live handle
   0x24 before it (the wlp2 bss pair; seen at 0x809C0574 in 7 house dumps, none outside).
+
+### 7.42 Session dump dca3cabd (enemy 1d, NO_TVPIC): $JOE seed counts up; the crash is a runaway recursion
+- $JOE: the seed log showed counters 52 / 53 going ..64D0, D1, D2, D3 on days 1-4: they are count-up counters (+1
+  every new day), so each day's "since yesterday" compared two markets. Fix (enemy 1e): the seed is kept in the top
+  halves (52 high 16 bits, 53 low 16 bits); the daily +1 only reaches the low halves. Existing seeds stay readable.
+- Crash with the TV picture copy OFF (so not the TV): "Invalid write to 0xBCD1D7B9, PC 0x80144348". 0x800020C4-
+  0x8046D84C is covered by 0x30-byte stack frames of func_8019D534 (return 0x8019D700): it walks a node tree
+  (+0x10 first child, +0x8 next sibling) and recursed forever on a node whose links point at itself.
+- Outer frames (still intact above 0x8035CE0C): player state lbl_800343EC (take the held item out: held_attach
+  func_8007C934, then motion 0x48 / 0x35 with item 4EB = H.M Murasama, row 0x8028DF04) -> func_8007C0C0 ->
+  func_8017DB28 -> sub-clip r31 = (desc word1 >> 11) & 0x7F = 6 from the player's sub-anim arc (*0x802EA718,
+  0x808326E0 in a healthy dump) -> func_80199F5C returned 0x808326DF (= the arc - 1: the file lookup failed) ->
+  func_8019CD50 / func_8019D330 instanced it -> the recursion. So at that moment the sub-anim archive's entry 6
+  was gone or corrupt. Lag in the field built up before it (the user: extreme lag, gone indoors).

@@ -22,17 +22,20 @@ typedef unsigned char u8;
    0 = an older save: it keeps the 1890 market it already had. */
 #define GAME        (*(u8 **)0x803491CC)
 #define SEED_CNT(g) (*(u32 *)((g) + 0x12194 + 4 * 52))
+#define SEED_BAK(g) (*(u32 *)((g) + 0x12194 + 4 * 53))   /* a mirror: counter 53, also unused */
 #define game_rand   F(0x8017D3E8, s32, (void))
+/* Counters 52 and 53 are "count up" counters: the game adds 1 to each every new day (user dump: the seed went
+   ..D0, ..D1, ..D2, ..D3 on days 1-4, so every day's "since yesterday" compared two different markets). So the
+   seed lives in their top halves (52: high 16 bits, 53: low 16 bits of the seed); the daily +1 only touches the
+   low halves (65536 days to reach the top). */
+#define HI(v) ((v) & 0xFFFF0000u)
+static u32 seed_of(u8 *g) { return HI(SEED_CNT(g)) | (SEED_BAK(g) >> 16); }
 static u32 mseed(void)
 {
-    u8 *g = GAME; u32 v;
-    if ((u32)g < 0x80000000u || (u32)g >= 0x81800000u) return SEED;
-    v = SEED_CNT(g); return v ? v : SEED;
+    u8 *g = GAME;
+    if ((u32)g < 0x80000000u || (u32)g >= 0x81800000u || !HI(SEED_CNT(g))) return SEED;
+    return seed_of(g);
 }
-/* The seed is picked once per new game. Something can clear counter 52 again on day 1 (user test: day 1 showed
-   37 G, then the seed changed and day 2 read -42 % from a different day 1), so the session keeps its own copy and
-   puts it back; joe_seed_newgame (toolfix.c, at the new game's setup) forgets it. */
-#define SEED_BAK(g) (*(u32 *)((g) + 0x12194 + 4 * 53))   /* a mirror: counter 53, also unused */
 static u32 seed_keep;
 /* debug ring for RAM dumps (magic 'JSED'): every time counter 52 / 53 was found changed: clock, 52, 53, what we did */
 struct { u32 magic, n, last52, last53; struct { u32 clock, c52, c53, act; } e[16]; } joe_seed_log;
@@ -50,20 +53,18 @@ void joe_seed_newgame(void)
 }
 void joe_seed_frame(void)
 {
-    u8 *g = GAME; u32 tb, v, b;
+    u8 *g = GAME; u32 tb, v;
     if ((u32)g < 0x80000000u || (u32)g >= 0x81800000u || !*(u32 **)0x80349218) return;
-    v = SEED_CNT(g); b = SEED_BAK(g);
-    if (v != joe_seed_log.last52 || b != joe_seed_log.last53) slog(g, 0);   /* something changed them */
-    if (v && v == b) seed_keep = v;                                      /* normal */
-    else if (v && !b) { SEED_BAK(g) = v; seed_keep = v; slog(g, 1); }      /* a save from before the mirror */
-    else if (b && v != b) { SEED_CNT(g) = b; seed_keep = b; slog(g, 2); }  /* 52 lost or overwritten: restore */
-    else if (CLOCK / T_DAY == 0) {                                       /* both 0 on day 1: a new game */
+    if (SEED_CNT(g) != joe_seed_log.last52 || SEED_BAK(g) != joe_seed_log.last53) slog(g, 0);   /* changed (daily +1 too) */
+    if (HI(SEED_CNT(g))) seed_keep = seed_of(g);                     /* this save has its seed */
+    else if (CLOCK / T_DAY == 0) {                                   /* a new game, day 1 */
         if (!seed_keep) {
             __asm__ volatile ("mftb %0" : "=r"(tb));
             v = (tb * 0x9E3779B1u) ^ ((u32)game_rand() << 16) ^ (u32)game_rand();
-            seed_keep = v ? v : 1u; slog(g, 3);
-        } else slog(g, 4);
-        SEED_CNT(g) = SEED_BAK(g) = seed_keep;
+            if (!HI(v)) v |= 0x10000u;                               /* the top half marks "set" */
+            seed_keep = v; slog(g, 3);
+        } else slog(g, 4);                                           /* cleared again on day 1: put it back */
+        SEED_CNT(g) = HI(seed_keep); SEED_BAK(g) = seed_keep << 16;
     }
     joe_seed_log.last52 = SEED_CNT(g); joe_seed_log.last53 = SEED_BAK(g);
 }
