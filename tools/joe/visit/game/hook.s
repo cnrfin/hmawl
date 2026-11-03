@@ -342,10 +342,27 @@ pm_new_stub:
     lwz   r4, 0xc(r1)
     lwz   r5, 0x10(r1)
     addi  r1, r1, 0x20
-1:  stwu  r1, -0x20(r1)             # the replaced instruction
-    b     new_return                # 0x80178E8C
+1:  stwu  r1, -0x20(r1)             # normal path: the original operator new, then the pool guard (mg_after)
+    mflr  r0
+    stw   r0, 0x24(r1)
+    stw   r3, 0x8(r1)
+    bl    new_orig
+    stw   r3, 0x14(r1)
+    mr    r4, r3
+    lis   r3, 0x8031
+    ori   r3, r3, 0x5508            # pool B
+    lwz   r5, 0x8(r1)
+    lwz   r6, 0x24(r1)
+    li    r7, 0
+    bl    mg_after
+    lwz   r3, 0x14(r1)
+    lwz   r0, 0x24(r1)
+    mtlr  r0
 2:  addi  r1, r1, 0x20
     blr
+new_orig:
+    stwu  r1, -0x20(r1)             # the replaced instruction
+    b     new_return                # 0x80178E8C
 
 # operator delete (0x80179168 entry, stwu r1,-0x20(r1)) -> pm_del_stub: our pool-A blocks go back to pool A.
     .globl pm_del_stub
@@ -365,3 +382,32 @@ pm_del_stub:
     bnelr
 1:  stwu  r1, -0x20(r1)             # the replaced instruction
     b     del_return                # 0x8017916C
+
+# Pool allocation func_80178A44(pool, size, file, line) (entry stwu r1,-0x30(r1)): every pool-A allocation and the
+# pool-B ones that do not go through operator new. After it, mg_after (pm.c) checks the new block against the
+# other pool's used blocks (memfix 19 pool guard).
+    .globl pm_pool_stub
+pm_pool_stub:
+    stwu  r1, -0x20(r1)
+    mflr  r0
+    stw   r0, 0x24(r1)
+    stw   r3, 0x8(r1)
+    stw   r4, 0xc(r1)
+    lwz   r0, 0x34(r1)              # the wrapper's caller (wrappers keep LR at +0x14 of a 0x10 frame)
+    stw   r0, 0x10(r1)
+    bl    pool_orig
+    stw   r3, 0x14(r1)
+    mr    r4, r3
+    lwz   r3, 0x8(r1)
+    lwz   r5, 0xc(r1)
+    lwz   r6, 0x24(r1)
+    lwz   r7, 0x10(r1)
+    bl    mg_after
+    lwz   r3, 0x14(r1)
+    lwz   r0, 0x24(r1)
+    mtlr  r0
+    addi  r1, r1, 0x20
+    blr
+pool_orig:
+    stwu  r1, -0x30(r1)             # the replaced instruction
+    b     pool_return               # 0x80178A48

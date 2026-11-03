@@ -3373,3 +3373,11 @@ so, door fades are timed there, possibly per frame. Not traced yet.
   setup_model, actor_ctor in spawn) a request >= 64 KB goes to allocA if it ends >= 64 KB below B's lowest block
   (else B as before); pm_del_a frees only blocks we put in A (8-entry list). No 256 KB spacer any more. A model
   copy replaced by slot_setup is freed at once. make_pm_dol.py must be the new one (two more patch sites).
+- memfix 18: user: "silky smooth, no breaks".
+- memfix 19 pool guard: HOOK27 func_80178A44 (pool alloc, every pool-A allocation and pool-B ones outside op_new)
+  -> pm_pool_stub (+0x3D4), and op_new's normal path (pm_new_stub) now calls mg_after too. mg_after checks the new
+  block against the other pool's USED blocks (B check: A's few records; A check: B's ~1600 only when the block
+  reaches below a cached B bottom, refreshed by MEMG every 4 frames). Overlap -> 'MGRD' record {magic, n_a, n_b,
+  overlaps, signalled, b_low, b_low_min, b_low_min_lr, pool, p, size, lr, lr2, other_p, other_size, frame}; the
+  first one reads 0x0BAD00A0 (A over B) / 0x0BAD00B0 (B over A): Dolphin's invalid-read box names it. Detection
+  only (no memory to give back at that point). pm.bin now ends 0x8037693C (arena 0x80377000: 1.7 KB left).

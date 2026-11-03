@@ -22,6 +22,7 @@ impact_return = 0x800332C4;
 arcanim_return = 0x801A0A8C;
 new_return = 0x80178E8C;
 del_return = 0x8017916C;
+pool_return = 0x80178A48;
 SECTIONS {
   . = 0x8035EFA0;
   .pm : { *(.text.hook) *(.text*) *(.rodata*) *(.sdata*) *(.data*) *(.sbss*) *(.bss*) }

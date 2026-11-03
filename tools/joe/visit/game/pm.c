@@ -210,6 +210,43 @@ static void place(float s, s32 back)
    are hooked (pm_new_stub / pm_del_stub in hook.s): while joe_to_a is set, a request of 64 KB or more goes to
    pool A if it ends at least 64 KB below B's lowest block; otherwise to B as before. */
 s32 joe_to_a;
+/* Pool guard (memfix 19, 'MGRD'): after every allocation the new block is checked against the other pool's used
+   blocks. An overlap is the corruption behind the T-poses / garbled textures / crashes; it is recorded here and the
+   first one makes Dolphin say "Invalid read from 0x0bad00a0" (a pool-A block over pool B, e.g. an area module) or
+   "0x0bad00b0" (a pool-B block over pool A). Ignore it and play on; a RAM dump then shows who (lr = caller). */
+struct { u32 magic, n_a, n_b, overlaps, signalled, b_low, b_low_min, b_low_min_lr;
+         u32 pool, p, size, lr, lr2, other_p, other_size, frame; } mg;
+static u32 mg_frames;
+void mg_after(u32 pool, u8 *p, u32 size, u32 lr, u32 lr2)
+{
+    u8 *r; s32 k; u32 lo = (u32)p, hi;
+    if (!p) return;
+    mg.magic = 0x4D475244u;
+    hi = lo + ((size + 0x1F) & ~0x1Fu);
+    if (pool == 0x80315508u) {
+        mg.n_b++;
+        if (!mg.b_low || lo < mg.b_low) mg.b_low = lo;
+        if (!mg.b_low_min || lo < mg.b_low_min) { mg.b_low_min = lo; mg.b_low_min_lr = lr2 ? lr2 : lr; }
+        for (r = *(u8 **)(0x802FD4D0 + 0x10), k = 0; r && k < 300; r = *(u8 **)(r + 8), k++) {
+            u32 a = *(u32 *)r, e = a + *(u32 *)(r + 4);
+            if (*(u32 *)(r + 0xC) == 2 && lo < e && a < hi) { r = (u8 *)a; size = e - a; goto hit; }
+        }
+        return;
+    }
+    if (pool != 0x802FD4D0u) return;
+    mg.n_a++;
+    if (mg.b_low && hi <= mg.b_low) return;             /* below B's lowest block (cached): fine */
+    for (r = *(u8 **)(0x80315508 + 0x10), k = 0; r && k < 6000; r = *(u8 **)(r + 8), k++) {
+        u32 e = *(u32 *)r, a = e - *(u32 *)(r + 4);
+        if (*(u32 *)(r + 0xC) == 2 && lo < e && a < hi) { r = (u8 *)a; size = e - a; goto hit; }
+    }
+    return;
+hit:
+    mg.overlaps++;
+    mg.pool = pool; mg.p = lo; mg.size = hi - lo; mg.lr = lr; mg.lr2 = lr2; mg.other_p = (u32)r; mg.other_size = size;
+    mg.frame = mg_frames;
+    if (!mg.signalled) { mg.signalled = 1; (void)*(volatile u32 *)(pool == 0x802FD4D0u ? 0x0BAD00A0u : 0x0BAD00B0u); }
+}
 static u8 *a_blk[8]; static u32 a_len[8];
 #define allocA  F(0x8017860C, void *, (u32, const char *, s32))
 #define freeA   F(0x80178660, void, (void *))
@@ -843,6 +880,7 @@ static void mem_gauge(void)
     for (r = *(u8 **)(0x80315508 + 0x10), k = 0; r && k < 6000; r = *(u8 **)(r + 8), k++)
         if (*(u32 *)(r + 0xC) == 2) { u32 lo = *(u32 *)r - *(u32 *)(r + 4); used += *(u32 *)(r + 4); if (lo < blow) blow = lo; }
     mem_g.magic = 0x4D454D47u; mem_g.a_top = atop; mem_g.b_low = blow; mem_g.b_used_kb = used >> 10;
+    mg.b_low = blow;                          /* the pool guard's cached B bottom, exact again */
     mem_g.gap = (s32)(blow - atop);
     if (mem_g.n <= 5 || mem_g.gap < mem_g.gap_min) { mem_g.gap_min = mem_g.gap; mem_g.clock_min = CLOCK; }
 }
@@ -904,6 +942,7 @@ void pm_frame(void)
     float s;
 
     if ((u32)g < 0x80000000u || (u32)g >= 0x81800000u || !*(u32 **)0x80349218) return;
+    mg_frames++;
     joe_seed_frame();                         /* joetv.c: the save's own $JOE market seed (first day of a new game) */
     free_orphans();                           /* our archives a scene change left behind */
     if (++S.sweep >= 60) { S.sweep = 0; dup_sweep(); }   /* every second: the game reloads 37's model after menus */

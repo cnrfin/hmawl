@@ -40,12 +40,14 @@ a session's temporary folder; the ones still only there are marked.
 | Player clips 126-131 served from pm.bin (weapons test 4): mainchapter archives back to vanilla size (fixes the chapter-block overflow behind the test 18 and weapons 3 crashes); arena start 0x80380000 | zt.c zt_arc_anim, clips.s, HOOK23 0x801A0A88, add_player_clips.py (strip) | tools/ztarget/NOTES.md |
 | Combo voice (weapons test 6): Toan's voice (user's Dark Cloud disc) with each swing, 440/441/442 = hits 1/2/3; 443 hurt, 444 dies in the bank for later; tired sound 304 replaced with toan_06 (test 7); lock on/off now vanilla 238/239; impact sounds only on enemy hits (test 7b); the day's wild animal is a Z target and the enemy (enemy test 1); hits 1/2 swing = vanilla 196 trimmed, as 445 (test 8) | zt.c swing_sounds (SE_VOICE1 + hit), SE_LOCK/SE_FREE | tools/sound/README.md (audio not committed) |
 | Breeze battle theme (v11, not in game yet): heroic arrangement at 184 bpm, 4-bar rise intro then a 32-bar loop from bar 5; flat level | tools/sound/battle/breeze_heroic.py | rendered with hmawl_music.sf2 |
+| Memory fixes (memfix 1-19): Joe's archives freed on every scene change (stale model-entry 37 / set-71 pointers cleared); Joe's model + animations loaded into pool A while he is in the valley (op_new / op_delete hooks); duplicate-copy sweep; pool guard: any pool A/B overlap is recorded ('MGRD') and the first shows in Dolphin as an invalid read from 0x0BAD00A0 (A over B) / 0x0BAD00B0 (B over A); memory gauge 'MEMG' every 4 frames | pm.c (joe_free_now, pm_new_a, pm_del_a, dup_sweep, mg_after, mem_gauge), hook.s (pm_new_stub, pm_del_stub, pm_pool_stub), HOOK25-27 | notes/findings.md 7.43 |
+| Chapter 1 slimmed: son's animations emptied, Grant / Kate / Samantha (chapter-2 newcomers) get 16 KB placeholder models (their animations / Grant's action tables kept: the load reads them) | tools/memory/strip_chapter.py --put, tools/goddess/scripts/build_stub.py (stubs only in the user's zip) | findings 7.43 |
 | Test keys (Z+B, Z+D-Up, Z+X, Z+D-Left/Right/Down, Z+Y) and debug blocks: removed in Joe test 16; HOOK11 probe unhooked | pm.c, logs.c, skill.c, make_pm_dol.py | visit/README.md test 16 |
 
 ## Data files
 | Feature | Files | Where |
 |---|---|---|
-| Joe model, 90 %, cigarette, bench clips, 1.2x walk, face 80 %, talk / sitting talk / pocket clips | gd/gd_0.arc, gd/gd_0.anm.arc | tools/joe/build/test8 (+ test9: mouth frames RGB5A3, soft edges; test10: face 90 %) |
+| Joe model, 90 %, cigarette, bench clips, 1.2x walk, face 80 %, talk / sitting talk / pocket clips | gd/gd_0.arc, gd/gd_0.anm.arc | tools/joe/build/test8 (+ test9: mouth frames RGB5A3, soft edges; test10: face 90 %; test11: textures at half size, 387 -> 156 KB) |
 | Joe's lines (mukumuku.mes 38+), people.mes 35 = "Joe" | mukumuku.mes, people.mes | tools/joe/visit/data |
 | Trade/talk events 408/409, bench 407 (no cmd_10) | Common.arc | tools/joe/visit/data |
 | Villager paths: dig-site bridge, bench spot | PathData.arc | tools/paths |
