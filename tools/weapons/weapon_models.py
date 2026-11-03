@@ -45,6 +45,17 @@ class Mesh:
             cx = sum(p[0] for p in r) / len(r); cz = sum(p[1] for p in r) / len(r)
             if len(set((round(p[0]), round(p[1])) for p in r)) < 3: continue
             s.face([(p[0], y, p[1]) for p in r], [(p[2], v) for p in r], (cx, y - d * 5, cz))
+    def guard_z(s, zs, ybot, hgt, hx, uv):
+        """a bar along z: box section (x +-hx, y ybot(z) .. +hgt) at each z, ends capped"""
+        secs = [[(-hx, ybot(z), z), (hx, ybot(z), z), (hx, ybot(z) + hgt, z), (-hx, ybot(z) + hgt, z)] for z in zs]
+        us = [uv[0], uv[1], uv[1], uv[0]]
+        for i in range(len(secs) - 1):
+            A, B = secs[i], secs[i + 1]; va, vb = i / (len(secs) - 1), (i + 1) / (len(secs) - 1)
+            c = (0, (A[0][1] + B[0][1]) / 2 + hgt / 2, (A[0][2] + B[0][2]) / 2)        # local centre of this piece
+            for e in range(4):
+                s.face([A[e], A[(e + 1) % 4], B[(e + 1) % 4], B[e]], [(us[e], va), (us[(e + 1) % 4], va), (us[(e + 1) % 4], vb), (us[e], vb)], c)
+        for S_, d in ((secs[0], -1), (secs[-1], 1)):
+            s.face(S_, [(u, 0.5) for u in us], (0, S_[0][1] + hgt / 2, S_[0][2] - d * 4))
     def gpl(s, tex, like, base, tail=b'real.tpl\0\0\0\0'):
         tris = [f for f in s.faces if len(f) == 3]; quads = [f for f in s.faces if len(f) == 4]; ng = [f for f in s.faces if len(f) > 4]
         prims = []
@@ -83,50 +94,75 @@ def farmers_sword():
     m = Mesh(); IRON = (0.55, 0.7); LEA = (0.78, 0.97)
     m.loft([(-13, ring(6, 3.3, 3.3, *IRON), 0.5), (-10, ring(6, 3.6, 3.6, *IRON), 0.5), (-8, ring(6, 2.6, 2.6, *IRON), 0.5)])   # pommel
     g = ring(8, 2.3, 2.3, *LEA); m.loft([(-8, g, 0.2), (7, g, 0.8)])                    # leather grip
-    gd = [(-2.8, -10, 0.55), (2.8, -10, 0.7), (2.8, 10, 0.7), (-2.8, 10, 0.55)]
-    m.loft([(7, gd, 0.3), (10, gd, 0.7)])                                             # iron crossguard
+    m.guard_z([z for z in range(-12, 13, 3)], lambda z: 7 + 0.028 * z * z, 3.0, 2.8, IRON)   # iron crossguard, ends curving up
     sec = lambda w, t: blade_ring(t, w, w, 0.03, 0.25, 0.47)
     m.loft([(10, sec(4.4, 1.2), 0.5), (55, sec(4.0, 1.1), 0.5), (62, sec(2.2, 0.8), 0.5), (66, sec(0.3, 0.3), 0.5)])
     return m
 def murasama():
-    """H.F. Murasama look: long slightly curved katana, steel blade with a red edge, gold habaki, black round
-    tsuba, long red-and-black wrapped tsuka with a black kashira.
-    texture 32x16: u 0-0.5 blade (spine 0 .. red edge 0.5), 0.5-0.625 gold, 0.625-0.75 black, 0.75-1 wrap"""
-    m = Mesh(); BLK = (0.66, 0.72); WRAP = (0.77, 0.98)
-    m.loft([(-20, ring(8, 2.3, 2.6, *BLK), 0.5), (-17, ring(8, 2.3, 2.6, *BLK), 0.5)])                # kashira
-    w = ring(8, 2.0, 2.4, *WRAP); m.loft([(-17, w, 0.0), (5, w, 1.0)])                                    # tsuka
-    m.loft([(5, ring(12, 6.0, 6.0, *BLK), 0.5), (7, ring(12, 6.0, 6.0, *BLK), 0.5)])                     # tsuba
-    m.loft([(7, ring(6, 1.6, 3.4, 0.52, 0.6), 0.5), (10, ring(6, 1.5, 3.2, 0.52, 0.6), 0.5)])              # habaki
-    curve = lambda y: -0.0006 * (y - 10) ** 2
+    """H.F. Murasama look, Masamune proportions: a long thin katana with a gentle even curve, all-red blade with a
+    pink hamon (texture), black square tsuba, black habaki, black tsuka with grey segments, black kashira.
+    texture 64x64: u 0-0.5 blade (spine 0 .. edge 0.5), v along the blade; 0.5-0.75 black metal; 0.75-1 tsuka"""
+    m = Mesh(); BLK = (0.55, 0.7); TS = (0.77, 0.98)
+    m.loft([(-24, ring(8, 2.1, 2.5, *BLK), 0.5), (-21, ring(8, 2.3, 2.7, *BLK), 0.5)])               # kashira
+    w = ring(8, 2.0, 2.4, *TS); m.loft([(-21, w, 0.0), (5, w, 1.0)])                                   # tsuka
+    sq = [(-5.2, -5.2, 0.55), (5.2, -5.2, 0.7), (5.2, 5.2, 0.55), (-5.2, 5.2, 0.7)]
+    m.loft([(5, sq, 0.3), (7, sq, 0.7)])                                                              # square tsuba
+    m.loft([(7, ring(6, 1.3, 2.4, *BLK), 0.5), (9.5, ring(6, 1.2, 2.2, *BLK), 0.5)])                  # habaki
+    curve = lambda y: -0.00075 * (y - 9.5) ** 2                                                         # toward the spine
     secs = []
-    for y in (10, 25, 40, 55, 66, 72):
-        f = 1 - max(0, y - 64) / 8 * 0.9
-        secs.append((y, blade_ring(1.1 * f + 0.15, 3.2 * f, 1.3 * f, 0.02, 0.22, 0.49, curve(y)), 0.5))
-    secs.append((75, blade_ring(0.15, 0.3, 0.2, 0.02, 0.22, 0.49, curve(75) - 1.5), 0.5))
+    for y in (9.5, 30, 50, 70, 90, 104, 112):
+        secs.append((y, blade_ring(0.9, 2.6, 1.5, 0.03, 0.24, 0.48, curve(y)), (y - 9.5) / 108))
+    secs.append((116, blade_ring(0.6, 1.4, 1.4, 0.03, 0.24, 0.48, curve(116)), 0.98))              # kissaki: edge sweeps
+    secs.append((118.5, blade_ring(0.15, 0.2, 0.2, 0.03, 0.24, 0.48, curve(118.5) - 0.6), 1.0))      # up to the point
     m.loft(secs)
     return m
 
-def texture(name, w, h):
+TEX_SIZE = {'stick': (32, 64), 'wood': (32, 64), 'farmer': (64, 64), 'murasama': (64, 64)}   # (w, h)
+def texture(name, w=None, h=None):
+    """UV layout in fractions (u across / v along), so any size works"""
+    w, h = (w, h) if w else TEX_SIZE[name]
+    rng = np.random.RandomState(7)
+    yy, xx = np.mgrid[0:h, 0:w]; U = (xx + 0.5) / w; V = (yy + 0.5) / h
+    noise = rng.uniform(-1, 1, (h, w))
     t = np.zeros((h, w, 3), float)
-    yy, xx = np.mgrid[0:h, 0:w]
+    def put(mask, rgb): t[mask] = rgb if np.ndim(rgb) == 1 or len(np.shape(rgb)) == 1 else rgb[mask]
+    def wood(base, scale=1.0):
+        grain = np.sin(U * 40 * scale + np.sin(V * 9) * 2.2) * 0.5 + 0.5
+        return np.array(base)[None, None] * (0.86 + 0.16 * grain[..., None]) + noise[..., None] * 5
     if name == 'stick':
-        t[:] = (150, 104, 62); t += ((np.sin(yy * 1.3 + xx * 0.2) * 10)[..., None]) ; t[:, ::5] *= 0.92
+        t[:] = wood((150, 104, 62), 0.6)
     elif name == 'wood':
-        t[:h // 2] = (214, 172, 112); t[:h // 2] += (np.sin(yy[:h // 2] * 0.9) * 8)[..., None]       # light wood blade
-        t[h // 2:3 * h // 4] = (150, 100, 58)                                                    # guard
-        wrap = ((xx + yy) // 3) % 2; t[3 * h // 4:] = np.where(wrap[3 * h // 4:, :, None], (120, 80, 48), (205, 180, 140))
+        t[:] = wood((214, 172, 112))
+        edge = (np.abs(U - 0.5) > 0.42) & (V < 0.5); t[edge] *= 1.06                      # worn blade edges
+        g = (V >= 0.5) & (V < 0.75); t[g] = wood((146, 98, 56))[g]                            # guard
+        wr = V >= 0.75; band = ((xx + yy * 0.8) / 5).astype(int) % 2
+        c = np.where(band[..., None], (112, 74, 44), (198, 172, 132)); sh = 0.8 + 0.2 * np.cos((U - 0.5) * 3)[..., None]
+        t[wr] = (c * sh)[wr]
     elif name == 'farmer':
-        bl = t[:, :w // 2]; u = xx[:, :w // 2] / (w // 2)
-        bl[:] = (178, 184, 192); bl[(u > 0.42) & (u < 0.6)] = (140, 146, 156); bl[u > 0.85] = (226, 230, 236)
-        t[:, w // 2:3 * w // 4] = (78, 80, 86)
-        lea = ((yy + xx) // 3) % 2; t[:, 3 * w // 4:] = np.where(lea[:, 3 * w // 4:, None], (104, 62, 30), (138, 86, 44))
+        bl = U < 0.5; k = U / 0.5                                                           # spine 0 .. edge 1
+        steel = 150 + 60 * np.clip(1 - np.abs(k - 0.5) * 1.6, 0, 1) + noise * 4 + np.sin(V * 90) * 2
+        steel = np.where((k > 0.42) & (k < 0.58), steel - 45, steel)                      # fuller
+        steel = np.where(k > 0.86, 236, steel)                                              # bevel highlight
+        t[bl] = np.stack([steel * 0.97, steel, steel * 1.04], -1)[bl]
+        ir = (U >= 0.5) & (U < 0.75); g = 70 + 18 * np.sin(V * 6) + noise * 5
+        t[ir] = np.stack([g, g * 1.02, g * 1.08], -1)[ir]
+        le = U >= 0.75; band = ((yy * 1.0 + xx * 0.6) / 4).astype(int) % 3
+        c = np.where(band[..., None] == 0, (70, 40, 20), (128, 78, 40)) * (0.85 + 0.15 * np.cos((U - 0.875) * 25))[..., None]
+        t[le] = c[le]
     elif name == 'murasama':
-        bl = t[:, :w // 2]; u = xx[:, :w // 2] / (w // 2)
-        bl[:] = (200, 204, 212); bl[u < 0.2] = (150, 152, 160); bl[u > 0.72] = (200, 30, 36)           # red edge
-        t[:, w // 2:5 * w // 8] = (214, 170, 60)                                                    # gold habaki
-        t[:, 5 * w // 8:3 * w // 4] = (22, 20, 22)                                                  # black tsuba / kashira
-        d = (((xx + yy) // 3) % 2) ^ (((xx - yy) // 3) % 2)
-        t[:, 3 * w // 4:] = np.where(d[:, 3 * w // 4:, None], (176, 18, 26), (26, 22, 24))            # red / black wrap
+        bl = U < 0.5; k = U / 0.5
+        hamon = 0.62 + 0.07 * np.sin(V * 38) + 0.03 * np.sin(V * 97 + 1)                 # wavy temper line
+        red = np.where((k < hamon)[..., None], np.array((196, 22, 38)), np.array((240, 120, 150)))
+        red = np.where((k < 0.16)[..., None], np.array((120, 10, 22)), red)              # dark spine
+        red = red * (0.92 + 0.08 * np.sin(V * 140))[..., None] + noise[..., None] * 6
+        line = np.abs(k - hamon) < 0.035; red[line] = (255, 170, 190)
+        t[bl] = red[bl]
+        bk = (U >= 0.5) & (U < 0.75); g = 26 + 10 * (np.abs(U - 0.625) < 0.02) + noise * 3
+        t[bk] = np.stack([g, g, g * 1.05], -1)[bk]
+        ts = U >= 0.75; seg = (V * 9) % 1
+        g = np.where((seg < 0.18), 120, 32) + noise * 4
+        g = np.where((np.abs(U - 0.875) < 0.03) & (seg > 0.4) & (seg < 0.6), 190, g)       # silver detail
+        t[ts] = np.stack([g, g, g * 1.06], -1)[ts]
     return np.clip(t, 0, 255).astype(np.uint8)
 
 def c565(rgb): r, g, b = [int(x) for x in rgb]; return (r >> 3) << 11 | (g >> 2) << 5 | (b >> 3)

@@ -26,3 +26,10 @@ swords delivered to the tool-shed cupboard: game+0x14D0 vtable +0x30, like the n
   0xDB/0xDC/0xD8/0xD9 (only the old duplicate ids used them). Base 5d7ab970 -> cdc4172d (+9.6 KB unpacked).
 - make_pm_dol.py: item rows 4E3/4E4/4EA/4EB bytes +2 / +3 -> the new models.
 - preview.py (scratchpad renderer): front / 3/4 / side previews with the decoded CMPR textures.
+
+## Weapons test 3 (user feedback on test 2)
+- H.M Murasama rebuilt with Masamune proportions: blade y 9.5..118.5 (1.7 units), gentle curve toward the spine,
+  all red with a pink wavy hamon, black square tsuba and habaki, black tsuka with grey segments.
+- Farmer's Sword: crossguard curving up at the ends (Mesh.guard_z).
+- Textures 32x64 (Stick, Wooden Sword) / 64x64 (swords), appended to real.tpl / symbol.tpl with the image headers
+  repointed (tpl_set). commonall 5d7ab970 -> 0a6ed437 (+23 KB unpacked). make_pm_dol.py as test 2.

@@ -4,7 +4,7 @@ usage: pack_weapons.py commonall.arc.clz OUT_commonall.arc.clz
 - real.gpl (in hand) gets models 27-30, symbol.gpl (rucksack / menus) models 196-199: 4 more table entries (8 bytes
   each = 0x20, so every model keeps its 0x20 alignment), the new models after the old ones, the names last.
 - real.tpl images 0x1F / 0x20 / 0x1C / 0x1D and symbol.tpl 0xDB / 0xDC / 0xD8 / 0xD9 (used only by the old duplicate
-  ids) are redrawn in place (same size and CMPR format).
+  ids): new 32x64 / 64x64 CMPR textures appended to the .tpl, those image headers pointed at them.
 - item rows: make_pm_dol.py points bytes +2 / +3 of 4E3 / 4E4 / 4EA / 4EB at the new models.
 Every other file in the archive is checked byte for byte."""
 import sys, os, struct, hashlib
@@ -47,10 +47,14 @@ def gpl_add(d, models, names, tail):
     assert bytes(out[tb + 8 * (cnt + len(models)):tb + 8 * (cnt + len(models)) + (names0 - tb - 8 * cnt)]) == d[tb + 8 * cnt:names0]
     return bytes(out)
 def tpl_set(d, idx, img):
-    t = [x for x in tpltool.read(d) if x['i'] == idx][0]
-    assert t['fmt'] == 14 and (t['h'], t['w']) == img.shape[:2], (idx, t)
-    data = W.enc_cmpr(img); assert len(data) == tpltool.size(14, t['w'], t['h'])
-    out = bytearray(d); out[t['data']:t['data'] + len(data)] = data; return bytes(out)
+    """same size: in place; bigger: appended (0x20-aligned) and the image header pointed at it with the new size,
+    as the $JOE coin's texture (the models' UVs are 0-1, so they scale)"""
+    t = [x for x in tpltool.read(d) if x['i'] == idx][0]; assert t['fmt'] == 14, (idx, t)
+    h, w = img.shape[:2]; data = W.enc_cmpr(img); assert len(data) == tpltool.size(14, w, h)
+    out = bytearray(d)
+    if (t['h'], t['w']) == (h, w): out[t['data']:t['data'] + len(data)] = data; return bytes(out)
+    out += bytes((-len(out)) % 0x20); o = len(out); out += data
+    struct.pack_into('>HHII', out, t['hdr'], h, w, 14, o); return bytes(out)
 def symbolize(m, like):
     """real -> symbol space, as make_axe_symbol.py: (x,y,z)_sym = (-y,-x,-z)*0.907 + (6.3,4.3,2.1), turned 90 deg
     about the handle so the blade lies flat to the menu camera; long ones scaled to the hoe icon's length"""
@@ -78,7 +82,7 @@ def main():
         tag = {0x4E3: 'stick', 0x4E4: 'ken_w', 0x4EA: 'ken_f', 0x4EB: 'ken_m'}[wid]; rn.append(tag); sn.append(tag)
     real2 = gpl_add(real, rm, rn, b''); sym2 = gpl_add(sym, sm, sn, b'')
     for wid, name, f, style, rt, st in W.WEAPONS:
-        w, h = (16, 32) if wid in (0x4E3, 0x4E4) else (32, 16); img = W.texture(style, w, h)
+        img = W.texture(style)
         rtpl = tpl_set(rtpl, rt, img); stpl = tpl_set(stpl, st, img)
     rep = {nm['real.gpl']: real2, nm['symbol.gpl']: sym2, nm['real.tpl']: rtpl, nm['symbol.tpl']: stpl}
     nu = u8arc.build(arc, rep); b = u8arc.read(nu); bn = u8arc.names(b)
