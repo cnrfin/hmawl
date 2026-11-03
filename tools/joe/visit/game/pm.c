@@ -199,6 +199,8 @@ static void place(float s, s32 back)
    them clear of it while they are loaded. */
 #define GUARD_SIZE 0x40000
 static void orphan(u8 *p);
+struct dupdbg { u32 magic, sweeps, cands, refd, freed, last_ref, spawns, reloads; };
+extern struct dupdbg dup_dbg;
 static void setup_model(void)
 {
     u8 *slot = char_slot(CHARMGR, CHAR_ID, 0);
@@ -253,7 +255,7 @@ static void orphan(u8 *p)
    and they used to stay for the rest of the session (user dumps: two copies of each with Joe around). Free
    one as soon as neither character 37's model entry nor any animation set points at it. */
 /* any word in RAM pointing at p, other than the pools' own block records (0x802FC000-0x80320000) and pm.bin */
-struct { u32 magic, sweeps, cands, refd, freed, last_ref; } dup_dbg;   /* debug ('DUPS'): sweeps run, duplicates seen, kept (referenced), freed, where the last reference was */
+struct dupdbg dup_dbg;   /* debug ('DUPS'): sweeps run, duplicates seen, kept (referenced), freed, where the last reference was */
 static u32 ref_at;
 static s32 referenced(u8 *p)
 {
@@ -345,11 +347,14 @@ static void spawn(void)
        freeing the copy already in the model entry: after every menu (the rucksack) Joe is made again and one
        more 377 KB copy stayed (9 copies in a user dump). With the slot torn down nothing draws the old copy,
        so free it first and let the constructor's load replace it. */
-    if (!slot[0xC] && MODEL37_ARC) { unload_model(CHAR_ID); S.own_model = 0; }
+    u8 *old = !slot[0xC] && MODEL37_ARC && *(u32 *)MODEL37_ARC == 0x55AA382Du ? MODEL37_ARC : 0;
+    if (old) { unload_model(CHAR_ID); S.own_model = 0; }   /* (only closes the handle: the memory stays) */
     a = op_new(0x2A8, pm_model, 1);
     if (!a) return;
     actor_ctor(a, 1, CHAR_ID);
     if (MODEL37_ARC) S.own_model = MODEL37_ARC;
+    dup_dbg.spawns++; if (old) dup_dbg.reloads++;
+    if (old && MODEL37_ARC != old) { op_delete(old); dup_dbg.freed++; }   /* the new copy replaced it: free the old one now */
     *(s32 *)(a + 0x64) = VALLEY;            /* map of the actor (read by the collider) */
     actor_add(ACTMGR, a + 0x70, 0xC000 + CHAR_ID);
     S.actor = a; S.talking = 0; S.motion = -1;

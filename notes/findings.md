@@ -3284,3 +3284,9 @@ so, door fades are timed there, possibly per frame. Not traced yet.
   without freeing the copy in the model entry; Joe's actor is made again after every menu. memfix 5: spawn()
   unloads the old model first when the slot is torn down; dup_sweep runs every 60 frames while Joe is loaded as a
   net; debug dup_dbg ('DUPS': sweeps, candidates, kept, freed, last reference address).
+- memfix 5 dumps joe3-5: copies 3 -> 5 -> 11 (one per rucksack close). dup_dbg: 37 sweeps, 13 candidates, all kept
+  as referenced (last reference 0x8031887C, a game static that held the copy at sweep time; 0 in the dumps).
+  unload_model (func_8002D3B4 -> func_8019A1CC) only closes the ARC handle: the memory stays. memfix 6: spawn()
+  remembers the old copy when slot 37 is torn down, lets the actor constructor load the new one, then
+  op_delete()s the old one at once; dup_dbg.spawns / reloads count respawns. (The file registry at 0x80318608
+  only lists the live copy.)
