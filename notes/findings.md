@@ -3323,3 +3323,5 @@ so, door fades are timed there, possibly per frame. Not traced yet.
 - Chapter 1 also carries Grant (gura), Kate (keit), Samantha (san), Dr. Hardy (pado; ch-1 anims already empty on
   the original disc), who move in in chapter 2 (body textures checked: villager_bodies.png). strip_chapter.py
   default now empties them too: 573 KB more (pool A 5.75 MB -> ~5.2 MB). Risk: the chapter 1 -> 2 transition.
+- Correction (user): Dr. Hardy (pado) is in the valley from the start (his ch-1 anims are pado_1.anm.arc, 16 KB).
+  Removed from the strip list: Grant / Kate / Samantha only, 414 KB.

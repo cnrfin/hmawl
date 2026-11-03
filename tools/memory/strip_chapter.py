@@ -3,9 +3,8 @@
 The chapter archive is unpacked whole into the bottom of the game's memory and kept for the whole chapter
 (pool A, findings 7.43); every byte removed from it widens the gap to the general pool 1:1.
 Default: chapter 1 (mainchapter0) without the son's animations (son_0.anm.arc 384 KB + subact/subanm:
-392 KB) - the son is born at the start of chapter 2 - and Grant (gura), Kate (keit), Samantha (san) and
-Dr. Hardy (pado), who move in in chapter 2 (573 KB; Dr. Hardy's chapter-1 animations are empty on the original
-disc too). The files stay in the archive's directory, empty.
+392 KB) - the son is born at the start of chapter 2 - and Grant (gura), Kate (keit) and Samantha (san),
+who move in in chapter 2 (414 KB). (Dr. Hardy, pado, is in the valley from the start: kept.) The files stay in the archive's directory, empty.
 usage: strip_chapter.py GAME.iso OUTDIR [--chapter 0] [--drop son_0.anm.arc,son_0_subact.arc,son_0_subanm.arc]
 Writes OUTDIR/mainchapterN.arc.clz; put it on the disc with gcbuild.py --replace mainchapterN.arc.clz=..."""
 import sys, os, struct
@@ -95,7 +94,7 @@ def iso_file(iso, path):
     sys.exit('%s not found on the disc' % path)
 
 def main():
-    a = sys.argv[1:]; ch = 0; drop = 'son_0.anm.arc,son_0_subact.arc,son_0_subanm.arc,gura_0.arc,gura_0.anm.arc,gura_0_subact.arc,gura_0_subanm.arc,keit_0.arc,keit_0.anm.arc,keit_0_subact.arc,keit_0_subanm.arc,san_0.arc,san_0.anm.arc,san_0_subact.arc,san_0_subanm.arc,pado_0.arc,pado_0.anm.arc,pado_0_subact.arc,pado_0_subanm.arc,pado_1.anm.arc,pado_1_subact.arc,pado_1_subanm.arc'
+    a = sys.argv[1:]; ch = 0; drop = 'son_0.anm.arc,son_0_subact.arc,son_0_subanm.arc,gura_0.arc,gura_0.anm.arc,gura_0_subact.arc,gura_0_subanm.arc,keit_0.arc,keit_0.anm.arc,keit_0_subact.arc,keit_0_subanm.arc,san_0.arc,san_0.anm.arc,san_0_subact.arc,san_0_subanm.arc'
     if '--chapter' in a: i = a.index('--chapter'); ch = int(a[i + 1]); del a[i:i + 2]
     if '--drop' in a: i = a.index('--drop'); drop = a[i + 1]; del a[i:i + 2]
     iso, out = a
