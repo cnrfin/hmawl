@@ -3273,3 +3273,8 @@ so, door fades are timed there, possibly per frame. Not traced yet.
   loads it a second time and the character-37 model entry (0x802EB4D4 + 37*0x44, ARC handle: +0 = archive start;
   memfix 1 wrongly read +0x10) keeps only the second. memfix 3: the first copy is freed once nothing in RAM points
   at it (full-RAM scan, skipping the pools' records and pm.bin). Next: Joe's model is huge (377 KB) - shrink it.
+- memfix 3 dump 055b67cc: still two copies (0x808E3040 orphan, 0x808849A0 live = model entry 37 +0); orphan list
+  empty, so the two loads are not load_model / slot_setup in that order (setup order top-down: guard, anims,
+  copy 1, copy 2). memfix 4: dup_sweep 60/180/300 frames after setup_model: any pool-B block with the live
+  archive's size and header (+4..+0x40) that no RAM word points at (skipping only the record arrays
+  0x802FC8C4-0x803154FC and pm.bin) is freed. Checked offline on the dump: finds exactly the orphan.
