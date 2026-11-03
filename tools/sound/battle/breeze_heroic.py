@@ -33,7 +33,7 @@ def main():
     roots[31] = 10                                 # bVII (Bb) after the Ab/Eb bars -> lift into the return
     def at(b): return (b - B0 + INTRO) * 4
     def sec(b, frac=0.0): return 1.0               # flat: one level throughout (no section build / swell)
-    TRIM = [0.7, 0.2, -0.1, -0.7, 0.1, 0.2, 0.0, -0.8, -0.1, 0.8, 0.9, -0.4, -0.0, 0.8, 0.9, -0.9, 0.5, 0.3, -0.0, -0.7, 0.4, 0.4, 0.2, -0.4, -0.1, -0.4, 0.2, -0.2, -0.7, -1.0, -1.0, -1.5]   # per-bar dB, calibrated (K-weighted loudness): every bar the same
+    TRIM = [0.7, 0.2, -0.1, -0.7, 0.1, 0.2, 0.0, -0.9, -0.1, 0.9, 1.0, -0.4, -0.0, 0.8, 1.0, -0.9, 0.5, 0.3, -0.0, -0.7, 0.4, 0.4, 0.2, -0.4, -0.2, -0.5, 0.2, -0.3, -0.4, -0.8, -0.6, -1.2]   # per-bar dB, calibrated (K-weighted loudness): every bar the same
     ITRIM = 1.6                                    # intro (dB), so it sits at the loop level
     def trim(b): return 10 ** (TRIM[(b - B0) % 32] / 40) if b >= B0 else 10 ** (ITRIM / 40)
     ev = []
@@ -68,7 +68,7 @@ def main():
             nxt = CH.get(roots.get(bar + 1, 0), CH[0]); tgt = 60 + nxt[0] + 12
             for k in range(8): ev.append((base + 2 + k * 0.25, 0.24, 2, tgt - 8 + [0, 2, 4, 5, 7, 9, 11, 12][k] - 4, 80))
         if B:                                                                     # B: half-time accent, 16th drive kept underneath
-            ev.append((base + 2, 0.2, 9, 40, 116))
+            if bar < B1 - 4: ev.append((base + 2, 0.2, 9, 40, 116))            # (the build-up has even quarters instead)
             for k in range(16):
                 if k != 8: ev.append((base + k * 0.25, 0.08, 9, 40, (62 if k % 2 == 0 else 46) + (6 if k in (6, 7, 14, 15) else 0)))
             ev.append((base, 0.3, 9, 41, 104)); ev.append((base + 3, 0.3, 9, 41, 88)); ev.append((base + 3.5, 0.3, 9, 41, 82))   # timpani-style tom: da -- da-da
@@ -86,8 +86,6 @@ def main():
             if not any(int((base + h + q) * 2) in busy for q in (0, 0.5, 1, 1.5)):
                 for off, dd in ((0, 0.9), (1.5, 0.45)) if h == 0 else ((0, 0.45), (1, 0.9)):
                     for n in tones: ev.append((base + h + off, dd, 2, n - 12, 127))
-    for bar in range(B1 - 4, B1):                                # build-up into the loop: snare on every beat
-        for k in range(4): ev.append((at(bar) + k, 0.2, 9, 40, 112))
     # bar -> source bar for the section shape; scale accompaniment velocities, humanize everything
     def src_bar(beat): return int(beat // 4) - INTRO + B0
     out = []
@@ -96,6 +94,8 @@ def main():
         v = v * trim(src_bar(beat))
         out.append((max(0, beat + rnd.uniform(-0.012, 0.012) * (0 if ch == 9 and n == 40 and v > 100 else 1)), dur, ch, n, v))
     ev = out
+    for bar in range(B1 - 4, B1):                                # build-up: snare on every beat (after the trim: exactly even)
+        for k in range(4): ev.append((at(bar) + k, 0.2, 9, 40, 110 + (k + 1) * 2.5 if bar == B1 - 1 else 110))   # even; the last 4 grow slightly
     LOOP = (B1 - B0) * 4; L0 = INTRO * 4
     if cycles > 1: ev = ev + [(b + LOOP * c, d, ch, n, v) for c in range(1, cycles) for b, d, ch, n, v in ev if b >= L0]
     END = L0 + LOOP * cycles
