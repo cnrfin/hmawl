@@ -39,3 +39,12 @@ swords delivered to the tool-shed cupboard: game+0x14D0 vtable +0x30, like the n
   per model in 1/16384: xmin ymin zmin xmax ymax zmax radius; only as long as the vanilla model list, so models
   196+ read the data after it and came out huge; Lumber was fixed by editing model 11's box). HOOK24 0x80012200
   (add r7,r5,r6, r6 = model * 14) -> pm_box_stub: models >= 196 use zt_sym_boxes (toolfix.c, from the icon meshes).
+
+## Weapons test 5: aimed blade, combo sounds
+- combo.py: per-key blade directions (body frame) for the three hits; after the arm IK the hand (subtree of the
+  wrist 36) is turned so the weapon on the hand bone 37 points along the blade direction with its edge (+z) along
+  the swing (from the blade direction's motion), edge forward during holds. Hand bone 37 = the attach bone
+  (vanilla hoe / sickle clips look right on it; 38 turns tools sideways). Clips 129-131 re-encoded and shrunk.
+- zt.c swing_sounds: swing 436 / 437 at each strike's snap (frames 5 / 3 / 10), impact 438 / 439 on the strike frame
+  (8 / 6 / 13) if the locked-on target is within reach (Stick 1.4, Wooden 1.5, Farmer's 1.6, Murasama 2.1, +0.4)
+  and in front. A first hit check: no damage or reactions yet.

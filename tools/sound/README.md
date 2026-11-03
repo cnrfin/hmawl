@@ -25,6 +25,23 @@ first lock sounds (gain 0.89) played louder than the wood hit.
 Vanilla GAME_ALL: arc 1c1e37e9, samp 9e4d0949. Intermediate: out1 9045e9c7 / 524f2252, out2 88f280d5 / b433835d.
 Install: `gcbuild.py --replace sound/GAME_ALL.arc=... --replace sound/GAME_ALL.samp=... --allow-unreferenced`.
 
+## Combo sounds (weapons test 5): Dark Cloud battle sounds from the user's own disc
+Not committed (the audio is the user's game data): darkcloud/extract_dc_sound.py pulls sound\battle out of the
+disc's DATA.DAT with DATA.HD2, darkcloud/dc_bank_wavs.py decodes the .hd/.bd banks to WAV. Picks (dan01bg):
+| Sound | Clip | Use |
+|---|---|---|
+| 436 | dan01bg_10, its loudest 0.45 s (fades 20 / 120 ms), gain 0.55 | swing, combo hits 1 / 2 |
+| 437 | dan01bg_30, gain 0.65 | swing, hit 3 |
+| 438 | dan01bg_22, gain 0.70 | impact, hits 1 / 2 |
+| 439 | dan01bg_07, gain 0.80 | impact, hit 3 |
+```
+python3 add_sfx.py swing_light.wav build/GAME_ALL.arc build/GAME_ALL.samp o1 --id 436 --template 305 --gain 0.55
+python3 add_sfx.py swing_heavy.wav o1/GAME_ALL.arc o1/GAME_ALL.samp o2 --id 437 --template 305 --gain 0.65
+python3 add_sfx.py impact_light.wav o2/GAME_ALL.arc o2/GAME_ALL.samp o3 --id 438 --template 305 --gain 0.70
+python3 add_sfx.py impact_heavy.wav o3/GAME_ALL.arc o3/GAME_ALL.samp o4 --id 439 --template 305 --gain 0.80
+```
+-> GAME_ALL.arc 8015d59b / .samp b3baa3e3 (on top of the Z-target bank b8d163da / 18982d7e).
+
 Tools:
 - `fanfare_patch.py`: a WAV over an existing sample, in place (resampled to fit its slot).
 - `add_sfx.py`: a new sound id: sample appended, macro copied from a template sound and pointed at the new

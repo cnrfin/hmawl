@@ -224,6 +224,7 @@ static void reticle(u8 *g)
 }
 
 static void swing_frame(s32 bpress, s32 free);
+static s32 sw_item; static u8 *sw_g;
 struct { u32 magic, n, lastm, bpress, tries, fail, starts, bones, slot, arc, anim; float w, frame, len; u32 ring[8][4]; u32 item, kids[4], kbone[4]; } sw_dbg;   /* 'SWDB' (dump) */
 void zt_frame(u8 *g, s32 map, volatile u32 *held, volatile u32 *press)
 {
@@ -286,6 +287,7 @@ void zt_frame(u8 *g, s32 map, volatile u32 *held, volatile u32 *press)
         s32 item = *(s32 *)(g + 0x11CC4), sickle = item == 0x4E3 || item == 0x4E4 || item == 0x4EA || item == 0x4EB;   /* the weapons: Stick, Wooden Sword, Farmer's Sword, H.M Murasama (tools/weapons) */
         sw_dbg.item = (u32)item;
         if (Z.target && sickle) { *press &= ~0x200u; *held &= ~0x200u; }     /* else B is the game's (put the tool away) */
+        sw_item = item; sw_g = g;
         swing_frame(bpress && Z.target && sickle, 1);
     }
     if (Z.target) Z.ty = theight(g, Z.target);
@@ -433,6 +435,29 @@ struct swctl { float frame, rate; u32 loop; float len; u8 *anim; struct swctl *n
 static struct swctl SWC[2];
 static struct { s32 on, hit, queued, cur; float w, xf; u32 swings; } SW;
 static float smooth01(float x) { if (x <= 0.0f) return 0.0f; if (x >= 1.0f) return 1.0f; return x * x * (3.0f - 2.0f * x); }
+/* Combo sounds (Dark Cloud battle sounds from the user's disc, sound bank 436-439, tools/sound): the swing as the
+   strike snaps, the impact on the strike frame if the locked-on target is within the weapon's reach in front. */
+#define SE_SWING_L 436                                  /* hits 1 / 2 */
+#define SE_SWING_H 437                                  /* hit 3 */
+#define SE_HIT_L   438
+#define SE_HIT_H   439
+static const float sw_snap[3] = { 5.0f, 3.0f, 10.0f }, sw_strike[3] = { 8.0f, 6.0f, 13.0f };
+static float weapon_reach(s32 item)
+{
+    switch (item) { case 0x4E3: return 1.4f; case 0x4E4: return 1.5f; case 0x4EA: return 1.6f; case 0x4EB: return 2.1f; }
+    return 1.4f;
+}
+static void swing_sounds(float f0, float f1)
+{
+    s32 h = SW.hit;
+    if (f0 < sw_snap[h] && f1 >= sw_snap[h]) sfx_play(*(u8 **)0x803491E4, h == 2 ? SE_SWING_H : SE_SWING_L, 0);
+    if (f0 < sw_strike[h] && f1 >= sw_strike[h] && Z.target && sw_g) {
+        float *p = SLOT_POS(sw_g, 0), dx = Z.tx - p[0], dz = Z.tz - p[2], r = weapon_reach(sw_item) + 0.4f;
+        if (dx * dx + dz * dz < r * r && dx * Z.fx + dz * Z.fz > 0.0f) {
+            sfx_play(*(u8 **)0x803491E4, h == 2 ? SE_HIT_H : SE_HIT_L, 0); sw_dbg.n++;
+        }
+    }
+}
 static s32 sw_start(s32 hit, s32 chained)
 {
     u8 *tab, *arc, *a;
@@ -468,6 +493,7 @@ static void swing_frame(s32 bpress, s32 free)
     sw_dbg.w = SW.w; sw_dbg.frame = c->frame; sw_dbg.len = c->len;
     if (p->frame + 1.0f < p->len) p->frame += 1.0f;
     if (c->frame + 1.0f >= c->len) { SW.on = 0; SW.w = 0.0f; return; }
+    swing_sounds(c->frame, c->frame + 1.0f);
     c->frame += 1.0f;
 }
 s32 zt_bone(u8 *ctl, s32 n, u8 *trs, u8 *inst)

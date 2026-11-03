@@ -32,6 +32,13 @@ HITS={
     (30,REST_R,PR_DOWN,REST_L,0,0,'io')],
 }
 CHAIN={1:11,2:9}      # frame of hit k at which hit k+1 may start
+# blade direction per key (same frames as HITS; body frame), None = the idle hand's own; the edge leads the swing
+BLADE={
+ 1:[None,(-0.6,0.35,-0.72),(0.45,-0.05,0.89),(0.88,-0.15,-0.45),None],
+ 2:[(0.88,-0.15,-0.45),(0.8,0.25,-0.55),(-0.4,-0.05,0.91),(-0.9,-0.15,-0.4),None],
+ 3:[(-0.9,-0.15,-0.4),(-0.12,0.62,-0.78),(0.08,-0.3,0.95),(0.15,-0.6,0.78),None],
+}
+ATTACH=37                        # the weapon model hangs off the hand bone (handle +y, edge +z)
 def cr(p0,p1,p2,p3,u):
     return 0.5*((2*p1)+(-p0+p2)*u+(2*p0-5*p1+4*p2-p3)*u*u+(-p0+3*p1-3*p2+p3)*u**3)
 def sample(keys,f):
@@ -49,6 +56,22 @@ def ik(W,sh,el,wr,T,pole):
     x=(a*a-b*b+dl*dl)/(2*dl); y=np.sqrt(max(a*a-x*x,0)); Ek=S_+u*x+p*y
     apply_about(W,subtree(sh),rot_between(E-S_,Ek-S_),S_)
     E1=W[el][:3,3]; W1=W[wr][:3,3]; apply_about(W,subtree(el),rot_between(W1-E1,S_+u*dl-E1),E1)
+def nrm(v): v=np.asarray(v,float); return v/np.linalg.norm(v)
+def slerpv(a,b,u):
+    a,b=nrm(a),nrm(b); c=np.clip(a@b,-1,1); th=np.arccos(c)
+    if th<1e-4: return nrm(a*(1-u)+b*u)
+    return (np.sin((1-u)*th)*a+np.sin(u*th)*b)/np.sin(th)
+_IDLE_B=None
+def idle_blade():
+    global _IDLE_B
+    if _IDLE_B is None: _IDLE_B=nrm(world(nodes,IDLE)[ATTACH][:3,:3]@np.array([0,1.0,0]))
+    return _IDLE_B
+def blade_at(h,f):
+    keys=HITS[h]; B=[idle_blade() if b is None else nrm(b) for b in BLADE[h]]
+    f=min(max(f,0),keys[-1][0]); k=0
+    while k<len(keys)-2 and f>keys[k+1][0]: k+=1
+    t=(f-keys[k][0])/(keys[k+1][0]-keys[k][0]); u=EASE[keys[k+1][6]](t)
+    return slerpv(B[k],B[k+1],min(max(u,0),1))
 def pose_at(keys,f,lag=1.0):
     W=world(nodes,IDLE)
     _,_,_,tw,le=sample(keys,f)                       # body leads
@@ -59,6 +82,15 @@ def pose_at(keys,f,lag=1.0):
     Rc=Ry(np.radians(tw))@Rx(np.radians(le))              # body axes turned by the twist / lean (bone axes differ)
     ik(W,R_SH,R_EL,R_WR,W[R_SH][:3,3]+Rc@hr,Rc@pr)
     ik(W,L_SH,L_EL,L_WR,W[L_SH][:3,3]+Rc@hl,Rc@np.array(PL))
+    h=[k for k,v in HITS.items() if v is keys]
+    if h:                                    # aim the weapon: blade along b, edge along the swing
+        h=h[0]; b=Rc@blade_at(h,f-lag); b1=Rc@blade_at(h,f-lag+0.6); b0=Rc@blade_at(h,f-lag-0.6)
+        e=b1-b0; e=e-b*(e@b)
+        if np.linalg.norm(e)<1e-3:           # holds: keep the edge facing forward
+            e=np.array([0,0,1.0])-b*b[2]
+            if np.linalg.norm(e)<1e-3: e=np.array([1.0,0,0])-b*b[0]
+        e=nrm(e); x=np.cross(b,e); Rw=np.stack([x,b,e],1)      # columns: model x, y (blade), z (edge)
+        Rd=Rw@W[ATTACH][:3,:3].T; c=W[R_WR][:3,3].copy(); apply_about(W,subtree(R_WR),Rd,c)
     return to_locals(W)
 def layered(base,att,w):
     out=[m.copy() for m in base]
