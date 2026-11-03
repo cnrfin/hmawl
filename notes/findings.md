@@ -3258,3 +3258,10 @@ so, door fades are timed there, possibly per frame. Not traced yet.
   scene change during a talk the character-37 names go back at once; archives no longer referenced by the
   model entry (0x802EB4D4 + 37*0x44 + 0x10) or any set (0x802EA714 + n*0x30) are freed (free_orphans);
   pm.bin symbol mem_g ('MEMG'): gap now / lowest seen / when, every 32 frames.
+- New-game crash on memfix 1 (dump 102e6cca, naming screen): PC 0x8001F9F4 = collider-list unlink with a garbage
+  node; our state empty; gauge: gap -12 KB already at the naming screen (A top 0x80996EE0, B low 0x80993E60,
+  B 14.7 MB). So the game needs memory back beyond our own additions. Pool A's block is exactly the unpacked
+  chapter archive (0x61FEA0 here), so a smaller archive frees memory 1:1.
+- Chapter 1 = mainchapter0 (has hyu_0; mainchapter1 has hyu_1). The son's animations (son_0.anm.arc 384 KB +
+  subact/subanm = 392 KB) are in it although he is born at the start of chapter 2. tools/memory/strip_chapter.py
+  (run on the user's ISO) empties them: -382 KB. Next candidates: characters that never appear in a chapter.
