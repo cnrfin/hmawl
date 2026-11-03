@@ -9,7 +9,7 @@ import sys, mido, math, random
 BPM = 184
 LEAD = (10, 0)
 PATCH = {0: LEAD, 4: LEAD, 1: (20, 1), 2: (7, 5), 3: (18, 0), 9: (8, 5)}
-VOL = {0: 108, 4: 74, 1: 86, 2: 66, 3: 70, 9: 74}
+VOL = {0: 82, 4: 60, 1: 92, 2: 80, 3: 84, 9: 80}
 CH = {0: (0, 4, 7), 7: (7, 11, 2), 5: (5, 9, 0), 9: (9, 0, 4), 8: (8, 0, 3), 10: (10, 2, 5), 2: (2, 5, 9), 4: (4, 7, 11), 3: (3, 7, 10)}
 def read(f):
     m = mido.MidiFile(f); tpb = m.ticks_per_beat; t = 0; on = {}; out = []
@@ -33,15 +33,15 @@ def main():
     roots[31] = 10                                 # bVII (Bb) after the Ab/Eb bars -> lift into the return
     def at(b): return (b - B0 + INTRO) * 4
     def sec(b, frac=0.0): return 1.0               # flat: one level throughout (no section build / swell)
-    TRIM = [3.3, 0.1, -0.9, 0.9, 0.1, -0.0, -0.7, -0.7, -0.5, 3.9, 3.9, 0.8, -0.0, 4.3, 4.0, -0.4, -0.1, 0.1, 0.0, 0.1, -0.2, -0.2, 0.2, 0.0, -0.4, -0.9, -0.1, -0.5, -0.1, -0.8, -0.4, -0.2]   # per-bar dB, calibrated: every bar at the same loudness
-    def trim(b): return 10 ** (TRIM[(b - B0) % 32] / 40) if b >= B0 else 10 ** (TRIM[0] / 40)
+    TRIM = [0.7, 0.2, -0.1, -0.7, 0.1, 0.2, 0.0, -0.8, -0.1, 0.8, 0.9, -0.4, -0.0, 0.8, 0.9, -0.9, 0.5, 0.3, -0.0, -0.7, 0.4, 0.4, 0.2, -0.4, -0.1, -0.4, 0.2, -0.2, -0.7, -1.0, -1.0, -1.5]   # per-bar dB, calibrated (K-weighted loudness): every bar the same
+    ITRIM = 2.6                                    # intro (dB), so it sits at the loop level
+    def trim(b): return 10 ** (TRIM[(b - B0) % 32] / 40) if b >= B0 else 10 ** (ITRIM / 40)
     ev = []
     for s, d, n, v in notes:                       # melody (as the v1 pick: top line), legato-ish, accented downbeats
         b = int(s // 4)
         if not (B0 <= b < B1) or n < 64 and not (n >= 63 and (s % 1) > 0.4) or n == lows.get(b): continue
         beat = at(b) + s % 4; dur = min(d, 2.0) * 0.95
-        vel = (100 if s % 1 < 0.1 else 88) + (n - 72) * 1.2 + min(d, 2) * 6      # contour: high and long notes speak up
-        vel = vel * sec(b, (s % 4) / 4) + rnd.uniform(-5, 5)
+        vel = 104 if s % 1 < 0.1 else 98                                      # even: no contour, so no note jumps out
         ev.append((beat, dur, 0, n, vel)); ev.append((beat, dur, 4, n - 12, vel - 22))
     IROOT = [0, 0, 8, 10]                                     # intro: C pedal, then bVI - bVII into the melody
     for bar in range(B0 - INTRO, B1):
@@ -61,9 +61,9 @@ def main():
                     for n in tones[1:]: ev.append((base + beat + off, dd, 3, n, 70 + (14 if off == 0 else 0)))
         if intro or B:                                                            # brass stabs, 3-3-2
             for off, dd, vv in ((0, 0.9, 100), (1.5, 0.9, 92), (3, 0.7, 96)):
-                for n in tones: ev.append((base + off, dd, 2, n - 12, vv))
+                for n in tones: ev.append((base + off, dd, 2, n - 12, vv * 0.72))
         else:
-            for n in tones: ev.append((base, 3.9, 2, n - 12, 62))                # horn pad
+            for n in tones: ev.append((base, 3.9, 2, n - 12, 88))                # horn pad
         if not intro and (bar - B0) % 4 == 3:                                     # rising run into the next phrase
             nxt = CH.get(roots.get(bar + 1, 0), CH[0]); tgt = 60 + nxt[0] + 12
             for k in range(8): ev.append((base + 2 + k * 0.25, 0.24, 2, tgt - 8 + [0, 2, 4, 5, 7, 9, 11, 12][k] - 4, 80))
@@ -79,13 +79,22 @@ def main():
         if (not intro and (bar - B0) % 4 == 3) or bar == B0 - 1:
             for k in range(8): ev.append((base + 2 + k * 0.25, 0.1, 9, 40, 60 + k * 7))   # roll into the phrase
         if bar >= B0 and (bar - B0) % 8 == 0: ev.append((base, 1.0, 9, 49, 96))           # cymbal on arrivals
+    busy = set(int(b * 2) for b, d, ch, n, v in ev if ch == 0 for b in (b, b + d * 0.9))   # half-bars... (beats*2 -> 1/2-beat slots)
+    for bar in range(B0, B1):                                    # lead rests: horns answer with 3-3-2 stabs an octave up
+        base = at(bar); t = CH.get(roots.get(bar, 0), CH[0]); tones = [72 + (p if p >= 4 else p + 12) for p in t]
+        for h in (0, 2):
+            if not any(int((base + h + q) * 2) in busy for q in (0, 0.5, 1, 1.5)):
+                for off, dd in ((0, 0.9), (1.5, 0.45)) if h == 0 else ((0, 0.45), (1, 0.9)):
+                    for n in tones: ev.append((base + h + off, dd, 2, n - 12, 127))
+    for bar in range(B1 - 4, B1):                                # build-up into the loop: snare on every beat
+        for k in range(4): ev.append((at(bar) + k, 0.2, 9, 40, 112))
     # bar -> source bar for the section shape; scale accompaniment velocities, humanize everything
     def src_bar(beat): return int(beat // 4) - INTRO + B0
     out = []
     for beat, dur, ch, n, v in ev:
         if ch not in (0, 4, 9): v = v * sec(src_bar(beat), (beat % 4) / 4)
         v = v * trim(src_bar(beat))
-        out.append((max(0, beat + rnd.uniform(-0.012, 0.012) * (0 if ch == 9 and n == 40 and v > 100 else 1)), dur, ch, n, v + rnd.uniform(-4, 4)))
+        out.append((max(0, beat + rnd.uniform(-0.012, 0.012) * (0 if ch == 9 and n == 40 and v > 100 else 1)), dur, ch, n, v))
     ev = out
     LOOP = (B1 - B0) * 4; L0 = INTRO * 4
     if cycles > 1: ev = ev + [(b + LOOP * c, d, ch, n, v) for c in range(1, cycles) for b, d, ch, n, v in ev if b >= L0]
