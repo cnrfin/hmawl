@@ -283,7 +283,7 @@ void zt_frame(u8 *g, s32 map, volatile u32 *held, volatile u32 *press)
         if (mw != sw_dbg.lastm) { sw_dbg.lastm = mw; sw_dbg.ring[sw_dbg.n & 7][0] = mw; sw_dbg.ring[sw_dbg.n & 7][1] = *held;
                                   sw_dbg.ring[sw_dbg.n & 7][2] = *press; sw_dbg.ring[sw_dbg.n & 7][3] = (u32)Z.target; sw_dbg.n++; }
         if (bpress) sw_dbg.bpress++;
-        s32 item = *(s32 *)(g + 0x11CC4), sickle = item >= 0x4E5 && item <= 0x4EB;   /* the 7 sickles: the combat tool */
+        s32 item = *(s32 *)(g + 0x11CC4), sickle = item == 0x4E3 || item == 0x4E4 || item == 0x4EA || item == 0x4EB;   /* the weapons: Stick, Wooden Sword, Farmer's Sword, H.M Murasama (tools/weapons) */
         sw_dbg.item = (u32)item;
         if (Z.target && sickle) { *press &= ~0x200u; *held &= ~0x200u; }     /* else B is the game's (put the tool away) */
         swing_frame(bpress && Z.target && sickle, 1);

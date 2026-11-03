@@ -259,3 +259,21 @@ pm_area_stub:
     mr    r3, r22
     lwz   r0, 0x1c(r1)              # the replaced instruction
     b     area_return               # 0x80043910
+
+# New game: the start-up code gives the Milker with bl func_8004FDA0(game+0x50, 0x4F6, 1, -1) at 0x800136D8 (r28 =
+# game). That bl comes here: the Milker, then the Stick (0x4E3) the same way, so it starts in the rucksack too.
+    .globl pm_newgame_stub
+pm_newgame_stub:
+    stwu  r1, -0x10(r1)
+    mflr  r0
+    stw   r0, 0x14(r1)
+    bl    item_pool_add             # the replaced call (Milker)
+    addi  r3, r28, 0x50
+    li    r4, 0x4E3
+    li    r5, 1
+    li    r6, -1
+    bl    item_pool_add             # the Stick
+    lwz   r0, 0x14(r1)
+    mtlr  r0
+    addi  r1, r1, 0x10
+    blr

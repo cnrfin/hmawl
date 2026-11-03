@@ -57,6 +57,8 @@ HOOK19 = 0x8019E5C4                                   # pose build (func_8019E43
 HOOK19_OFF = 0x250                                    # pm_bone_stub (mr r6,r24; b zt_bone)
 HOOK20 = 0x8004390C                                   # A-action case 0xF, after the tool-hit send (area tools)
 HOOK20_OFF = 0x258                                    # pm_area_stub (toolfix.c)
+HOOK21 = 0x800136D8                                   # new game: bl func_8004FDA0 (Milker) -> + the Stick
+HOOK21_OFF = 0x278                                    # pm_newgame_stub
 PREV = {0x80113894: (0x4824B8F1,), 0x80060EF8: (0x482FE260,), 0x801B0EE4: (0x3C608036,), 0x801B0EE8: (0x38636000,), 0x801B0F2C: (0x38636000,)}   # earlier builds' words (update mode)
 PATCHES = [  # (RAM address, original word, new word, why)
     (0x801B0EE4, 0x80630030, 0x3C608037, 'OSInit: arena low = 0x8036A000 (was BootInfo->arenaLo or __ArenaLo) ...'),
@@ -93,6 +95,39 @@ PATCHES = [  # (RAM address, original word, new word, why)
     (0x80042D44, 0x480393BD, 'blhook', 'free-roam idle motion pick -> pm_mot_stub (Z-target strafe / walk-back clips)'),
     (0x80042D98, 0x48039369, 'blhook', 'free-roam walk motion pick -> pm_mot_stub'),
     (0x80042DD0, 0x48039331, 'blhook', 'free-roam run motion pick -> pm_mot_stub'),
+    # weapons phase 1 (tools/weapons): the duplicate ids 4E3 / 4E4 / 4EA / 4EB become Stick / Wooden Sword /
+    # Farmer's Sword / H.M Murasama. The chapter-start "alternate look" swap of Hoe / Light Hoe / Sickle /
+    # Light Sickle into them is switched off, they map to themselves, and they are sickle-type tools.
+    (HOOK21, 0x4803C6C9, 'blhook', 'new game: Milker + Stick (0x4E3) into the item pool -> pm_newgame_stub'),
+    (0x80050F74, 0x38A004EA, 0x38A004E6, 'chapter start, item pool swap Sickle -> 4EA: keep 4E6'),
+    (0x80050FF8, 0x38A004EB, 0x38A004E7, 'chapter start, item pool swap Light Sickle -> 4EB: keep 4E7'),
+    (0x8005107C, 0x38A004E3, 0x38A004DF, 'chapter start, item pool swap Hoe -> 4E3: keep 4DF'),
+    (0x80051100, 0x38A004E4, 0x38A004E0, 'chapter start, item pool swap Light Hoe -> 4E4: keep 4E0'),
+    (0x80013D68, 0x380004EA, 0x380004E6, 'chapter start, held Sickle -> 4EA: keep 4E6'),
+    (0x80013D74, 0x380004EB, 0x380004E7, 'chapter start, held Light Sickle -> 4EB: keep 4E7'),
+    (0x80013D80, 0x380004E3, 0x380004DF, 'chapter start, held Hoe -> 4E3: keep 4DF'),
+    (0x80013D8C, 0x380004E4, 0x380004E0, 'chapter start, held Light Hoe -> 4E4: keep 4E0'),
+    (0x8024EE0C, 0x000004EA, 0x000004E6, 'shed alt id slot 4 (Sickle): 4E6'),
+    (0x8024EE14, 0x000004EB, 0x000004E7, 'shed alt id slot 6 (Light Sickle): 4E7'),
+    (0x8024EE1C, 0x000004E3, 0x000004DF, 'shed alt id slot 8 (Hoe): 4DF'),
+    (0x8024EE20, 0x000004E4, 0x000004E0, 'shed alt id slot 9 (Light Hoe): 4E0'),
+    (0x80298068, 0x80012540, 0x80012564, 'func_800124FC: 4E3 maps to itself (was Hoe)'),
+    (0x8029806C, 0x80012548, 0x80012564, 'func_800124FC: 4E4 maps to itself (was Light Hoe)'),
+    (0x80298084, 0x80012530, 0x80012564, 'func_800124FC: 4EA maps to itself (was Sickle)'),
+    (0x80298088, 0x80012538, 0x80012564, 'func_800124FC: 4EB maps to itself (was Light Sickle)'),
+    (0x8028DDE4, 0x01206E10, 0x02206E10, 'item 4E3 Stick: category 2 (sickle-type)'),
+    (0x8028DE00, 0x00006001, 0x0000A001, 'item 4E3 Stick: sickle flags'),
+    (0x8028DE08, 0x01206F11, 0x02206F11, 'item 4E4 Wooden Sword: category 2'),
+    (0x8028DE24, 0x00006001, 0x0000A001, 'item 4E4 Wooden Sword: sickle flags'),
+    (0x8028DEEC, 0x003C0000, 0x012C0000, "item 4EA Farmer's Sword: price 300 (3000 G)"),
+    (0x802A7874, 0x8004D210, 0x8004D26C, 'usage counter (func_8004D1EC): 4E3 sickle case'),
+    (0x802A7878, 0x8004D210, 0x8004D26C, 'usage counter (func_8004D1EC): 4E4 sickle case'),
+    (0x802A78F4, 0x8004D538, 0x8004D594, 'usage counter (func_8004D4F0): 4E3 off the Hoe counter'),
+    (0x802A78F8, 0x8004D554, 0x8004D5B0, 'usage counter (func_8004D4F0): 4E4 off the Light Hoe counter'),
+    (0x802A7978, 0x8004D714, 0x8004D734, 'usage counter read (func_8004D6E0): 4E3'),
+    (0x802A797C, 0x8004D71C, 0x8004D73C, 'usage counter read (func_8004D6E0): 4E4'),
+    (0x802A79FC, 0x8004D8E0, 0x8004D8E8, 'usage (func_8004D8BC): 4E3 sickle case'),
+    (0x802A7A00, 0x8004D8E0, 0x8004D8E8, 'usage (func_8004D8BC): 4E4 sickle case'),
     (HOOK20, 0x8001001C, None, 'tool hit (func_80043120 case 0xF) -> pm_area_stub: Strange/Weird hoe + sickle, Watering Can W area shapes'),
     (HOOK19, 0x48001C35, 'blhook', 'pose build per-bone anim eval (bl func_801A01F8) -> pm_bone_stub: Z-target swing upper-body layer'),
     (HOOK18, 0x9421FFC0, None, 'field tile cursor (func_80091F58) -> pm_tile_stub: bracket style (tile.c)'),
@@ -134,7 +169,7 @@ def main():
     if CODE_ADDR + len(code) > ARENA_LO: die('code does not fit below the new arena start')
     entry = CODE_ADDR                                   # pm_hook is the first thing in pm.bin
     if be32(code, HOOK2_OFF) != 0x9421FFE0: die('pm.bin does not have pm_hook2 at +0x14')
-    targets = {HOOK: entry, HOOK2: entry + HOOK2_OFF, HOOK3: entry + HOOK3_OFF, HOOK4: entry + HOOK4_OFF, HOOK5: entry + HOOK5_OFF, HOOK6: entry + HOOK6_OFF, HOOK7: entry + HOOK7_OFF, HOOK8: entry + HOOK8_OFF, HOOK9: entry + HOOK9_OFF, HOOK10: entry + HOOK10_OFF, HOOK11: entry + HOOK11_OFF, HOOK12: entry + HOOK12_OFF, HOOK13: entry + HOOK13_OFF, HOOK14: entry + HOOK14_OFF, HOOK15: entry + HOOK15_OFF, HOOK16: entry + HOOK16_OFF, HOOK18: entry + HOOK18_OFF, HOOK19: entry + HOOK19_OFF, HOOK20: entry + HOOK20_OFF}
+    targets = {HOOK: entry, HOOK2: entry + HOOK2_OFF, HOOK3: entry + HOOK3_OFF, HOOK4: entry + HOOK4_OFF, HOOK5: entry + HOOK5_OFF, HOOK6: entry + HOOK6_OFF, HOOK7: entry + HOOK7_OFF, HOOK8: entry + HOOK8_OFF, HOOK9: entry + HOOK9_OFF, HOOK10: entry + HOOK10_OFF, HOOK11: entry + HOOK11_OFF, HOOK12: entry + HOOK12_OFF, HOOK13: entry + HOOK13_OFF, HOOK14: entry + HOOK14_OFF, HOOK15: entry + HOOK15_OFF, HOOK16: entry + HOOK16_OFF, HOOK18: entry + HOOK18_OFF, HOOK19: entry + HOOK19_OFF, HOOK20: entry + HOOK20_OFF, HOOK21: entry + HOOK21_OFF}
     for a_ in MOT_SITES: targets[a_] = entry + MOT_OFF
     if be32(code, HOOK3_OFF) >> 16 != 0x3D80: die('pm.bin does not have pm_player_stub at +0x58')
     if be32(code, HOOK4_OFF) != 0x9421FFF0: die('pm.bin does not have pm_label_stub at +0x68')
@@ -147,6 +182,7 @@ def main():
     if be32(code, HOOK11_OFF) != 0x9421FFE0: die('pm.bin does not have pm_van_stub at +0x1B8')
     if be32(code, HOOK12_OFF) != 0x2C050015: die('pm.bin does not have pm_msg_stub at +0x1E4')
     if be32(code, HOOK13_OFF) != 0x9421FFF0: die('pm.bin does not have pm_zt_stub at +0x1F4')
+    if be32(code, HOOK21_OFF) != 0x9421FFF0: die('pm.bin does not have pm_newgame_stub at +0x278')
     if be32(code, HOOK20_OFF) != 0x7C761B78: die('pm.bin does not have pm_area_stub at +0x258')
     if be32(code, HOOK19_OFF) != 0x7F06C378: die('pm.bin does not have pm_bone_stub at +0x250')
     if be32(code, HOOK18_OFF) >> 26 != 18: die('pm.bin does not have pm_tile_stub at +0x24C')
