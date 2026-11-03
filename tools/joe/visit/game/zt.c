@@ -26,6 +26,26 @@ typedef short s16;
 #define ZT_LEASH   13.5f                                /* let go past this */
 #define ZT_COS60   0.5f
 #define ZT_JOE     100                                  /* target id for Joe (not an event slot) */
+#define ZT_WILD    101                                  /* target id for the day's wild animal (not an event slot) */
+/* The day's one wild animal (findings 7.40): field scene *(0x80305FBC), animal object at scene+0x44
+   (class vtable lbl_802C618C at +0x10, species 0x2C lizard .. 0x30 owl at +0x128), position at +0x4C. */
+static u8 *wild_obj(void)
+{
+    u8 *sc = *(u8 **)0x80305FBC, *a;
+    s32 sp;
+    if ((u32)sc < 0x80000000u || (u32)sc >= 0x81800000u) return 0;
+    a = *(u8 **)(sc + 0x44);
+    if ((u32)a < 0x80000000u || (u32)a >= 0x81800000u || *(u32 *)(a + 0x10) != 0x802C618Cu) return 0;
+    sp = *(s32 *)(a + 0x128);
+    return sp >= 0x2C && sp <= 0x30 ? a : 0;
+}
+static float aim_h(s32 id)                              /* reticle / visibility height above the feet */
+{
+    u8 *a;
+    if (id != ZT_WILD || !(a = wild_obj())) return 0.85f;
+    switch (*(s32 *)(a + 0x128)) { case 0x2D: return 0.15f; case 0x2E: return 0.35f; case 0x30: return 0.3f; }
+    return 0.2f;                                        /* lizard, turtle */
+}
 #define SE_LOCK    238                                  /* lock on: vanilla sound 238 (user pick; 434 = our OoT-style flutter, still in the bank) */
 #define SE_FREE    239                                  /* lock off: vanilla 239 (435 = ours) */
 
@@ -77,6 +97,11 @@ static s32 tpos(u8 *g, s32 id, s32 map, float *x, float *z)
         if (map != 1 || !pm_joe_pos(p)) return 0;
         *x = p[0]; *z = p[2]; return 1;
     }
+    if (id == ZT_WILD) {
+        u8 *a = wild_obj();
+        if (map != 1 || !a) return 0;
+        *x = *(float *)(a + 0x4C); *z = *(float *)(a + 0x54); return 1;
+    }
     if (!Z.apos[id] || Z.now - Z.seen[id] > ZT_PRESENT || SLOT_MAP(g, id) != map) return 0;   /* out here, lately */
     s = SLOT_POS(g, id);                                 /* the live position (event slot, every frame) */
     *x = s[0]; *z = s[2]; return 1;
@@ -90,6 +115,7 @@ static float theight(u8 *g, s32 id)
 {
     float p[3];
     if (id == ZT_JOE) { pm_joe_pos(p); return p[1]; }
+    if (id == ZT_WILD) { u8 *a = wild_obj(); return a ? *(float *)(a + 0x50) : 0.0f; }
     return SLOT_POS(g, id)[1];
 }
 /* best target in front: switching = 1 skips the current one, widens the cone to 90 degrees and favours
@@ -119,14 +145,14 @@ static s32 pick(u8 *g, s32 map, s32 switching)
 {
     float *p = SLOT_POS(g, 0), best = 1e30f, x, z, nx, ny;
     s32 id, found = 0, i, n = 0;
-    for (i = 0; i <= 0x26; i++) {
+    for (i = -1; i <= 0x26; i++) {
         float dx, dz, d2, score, ax;
-        id = i == 0 ? ZT_JOE : i;
+        id = i == 0 ? ZT_JOE : i < 0 ? ZT_WILD : i;
         if (switching && id == Z.target) continue;
         if (!tpos(g, id, map, &x, &z)) continue;
         dx = x - p[0]; dz = z - p[2]; d2 = dx * dx + dz * dz;
         if (d2 > ZT_RANGE * ZT_RANGE || d2 < 0.0001f) continue;
-        if (proj(x, theight(g, id) + 0.85f, z, &nx, &ny) <= 0) continue;
+        if (proj(x, theight(g, id) + aim_h(id), z, &nx, &ny) <= 0) continue;
         if (nx < -0.95f || nx > 0.95f || ny < -0.95f || ny > 0.95f) continue;
         n++;
         ax = nx < 0 ? -nx : nx;
@@ -197,7 +223,7 @@ static void reticle(u8 *g)
     if (Z.target) { if (Z.alpha < 255) Z.alpha += 51; if (Z.alpha > 255) Z.alpha = 255; }
     else { Z.alpha -= 64; if (Z.alpha < 0) Z.alpha = 0; Z.r = -1; }
     if (!Z.alpha || (u32)c < 0x80000000u || (u32)c >= 0x81800000u) { ret_hide(a); return; }
-    x = Z.tx; y = Z.ty + RET_Y; z = Z.tz;
+    x = Z.tx; y = Z.ty + aim_h(Z.target); z = Z.tz;
     w = proj(x, y, z, &sx, &sy);
     zt_dbg.w = w; zt_dbg.ndx = sx; zt_dbg.ndy = sy;
     if (w <= 0) { ret_hide(a); return; }
@@ -448,9 +474,8 @@ static float weapon_reach(s32 item)
     switch (item) { case 0x4E3: return 1.4f; case 0x4E4: return 1.5f; case 0x4EA: return 1.6f; case 0x4EB: return 2.1f; }
     return 1.4f;
 }
-/* Impacts only on enemies. There are none yet (villagers / Joe can be locked onto but are never hit), so this is 0
-   until enemies exist; then it checks the target's type. */
-static s32 target_is_enemy(void *t) { (void)t; return 0; }
+/* Impacts only on enemies: the day's wild animal (villagers / Joe can be locked onto but are never hit). */
+static s32 target_is_enemy(s32 t) { return t == ZT_WILD; }
 static void swing_sounds(float f0, float f1)
 {
     s32 h = SW.hit;
@@ -458,7 +483,7 @@ static void swing_sounds(float f0, float f1)
         sfx_play(*(u8 **)0x803491E4, h == 2 ? SE_SWING_H : SE_SWING_L, 0);
         sfx_play(*(u8 **)0x803491E4, SE_VOICE1 + h, 0);
     }
-    if (f0 < sw_strike[h] && f1 >= sw_strike[h] && Z.target && sw_g && target_is_enemy((void *)Z.target)) {
+    if (f0 < sw_strike[h] && f1 >= sw_strike[h] && Z.target && sw_g && target_is_enemy(Z.target)) {
         float *p = SLOT_POS(sw_g, 0), dx = Z.tx - p[0], dz = Z.tz - p[2], r = weapon_reach(sw_item) + 0.4f;
         if (dx * dx + dz * dz < r * r && dx * Z.fx + dz * Z.fz > 0.0f) {
             sfx_play(*(u8 **)0x803491E4, h == 2 ? SE_HIT_H : SE_HIT_L, 0); sw_dbg.n++;
