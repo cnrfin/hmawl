@@ -55,6 +55,8 @@ HOOK18 = 0x80091F58                                   # field tile cursor draw (
 HOOK18_OFF = 0x24C                                    # pm_tile_stub (b zt_tile_cursor)
 HOOK19 = 0x8019E5C4                                   # pose build (func_8019E438): bl func_801A01F8, per-bone anim eval
 HOOK19_OFF = 0x250                                    # pm_bone_stub (mr r6,r24; b zt_bone)
+HOOK20 = 0x8004390C                                   # A-action case 0xF, after the tool-hit send (area tools)
+HOOK20_OFF = 0x258                                    # pm_area_stub (toolfix.c)
 PREV = {0x80113894: (0x4824B8F1,), 0x80060EF8: (0x482FE260,), 0x801B0EE4: (0x3C608036,), 0x801B0EE8: (0x38636000,), 0x801B0F2C: (0x38636000,)}   # earlier builds' words (update mode)
 PATCHES = [  # (RAM address, original word, new word, why)
     (0x801B0EE4, 0x80630030, 0x3C608037, 'OSInit: arena low = 0x8036A000 (was BootInfo->arenaLo or __ArenaLo) ...'),
@@ -91,6 +93,7 @@ PATCHES = [  # (RAM address, original word, new word, why)
     (0x80042D44, 0x480393BD, 'blhook', 'free-roam idle motion pick -> pm_mot_stub (Z-target strafe / walk-back clips)'),
     (0x80042D98, 0x48039369, 'blhook', 'free-roam walk motion pick -> pm_mot_stub'),
     (0x80042DD0, 0x48039331, 'blhook', 'free-roam run motion pick -> pm_mot_stub'),
+    (HOOK20, 0x8001001C, None, 'tool hit (func_80043120 case 0xF) -> pm_area_stub: Strange/Weird hoe + sickle, Watering Can W area shapes'),
     (HOOK19, 0x48001C35, 'blhook', 'pose build per-bone anim eval (bl func_801A01F8) -> pm_bone_stub: Z-target swing upper-body layer'),
     (HOOK18, 0x9421FFC0, None, 'field tile cursor (func_80091F58) -> pm_tile_stub: bracket style (tile.c)'),
     (HOOK16, 0x48000020, None, 'stick facing set (func_8003083C) -> pm_face_stub: face the Z-target while moving'),
@@ -131,7 +134,7 @@ def main():
     if CODE_ADDR + len(code) > ARENA_LO: die('code does not fit below the new arena start')
     entry = CODE_ADDR                                   # pm_hook is the first thing in pm.bin
     if be32(code, HOOK2_OFF) != 0x9421FFE0: die('pm.bin does not have pm_hook2 at +0x14')
-    targets = {HOOK: entry, HOOK2: entry + HOOK2_OFF, HOOK3: entry + HOOK3_OFF, HOOK4: entry + HOOK4_OFF, HOOK5: entry + HOOK5_OFF, HOOK6: entry + HOOK6_OFF, HOOK7: entry + HOOK7_OFF, HOOK8: entry + HOOK8_OFF, HOOK9: entry + HOOK9_OFF, HOOK10: entry + HOOK10_OFF, HOOK11: entry + HOOK11_OFF, HOOK12: entry + HOOK12_OFF, HOOK13: entry + HOOK13_OFF, HOOK14: entry + HOOK14_OFF, HOOK15: entry + HOOK15_OFF, HOOK16: entry + HOOK16_OFF, HOOK18: entry + HOOK18_OFF, HOOK19: entry + HOOK19_OFF}
+    targets = {HOOK: entry, HOOK2: entry + HOOK2_OFF, HOOK3: entry + HOOK3_OFF, HOOK4: entry + HOOK4_OFF, HOOK5: entry + HOOK5_OFF, HOOK6: entry + HOOK6_OFF, HOOK7: entry + HOOK7_OFF, HOOK8: entry + HOOK8_OFF, HOOK9: entry + HOOK9_OFF, HOOK10: entry + HOOK10_OFF, HOOK11: entry + HOOK11_OFF, HOOK12: entry + HOOK12_OFF, HOOK13: entry + HOOK13_OFF, HOOK14: entry + HOOK14_OFF, HOOK15: entry + HOOK15_OFF, HOOK16: entry + HOOK16_OFF, HOOK18: entry + HOOK18_OFF, HOOK19: entry + HOOK19_OFF, HOOK20: entry + HOOK20_OFF}
     for a_ in MOT_SITES: targets[a_] = entry + MOT_OFF
     if be32(code, HOOK3_OFF) >> 16 != 0x3D80: die('pm.bin does not have pm_player_stub at +0x58')
     if be32(code, HOOK4_OFF) != 0x9421FFF0: die('pm.bin does not have pm_label_stub at +0x68')
@@ -144,6 +147,7 @@ def main():
     if be32(code, HOOK11_OFF) != 0x9421FFE0: die('pm.bin does not have pm_van_stub at +0x1B8')
     if be32(code, HOOK12_OFF) != 0x2C050015: die('pm.bin does not have pm_msg_stub at +0x1E4')
     if be32(code, HOOK13_OFF) != 0x9421FFF0: die('pm.bin does not have pm_zt_stub at +0x1F4')
+    if be32(code, HOOK20_OFF) != 0x7C761B78: die('pm.bin does not have pm_area_stub at +0x258')
     if be32(code, HOOK19_OFF) != 0x7F06C378: die('pm.bin does not have pm_bone_stub at +0x250')
     if be32(code, HOOK18_OFF) >> 26 != 18: die('pm.bin does not have pm_tile_stub at +0x24C')
     if be32(code, MOT_OFF) >> 26 != 18 or be32(code, HOOK16_OFF) != 0x7F23CB78: die('pm.bin does not have pm_mot_stub / pm_face_stub at +0x23C / +0x240')

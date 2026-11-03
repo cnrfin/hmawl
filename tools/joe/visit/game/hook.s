@@ -244,3 +244,18 @@ pm_tile_stub:
 pm_bone_stub:
     mr    r6, r24
     b     zt_bone
+
+# Area tools: right after func_80043120 case 0xF sends its one tool-hit message (bl func_80011680 at 0x80043908;
+# message at r1+0x778, r26 = item, r31 = player). The function saved LR in its prologue, so bl is free here.
+# tool_area (toolfix.c) re-sends it to the neighbouring field tiles; the send's result (r3) is kept in r22, which
+# the game sets from r3 at 0x80043918 anyway.
+    .globl pm_area_stub
+pm_area_stub:
+    mr    r22, r3
+    addi  r3, r1, 0x778
+    mr    r4, r26
+    mr    r5, r31
+    bl    tool_area
+    mr    r3, r22
+    lwz   r0, 0x1c(r1)              # the replaced instruction
+    b     area_return               # 0x80043910

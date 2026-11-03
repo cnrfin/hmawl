@@ -23,3 +23,19 @@
 - Field objects get a tool-hit message: func_8008EE80(obj, msg) (vtable lbl_802ADD58 slot +0x30) -> per type/state
   ptmf table lbl_802AFF08 +0x30 -> handlers (0x800964D4-0x80097F00) check msg+4 == 1 and item msg+0xC.
 - func_80028988: per-tool text lookup (lbl_8029BECC), Strange/Weird hoes have their own entries.
+
+## The send and the fix (toolfix 1)
+- func_80043120 (A action): target = cone search func_80010A94 (pos player+0x4C, dir +0x58); action from table
+  lbl_80292A78[itemKind*0xAC + targetKind]; switch lbl_802A7470. Case 0xF (0x800438A8) = hoe / sickle / can on a
+  field tile: func_8004579C builds the message at r1+0x778 (+0 sender, +4 type 1, +8 water flag, +0xC item,
+  +0x10 target id), func_80011680 sends it (-> func_800116F8 -> object by id -> func_8008EE80). Handlers only set
+  a pending action (func_8008F6E8: +0x77 = 3, +0x76 = 1); the tile's update applies it. Stamina / skill / water
+  are charged by the player's tool state, once.
+- Tiles: 210 permanent objects, id 0x1A5 + g, array *(0x80349200)+0x4C stride 0x308; +0x70 descriptor {w, h, flag,
+  first}, +0x74 g, +0x75 l; a = l / h (x), b = l % h (z), pos = base + (a + 0.5, b + 0.5). Fields: 7x5 (g 0-34),
+  5x7 (35-69), 10x14 (70-209).
+- HOOK20 0x8004390C (lwz r0,0x1c(r1) after the send) -> pm_area_stub -> tool_area(msg, item, player): neighbours by
+  shape, target id rewritten and re-sent, then restored. Not yet covered: sickle with a bare-soil centre tile
+  (case 0x17 at 0x80043BCC sends nothing), hoe on target kind 0x24 (case 0x12, message at r1+0x744).
+- No per-tool area logic exists anywhere (dead or alive); the Strange/Weird compares elsewhere are skill gain
+  (func_8001216C), stamina (func_8004E3B4), text (func_80028988), dialogue, inventory swaps.

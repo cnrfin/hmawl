@@ -16,6 +16,7 @@ zt_hook_return = 0x800313C8;
 tilt_return1 = 0x8017B88C;
 tilt_return2 = 0x8017B8F8;
 face_return = 0x80030A5C;
+area_return = 0x80043910;
 SECTIONS {
   . = 0x8035EFA0;
   .pm : { *(.text.hook) *(.text*) *(.rodata*) *(.sdata*) *(.data*) *(.sbss*) *(.bss*) }
