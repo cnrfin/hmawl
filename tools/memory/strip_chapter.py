@@ -5,7 +5,10 @@ The chapter archive is unpacked whole into the bottom of the game's memory and k
 Default: chapter 1 (mainchapter0) without the son's animations (son_0.anm.arc 384 KB + subact/subanm:
 392 KB) - the son is born at the start of chapter 2 - and Grant (gura), Kate (keit) and Samantha (san),
 who move in in chapter 2 (414 KB). (Dr. Hardy, pado, is in the valley from the start: kept.) The files stay in the archive's directory, empty.
-usage: strip_chapter.py GAME.iso OUTDIR [--chapter 0] [--drop son_0.anm.arc,son_0_subact.arc,son_0_subanm.arc]
+Their MODELS cannot be emptied: the game opens every chapter character's model when a save loads (memfix 12:
+empty gura/keit/san_0.arc -> invalid read from 0 on load, crash entering the mansion). --put replaces a file
+with a small placeholder model (tools/goddess/scripts/build_stub.py NAME OUTDIR, 16 KB).
+usage: strip_chapter.py GAME.iso OUTDIR [--chapter 0] [--drop a,b,...] [--put name=file,...]
 Writes OUTDIR/mainchapterN.arc.clz; put it on the disc with gcbuild.py --replace mainchapterN.arc.clz=..."""
 import sys, os, struct
 
@@ -94,9 +97,14 @@ def iso_file(iso, path):
     sys.exit('%s not found on the disc' % path)
 
 def main():
-    a = sys.argv[1:]; ch = 0; drop = 'son_0.anm.arc,son_0_subact.arc,son_0_subanm.arc,gura_0.arc,gura_0.anm.arc,gura_0_subact.arc,gura_0_subanm.arc,keit_0.arc,keit_0.anm.arc,keit_0_subact.arc,keit_0_subanm.arc,san_0.arc,san_0.anm.arc,san_0_subact.arc,san_0_subanm.arc'
+    a = sys.argv[1:]; ch = 0; drop = 'son_0.anm.arc,son_0_subact.arc,son_0_subanm.arc,gura_0.anm.arc,gura_0_subact.arc,gura_0_subanm.arc,keit_0.anm.arc,keit_0_subact.arc,keit_0_subanm.arc,san_0.anm.arc,san_0_subact.arc,san_0_subanm.arc'
     if '--chapter' in a: i = a.index('--chapter'); ch = int(a[i + 1]); del a[i:i + 2]
     if '--drop' in a: i = a.index('--drop'); drop = a[i + 1]; del a[i:i + 2]
+    put = {}
+    if '--put' in a:
+        i = a.index('--put')
+        for x in a[i + 1].split(','): n_, f_ = x.split('=', 1); put[n_] = open(f_, 'rb').read()
+        del a[i:i + 2]
     iso, out = a
     nm = 'mainchapter%d.arc.clz' % ch
     c = iso_file(iso, nm); u = clz_decompress(c); arc = u8_read(u); names = u8_names(arc)
@@ -104,6 +112,9 @@ def main():
     for f in drop.split(','):
         if f not in names: sys.exit('%s: no %s' % (nm, f))
         k = names[f]; freed += len(arc['files'][k]); rep[k] = b''
+    for f, data in put.items():
+        if f not in names: sys.exit('%s: no %s' % (nm, f))
+        rep[names[f]] = data
     nu = u8_build(arc, rep); back = u8_read(nu)
     for f, k in names.items():
         if k not in rep: assert back['files'][k] == arc['files'][k], f

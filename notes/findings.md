@@ -3325,3 +3325,10 @@ so, door fades are timed there, possibly per frame. Not traced yet.
   default now empties them too: 573 KB more (pool A 5.75 MB -> ~5.2 MB). Risk: the chapter 1 -> 2 transition.
 - Correction (user): Dr. Hardy (pado) is in the valley from the start (his ch-1 anims are pado_1.anm.arc, 16 KB).
   Removed from the strip list: Grant / Kate / Samantha only, 414 KB.
+- memfix 12 dumps 2c2d8dea (invalid read from 0, PC 0x801A04F4, loading the save) / 42d0ffea (crash entering the
+  mansion): the game OPENS every chapter character's model at load (model entries 0-31 + 35-37 filled; 14-16 =
+  Grant / Kate / Samantha, empty with their emptied archives). Memory itself was fine: gap +324 KB in the mansion dump.
+  memfix 13: their models are replaced by a 16 KB placeholder (tools/goddess/scripts/build_stub.py: 72 faces of the
+  blank body on Celia's skeleton, blank face frames; built from disc data, so only in the user's zip); their
+  anims / subact / subanm stay empty (as pado_0.anm.arc on the original disc, whose model is opened too).
+  strip_chapter.py --put name=file. Expected: ~364 KB freed for the three (instead of 414).
