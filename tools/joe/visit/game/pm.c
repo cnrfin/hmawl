@@ -133,6 +133,7 @@ static struct {
     u8 *own_model, *own_anims;    /* our two archives in memory (character 37's model entry +0x10, set 71 +0) */
     u8 *orphan[4];                /* our archives left behind by a scene change: freed once nothing uses them */
     s32 sweep;                    /* frames since the last duplicate sweep */
+    u8 *last_anims;               /* the animation archive we loaded last (set 71 +0) */
     Vec pos, dir;
 } S;
 
@@ -216,7 +217,10 @@ static void setup_model(void)
         MODEL74_NAME = S.who ? gd_model : pm_model; SET71_NAME = S.who ? gd_anims : pm_anims;
         MODEL74_SIZE[0] = sz[0]; MODEL74_SIZE[1] = sz[1]; MODEL74_SIZE[2] = sz[2];
     }
-    for (i = 0; i < 12; i++) S.orig_set[i] = SET71_DATA[i];
+    {   u8 *cur = (u8 *)SET71_DATA[0]; s32 ours = cur && (cur == S.own_anims || cur == S.last_anims);
+        for (i = 0; i < 4; i++) if (cur && S.orphan[i] == cur) ours = 1;
+        if (!ours) for (i = 0; i < 12; i++) S.orig_set[i] = SET71_DATA[i];   /* (after a menu it still holds ours) */
+    }
     S.orig_mot2 = MOT2_WORD; MOT2_WORD = MOT2_JOG;
     S.orig_list = SET71_LIST;
     if (S.who) {                              /* the goddess: motion n = Celia's animation n */
@@ -232,6 +236,7 @@ static void setup_model(void)
         SET71_LIST = gd_list;
     }
     load_animset(ANIMSET, 0);
+    S.last_anims = (u8 *)SET71_DATA[0];
     {   /* Our previous model archive can still be in the model entry (restore_names after a menu only puts the names
            back): the load below replaces it without freeing it (+377 KB per menu, 11 copies in a user dump). The
            slot was torn down above, so nothing draws it: free it as soon as the new copy is in. */
@@ -764,14 +769,43 @@ struct { u32 magic, n; s32 gap, gap_min; u32 a_top, b_low, clock_min, b_used_kb;
 static void mem_gauge(void)
 {
     u8 *r; s32 k; u32 atop = 0, blow = 0xFFFFFFFFu, used = 0;
-    if (mem_g.n++ & 31) return;
+    if (mem_g.n++ & 3) return;                /* every 4 frames (every 32 missed a building's load block) */
     for (r = *(u8 **)(0x802FD4D0 + 0x10), k = 0; r && k < 300; r = *(u8 **)(r + 8), k++)
         if (*(u32 *)(r + 0xC) == 2 && *(u32 *)r + *(u32 *)(r + 4) > atop) atop = *(u32 *)r + *(u32 *)(r + 4);
     for (r = *(u8 **)(0x80315508 + 0x10), k = 0; r && k < 6000; r = *(u8 **)(r + 8), k++)
         if (*(u32 *)(r + 0xC) == 2) { u32 lo = *(u32 *)r - *(u32 *)(r + 4); used += *(u32 *)(r + 4); if (lo < blow) blow = lo; }
     mem_g.magic = 0x4D454D47u; mem_g.a_top = atop; mem_g.b_low = blow; mem_g.b_used_kb = used >> 10;
     mem_g.gap = (s32)(blow - atop);
-    if (mem_g.n <= 33 || mem_g.gap < mem_g.gap_min) { mem_g.gap_min = mem_g.gap; mem_g.clock_min = CLOCK; }
+    if (mem_g.n <= 5 || mem_g.gap < mem_g.gap_min) { mem_g.gap_min = mem_g.gap; mem_g.clock_min = CLOCK; }
+}
+/* Scene change (a menu counts too): Joe's actor is gone, so free his archives now, before the next scene loads.
+   The game's unload only closes the handles: character 37's model entry and animation set 71 kept pointing at
+   our archives, so free_orphans waited for ever and 230 KB of Joe (model 152 KB + animations 73 KB) stayed at
+   the bottom of the general pool in every building, right where a building's load puts its 239 KB pool-A block
+   (memfix 16 dumps d1239f81 / cb8aea64: the inn's block overwrote Joe's model; orphans = model + anims, both
+   still in entry 37 +0 / set 71 +0). Entry 37 goes back to an unused character's state (all zero but the
+   handle's vtable word at +0x20), set 71 to what it held before Joe. */
+static void joe_free_now(void)
+{
+    u8 *list[6]; s32 i, k;
+    list[0] = S.own_model; list[1] = S.own_anims;
+    for (i = 0; i < 4; i++) list[2 + i] = S.orphan[i];
+    for (i = 0; i < 6; i++) {
+        u8 *p = list[i];
+        if (!p) continue;
+        if (MODEL37_ARC == p) {
+            u32 *e = (u32 *)(0x802EB4D4 + CHAR_ID * 0x44);
+            for (k = 0; k < 17; k++) if (k != 8) e[k] = 0;
+        }
+        if ((u8 *)SET71_DATA[0] == p) {
+            for (k = 0; k < 12; k++) SET71_DATA[k] = S.orig_set[k];
+            for (k = 0; k < 6; k++) if (list[k] && (u8 *)SET71_DATA[0] == list[k]) SET71_DATA[0] = 0;   /* (never ours) */
+        }
+        if (block_size(p)) { op_delete(p); dup_dbg.freed++; }
+        for (k = i + 1; k < 6; k++) if (list[k] == p) list[k] = 0;
+    }
+    S.own_model = S.own_anims = 0;
+    for (i = 0; i < 4; i++) S.orphan[i] = 0;
 }
 void pm_scene_change(void)
 {
@@ -783,6 +817,7 @@ void pm_scene_change(void)
     }
     if (S.actor) despawn();
     if (S.loaded) release_model();
+    joe_free_now();
 }
 
 void zt_frame(u8 *g, s32 map, volatile u32 *held, volatile u32 *press);

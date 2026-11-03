@@ -3344,3 +3344,15 @@ so, door fades are timed there, possibly per frame. Not traced yet.
   at an anim player's +0x10 in the dump: 0x80EF2BCC, 0x80FE66B0) -> func_8019FE08 -> func_801A0AF4. The load asks the
   newcomers' animation archives for clips, so the 64-byte empty ones fail. memfix 16: their .anm.arc are kept (33 KB);
   only the models are replaced (about 330 KB freed).
+- memfix 16 dumps d1239f81 (inn, ignorable error at 0x801A3630) / cb8aea64 (Celia's house, hang): no error on load.
+  Root cause of the building crashes, traced in both dumps:
+  1. Pool A, besides the chapter archive, takes a 239 KB block (0x3A660 at 0x808E3D80, + 0x320) when a building
+     loads. MEMG (every 32 frames) missed it: real A top 0x8091E700, B low 0x8091A540 -> overlap ~17-20 KB.
+     Vanilla's 276 KB gap is what keeps this block clear.
+  2. The B blocks it overlapped are Joe's model (156,128 B, its U8 header overwritten by A data) and animations
+     (74,464 B), still allocated INSIDE the building. S: loaded 0, own_* 0, orphan[] = model + anims; entry 37 +0 /
+     set 71 +0 still point at them (unload only closes handles), so free_orphans never freed them.
+  3. setup_model re-captured orig_set after a menu while set 71 still held our animations.
+  memfix 17: pm_scene_change -> joe_free_now(): entry 37 back to the unused state (zeros, vtable word +0x20 kept),
+  set 71 back to orig_set, then op_delete model + anims + orphans before the next scene loads; orig_set never
+  captured from our own archive (S.last_anims); MEMG every 4 frames.
