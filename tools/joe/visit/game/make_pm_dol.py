@@ -255,7 +255,9 @@ def main():
         return new
     for addr, old, new, why in PATCHES:
         cur = be32(dol, at(addr))
-        if cur != old and not (update and (cur == final(addr, new) or cur in PREV.get(addr, ()))):
+        old_hook = update and new in (None, 'blhook') and cur >> 26 == 18 and \
+            CODE_ADDR <= (addr + ((cur & 0x03FFFFFC) - (0x04000000 if cur & 0x02000000 else 0))) < ARENA_LO
+        if cur != old and not old_hook and not (update and (cur == final(addr, new) or cur in PREV.get(addr, ()))):
             die(f'{addr:#010x} ({why}): main.dol has {cur:08x}, expected {old:08x}')
     print('all patch sites match the original code')
 
