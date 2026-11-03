@@ -26,6 +26,7 @@ typedef struct { float x, y, z; } Vec;
 #define MODEL74_SIZE ((float *)0x8024A160)
 #define SET71_NAME  (*(const char **)0x802490CC)  /* animation set 71 */
 #define SET71_DATA  ((u32 *)(0x802EA714 + 71 * 0x30))   /* loaded set 71 (archive pointer at +0) */
+#define MODEL37_ARC (*(u8 **)(0x802EB4D4 + 37 * 0x44 + 0x10))   /* character 37's loaded model archive (func_8002D3B4 frees it) */
 
 /* ---- game functions */
 #define F(addr, ret, args) ((ret (*) args)(addr))
@@ -129,6 +130,8 @@ static struct {
     u32 orig_mot2;
     u32 **orig_list;
     void *guard;                  /* spacer while our model is loaded (see setup_model) */
+    u8 *own_model, *own_anims;    /* our two archives in memory (character 37's model entry +0x10, set 71 +0) */
+    u8 *orphan[4];                /* our archives left behind by a scene change: freed once nothing uses them */
     Vec pos, dir;
 } S;
 
@@ -228,11 +231,38 @@ static void setup_model(void)
     load_model(CHAR_ID);
     slot_setup(slot, CHAR_ID, -1);
     S.loaded = 1;
+    S.own_model = MODEL37_ARC; S.own_anims = (u8 *)SET71_DATA[0];
 }
 
 static void joe_expr_patch(s32 on);
+static void orphan(u8 *p)
+{
+    s32 i;
+    if ((u32)p < 0x80000000u || (u32)p >= 0x81800000u) return;
+    for (i = 0; i < 4; i++) if (S.orphan[i] == p) return;
+    for (i = 0; i < 4; i++) if (!S.orphan[i]) { S.orphan[i] = p; return; }
+}
+/* Our archives left in memory when slot 37 had to be left to the new scene (a talk across a scene change,
+   or leaving the valley without the scene hook): each one is about 450 KB (model 377 KB + animations 73 KB)
+   and they used to stay for the rest of the session (user dumps: two copies of each with Joe around). Free
+   one as soon as neither character 37's model entry nor any animation set points at it. */
+static void free_orphans(void)
+{
+    s32 i, k, used;
+    for (i = 0; i < 4; i++) {
+        u8 *p = S.orphan[i];
+        if (!p) continue;
+        used = MODEL37_ARC == p || p == S.own_model || p == S.own_anims;
+        for (k = 0; k < 0x60 && !used; k++) if (*(u8 **)(0x802EA714 + k * 0x30) == p) used = 1;
+        if (!used && *(u32 *)p == 0x55AA382Du) op_delete(p);
+        if (!used) S.orphan[i] = 0;
+    }
+}
 static void restore_names(void)
 {
+    if (S.own_model || S.own_anims) {        /* not freed by release_model: hand them to free_orphans */
+        orphan(S.own_model); orphan(S.own_anims); S.own_model = S.own_anims = 0;
+    }
     joe_expr_patch(0);                       /* character 37's expression tables back */
     if (S.orig_list) SET71_LIST = S.orig_list;
     MODEL74_NAME = S.orig_model; SET71_NAME = S.orig_anims;
@@ -248,11 +278,13 @@ static void release_model(void)
 {
     u8 *slot = char_slot(CHARMGR, CHAR_ID, 0);
     s32 i;
-    if (slot[0xC]) {
+    if (slot[0xC] && (!S.own_model || MODEL37_ARC == S.own_model)) {   /* still ours (or not known): the game frees it */
         vcall(slot, 0, 2)(slot, 0);
         unload_model(CHAR_ID);
+        S.own_model = 0;
     }
-    unload_animset(ANIMSET);
+    if (!S.own_anims || (u8 *)SET71_DATA[0] == S.own_anims) { unload_animset(ANIMSET); S.own_anims = 0; }
+    /* anything not freed above stays in own_* and goes to free_orphans via restore_names */
     for (i = 0; i < 12; i++) SET71_DATA[i] = S.orig_set[i];
     MOT2_WORD = S.orig_mot2;
     SET71_LIST = S.orig_list;
@@ -277,6 +309,7 @@ static void spawn(void)
     }
     S.col = c;
     actor_show(a);
+    if (S.guard) { op_delete(S.guard); S.guard = 0; }   /* placed: give the 256 KB back (the pools were overlapping) */
 }
 
 static void despawn(void)
@@ -641,11 +674,32 @@ void spring_frame(u8 *g, s32 map, u32 pad_held, u32 pad_press);
 void joe_dig_frame(void);
 void joe_seed_frame(void);
 
+
+/* debug for RAM dumps (magic 'MEMG'): the gap between the per-frame pool A (0x802FD4D0, grows up from the arena
+   start: mainchapter + scratch) and the general pool B (0x80315508, operator new, fills down from the top; its
+   records hold the block's top address). When the gap goes negative they overlap: random corruption (findings
+   7.43). Measured every 32 frames: now, the lowest seen, and when. */
+struct { u32 magic, n; s32 gap, gap_min; u32 a_top, b_low, clock_min, b_used_kb; } mem_g;
+static void mem_gauge(void)
+{
+    u8 *r; s32 k; u32 atop = 0, blow = 0xFFFFFFFFu, used = 0;
+    if (mem_g.n++ & 31) return;
+    for (r = *(u8 **)(0x802FD4D0 + 0x10), k = 0; r && k < 300; r = *(u8 **)(r + 8), k++)
+        if (*(u32 *)(r + 0xC) == 2 && *(u32 *)r + *(u32 *)(r + 4) > atop) atop = *(u32 *)r + *(u32 *)(r + 4);
+    for (r = *(u8 **)(0x80315508 + 0x10), k = 0; r && k < 6000; r = *(u8 **)(r + 8), k++)
+        if (*(u32 *)(r + 0xC) == 2) { u32 lo = *(u32 *)r - *(u32 *)(r + 4); used += *(u32 *)(r + 4); if (lo < blow) blow = lo; }
+    mem_g.magic = 0x4D454D47u; mem_g.a_top = atop; mem_g.b_low = blow; mem_g.b_used_kb = used >> 10;
+    mem_g.gap = (s32)(blow - atop);
+    if (mem_g.n <= 33 || mem_g.gap < mem_g.gap_min) { mem_g.gap_min = mem_g.gap; mem_g.clock_min = CLOCK; }
+}
 void pm_scene_change(void)
 {
     logs_release();
     spring_release();
-    if (S.talking) return;
+    if (S.talking) {                         /* the talk keeps him, but the next scene must not load our files as 37 */
+        if (S.loaded) { MODEL74_NAME = S.orig_model; SET71_NAME = S.orig_anims; }
+        return;
+    }
     if (S.actor) despawn();
     if (S.loaded) release_model();
 }
@@ -667,6 +721,8 @@ void pm_frame(void)
 
     if ((u32)g < 0x80000000u || (u32)g >= 0x81800000u || !*(u32 **)0x80349218) return;
     joe_seed_frame();                         /* joetv.c: the save's own $JOE market seed (first day of a new game) */
+    free_orphans();                           /* our archives a scene change left behind */
+    mem_gauge();                              /* debug: the gap between the two memory pools */
     t = CLOCK;
     day = (t / T_DAY) % 10;
     tod = t % T_DAY;

@@ -3242,3 +3242,19 @@ so, door fades are timed there, possibly per frame. Not traced yet.
   element 7 (the farmer's name, 12 glyph quads in vanilla) was grown to 37 quads for the skill row / pop-up /
   reticle; the game re-renders the name on HUD rebuilds (every map change). Test hudtest1: weapons3 commonall with
   element 7's count back to 12 (our HUD extras then switch themselves off: E7_COUNT check), commonall 96ffdad7.
+
+### 7.43 Memory: the two pools overlap (the cause of the random corruption, T-poses, slowdowns, crashes)
+- Pool A (0x802FD4D0, records {start, size, next, flag 2 used / 1 free}) grows up from the arena start:
+  the mainchapter (6.27 MB) + per-frame scratch. Pool B (0x80315508, operator new; records hold the block's
+  TOP address and size) fills down from the arena top. Nothing keeps them apart: when B reaches A's top it
+  hands out memory inside the mainchapter (villager animations: T-poses, corrupt textures, crashes).
+- Gap = B lowest used (top - size) - A top: Oct 28 dump (near vanilla) +276 KB; joeprice +480 KB;
+  targetanimal / field crash / HUD crash -50 KB; T-pose and Joe dumps -1219 KB.
+- Costs: our arena reservation 0x8035CFA0 -> 0x80380000 (141 KB); commonall +175 KB since Oct 28 (HUD,
+  weapons, symbol/real tpl, mapobj); with Joe: 256 KB spacer + a SECOND copy of his archives (377 KB model
+  + 73 KB anims, unreferenced: leaked when names were restored without unloading, or the next scene loaded
+  them again as character 37).
+- memfix 1: arena start 0x80377000 (pm.bin ends 0x80375884); the spacer is freed once Joe is spawned; on a
+  scene change during a talk the character-37 names go back at once; archives no longer referenced by the
+  model entry (0x802EB4D4 + 37*0x44 + 0x10) or any set (0x802EA714 + n*0x30) are freed (free_orphans);
+  pm.bin symbol mem_g ('MEMG'): gap now / lowest seen / when, every 32 frames.
