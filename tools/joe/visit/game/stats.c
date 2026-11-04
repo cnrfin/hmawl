@@ -28,7 +28,7 @@ enum { C_MAGIC = 54, C_EXP, C_LV, C_HP, C_PWR, C_END, C_LCK, C_ANS, C_PTS };
 void skill_levelup(void);
 #define SH_DATA
 #include "stat_hud.h"
-struct { u32 magic; s32 ignore, acc, last, lastfull, menu, cool, gained, refund, wait, fish_set; } ST;   /* 'STAT' (dump) */
+struct { u32 magic; s32 ignore, acc, last, lastfull, menu, cool, gained, refund, wait, fish_set, r_exp, r_gold, r_wait, r_open; } ST;   /* 'STAT' (dump) */
 
 static s32 need(s32 lv) { return 500 + 1250 * (lv - 1); }   /* stats3: 500, 1750, 3000 ... (farming EXP x3); stats2: 500, 1250, 2000 ... (was 1500 + 500 lv: Lv 2 took 2000) */
 static s32 ready(u8 *g) { return OK(g) && CNT(g, C_MAGIC) == (s32)ST_MAGIC; }
@@ -39,6 +39,23 @@ void stats_exp(s32 n)                                        /* EXP gained (zt.c
     u8 *g = *(u8 **)0x803491CC;
     if (!ready(g) || n <= 0) return;
     CNT(g, C_EXP) += n; ST.gained += n;
+}
+/* step 4: a defeated animal's reward (zt.c). Gold first, in the game's info box (func_801020E4 mode 1, as player state
+   0x2A: file, msg, speaker -1, 0x70, 0, 0) with the cash sound; its EXP is only added once that box has closed, so
+   "Level up!" and the stat menu always come after it, never together. */
+#define msg_open  F(0x801020E4, s32, (u8 *, s32, s32, s32, s32, s32, s32, s32))
+#define gold_add  F(0x80113234, void, (u8 *, s32))
+#define sfx_play  F(0x8012A52C, s32, (u8 *, s32, s32))
+#define MES_DEBUG 0x32
+#define M_GOLD    30                                          /* debug.mes "You found <n0> G!" (build_stats_events.py) */
+#define SE_CASH   0xCD                                        /* script command 0xC1's sound */
+#define REWARD_WAIT 90                                        /* the defeat animation first */
+extern s32 skill_pop_on;
+void stats_reward(s32 exp, s32 gold)
+{
+    if (exp > 0) ST.r_exp += exp;
+    if (gold > 0) ST.r_gold += gold;
+    ST.r_wait = REWARD_WAIT;
 }
 static s32 event_free(void)
 {
@@ -184,6 +201,26 @@ void stats_frame(u8 *g, s32 map, volatile u32 *held, volatile u32 *press, s32 bu
             if (df > 0 && df < 1000) { full += df * 25 * CNT(g, C_END) / 1000; *(s32 *)(g + 0x11B94) = full; }
         }
         ST.lastfull = full;
+    }
+    /* a defeat's reward: gold box, then its EXP (levels and menus wait) */
+    if (ST.r_open) {
+        u8 *mm = MSGMGR;
+        if (OK(mm) && *(s32 *)(mm + 0x48)) return;           /* still open */
+        ST.r_open = 0; CONTROL = 1; ST.cool = 20;
+    }
+    if (ST.r_gold || ST.r_exp) {
+        u8 *mm = MSGMGR;
+        if (ST.r_wait > 0) { ST.r_wait--; return; }
+        if (ST.r_gold > 0) {
+            if (busy || map < 0 || skill_pop_on || !event_free() || !OK(mm) || *(s32 *)(mm + 0x48)) return;
+            gold_add(g + 0x11A14, ST.r_gold);
+            sfx_play(*(u8 **)0x803491E4, SE_CASH, 0);
+            msg_num(mm, 0, ST.r_gold);
+            if (msg_open(mm, 1, MES_DEBUG, M_GOLD, -1, 0x70, 0, 0)) { ST.r_open = 1; CONTROL = 0; }
+            ST.r_gold = 0;
+            return;
+        }
+        CNT(g, C_EXP) += ST.r_exp; ST.gained += ST.r_exp; ST.r_exp = 0;
     }
     /* levels */
     if (CNT(g, C_LV) < 1) CNT(g, C_LV) = 1;

@@ -402,6 +402,7 @@ void stats_frame(u8 *g, s32 map, volatile u32 *held, volatile u32 *press, s32 bu
 static s32 zt_busy(void);
 void stats_ignore(s32 dmg);
 void stats_exp(s32 n);
+void stats_reward(s32 exp, s32 gold);
 s32 stats_pwr(void);
 static void hurt_frame(volatile u32 *held, volatile u32 *press);
 static void collapse_frame(u8 *g, s32 map, volatile u32 *held, volatile u32 *press);
@@ -682,8 +683,9 @@ static void en_hit(s32 h, float dx, float dz)
     if (EN.hp <= 0) {
         u8 *a = wild_obj();
         EN.hp = 0; EN.state = 1; EN.t = 0;
-        { u8 *aa = wild_obj(); s32 sp = aa ? *(s32 *)(aa + 0x128) - 0x2C : 4; static const s32 XP[5] = { 3000, 800, 1500, 6000, 1500 };
-          stats_exp(XP[sp >= 0 && sp < 5 ? sp : 4]); }   /* step 2: a defeated animal's EXP (lizard, chihuahua, tanuki, turtle, owl) */
+        { u8 *aa = wild_obj(); s32 sp = aa ? *(s32 *)(aa + 0x128) - 0x2C : 4; static const s32 XP[5] = { 3000, 800, 1500, 6000, 1500 }, GOLD[5] = { 300, 80, 150, 600, 150 };
+          if (sp < 0 || sp > 4) sp = 4;
+          stats_reward(XP[sp], GOLD[sp]); }   /* steps 2 / 4: a defeated animal's EXP and gold (lizard, chihuahua, tanuki, turtle, owl) */
         if (a) { EN.x = *(float *)(a + 0x4C); EN.y = *(float *)(a + 0x50); EN.z = *(float *)(a + 0x54); }
         let_go_why(9);                                       /* the lock lets go: the enemy is dying */
     }

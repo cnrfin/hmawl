@@ -43,12 +43,13 @@ STATS = pad(body('Lvl ') + num(0) + body('    EXP ') + num(1) + body(' / ') + nu
             body('HP ') + num(3) + body('    Attack ') + num(4) + b'\x01' +
             body('Endurance ') + num(5) + body('    Luck ') + num(6) + b'\x30')
 
+GOLD = pad(body('You found ') + num(0) + body(' G!'))   # step 4: a defeated animal's gold (pm.bin opens it in the info box)
 ev = open(mes_in, 'rb').read(); ents = mes_entries(ev)
 assert mes_build(ents) == ev
 free = [i for i, e in enumerate(ents) if e == b'\0\0\0\0' and i < len(ents) - 1]
-assert len(free) >= 2, 'no free debug.mes entries'
-M_LV, M_ST = free[0], free[1]
-ents[M_LV] = LVUP; ents[M_ST] = STATS
+assert len(free) >= 3, 'no free debug.mes entries'
+M_LV, M_ST, M_GOLD = free[0], free[1], free[2]
+ents[M_LV] = LVUP; ents[M_ST] = STATS; ents[M_GOLD] = GOLD
 grow = sum(len(x) for x in ents) - sum(len(x) for x in mes_entries(ev))
 assert set(ents[-1]) == {0} and len(ents[-1]) > grow, 'no zero padding at the end of debug.mes'
 ents[-1] = ents[-1][:len(ents[-1]) - grow]
@@ -105,6 +106,6 @@ open(os.path.join(outdir, 'debug.mes'), 'wb').write(new_mes)
 _, fs = load(os.path.join(outdir, 'Common.arc'))
 assert [b for _, b in fs] == raws
 for s in scripts: ins, ch = parse(s)
-print('events: level-up %d, stats %d; debug.mes entries %d, %d' % (first_event, first_event + 1, M_LV, M_ST))
+print('events: level-up %d, stats %d; debug.mes entries %d, %d, gold %d' % (first_event, first_event + 1, M_LV, M_ST, M_GOLD))
 for f in ('Common.arc', 'debug.mes'):
     b = open(os.path.join(outdir, f), 'rb').read(); print(f, hex(len(b)), hashlib.sha1(b).hexdigest()[:8])

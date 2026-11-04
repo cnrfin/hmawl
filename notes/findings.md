@@ -3738,3 +3738,14 @@ so, door fades are timed there, possibly per frame. Not traced yet.
   taken from the water's most common kind; lbl_8034895C = 10000 / (100 + 5 Luck). Both globals are only read there.
 - luck1: pm test b7f9d6ff, Luck-20 test 26500972, normal 6c83066f.
 - luck1 tested (user, Luck-20 test build): dig site and fishing both yield clearly more; feels rewarding, not game-breaking.
+
+### 7.54 Gold from defeats (step 4; gold1)
+- func_801020E4 mode: 0 = talk window (mgr+0x314; speaker -1 = no name), 1 = info window (mgr+0x34C; speaker forced
+  -1), used by player state 0x2A (0x80034D10: mgr, 1, file +0x14C0, msg +0x14C4, -1, 0x70, 0, 0; it also clears
+  CONTROL and sets it back to 1 once mgr+0x48 == 0), field items (system.mes 0x1D6) and others. Scripts' cmd 0x04
+  uses mode 0 (no background, as events 410 / 411). Mode 1 is taken to be the wooden board (to confirm in game).
+- stats.c stats_reward (zt.c en_hit on a defeat): after 90 frames, once not fighting / collapsing, in the field, no
+  pop-up, no event and no box open: gold via func_80113234(game+0x11A14, n) (as script 0xC1) + SE 0xCD, number slot 0,
+  debug.mes 30 "You found <n0> G!" in mode 1, CONTROL 0. The defeat's EXP is added when the box closes (mgr+0x48 0),
+  so the level-up pop-up and menu come after it; while a reward waits, levels / menus / the stats view wait too.
+- gold1: debug.mes 3513c028 (Common.arc unchanged 5f1848b3), pm test 78640463, normal ca08914b.
