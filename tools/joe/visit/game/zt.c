@@ -58,7 +58,7 @@ static float aim_h(s32 id)                              /* reticle / visibility 
 #define EN_TINT     15                                  /* defeat: frames white -> red */
 #define EN_FADE     45                                  /* then frames red -> transparent */
 static const u8 en_dmg[4] = { 10, 13, 20, 40 };         /* Stick, Wooden Sword, Farmer's Sword, H.M Murasama */
-struct { u32 magic; s32 hp, day, state, t, flash, last_dmg, hits; float x, y, z, kx, kz; s32 lasth; } EN;   /* 'ENMY' (dump) */
+struct { u32 magic; s32 hp, day, state, t, flash, last_dmg, hits; float x, y, z, kx, kz; s32 lasth, maxhp, armour, clinks, pushes; } EN;   /* 'ENMY' (dump) */
 static u8 *wild_inst(u8 *a)
 {
     u8 *sk = *(u8 **)(a + 0x168), *in;
@@ -82,7 +82,8 @@ u8 *en_ctl;                                              /* the animal our battl
    obj+0xD8 = its clip n (motion table per species family = species - 0x2C; findings 7.46), with the play state
    obj+0xE0 = 0 (loop; 1 = once, 3 = stopped); idle 0; the moving clips per species: ai_go / ai_dash.
    Facing: +0xF0 sin / +0xF8 cos (copied to +0x58 / +0x60 every update). No damage to the player yet. */
-enum { AI_CIRCLE, AI_WINDUP, AI_LUNGE, AI_RECOVER, AI_HIT, AI_HOME = 100 };
+enum { AI_CIRCLE, AI_WINDUP, AI_LUNGE, AI_RECOVER, AI_HIT, AI_RETREAT, AI_POOF, AI_HOME = 100 };
+enum { ATK_LUNGE, ATK_BITE, ATK_WHIP, ATK_FEINT, ATK_POOF };
 #define AI_R       3.5f                                 /* circling distance */
 #define AI_TAN     0.09f                                /* circling speed (per frame) */
 #define AI_WIND    18                                   /* wind up: 0.3 s, hopping back a little */
@@ -91,15 +92,18 @@ enum { AI_CIRCLE, AI_WINDUP, AI_LUNGE, AI_RECOVER, AI_HIT, AI_HOME = 100 };
 #define AI_REC     30
 #define AI_AGAIN   35                                   /* % chance of a second lunge straight after */
 #define MOT_IDLE   0
-struct { u32 magic; s32 st, t, len, dir; float lx, lz; s32 atk, kb, hseen, again; } AI;   /* 'ENAI' (dump) */
-/* Attack moves (battle11, user design): per species {wind-up, lunge, recover frames, % second lunge, lunge speed};
-   atk 1 = the turtle's bite (wind-up 10, a 12-frame step in at 0.2 with the neck strike, recover 16). */
-static const struct { u8 wind, lunge, rec, again; float spd; } AIP[5] = {
-    { 18, 18, 26, 35, 0.40f },                           /* lizard: crouch, jump + jaw snaps */
-    { 16, 12, 22, 40, 0.45f },                           /* chihuahua: play bow, dart */
-    { 26, 20, 26, 25, 0.36f },                           /* tanuki: butt wiggle, jump */
-    { 24, 36, 34,  0, 0.28f },                           /* turtle: into the shell, spin; dizzy after */
-    { 18, 16, 30, 35, 0.42f } };                         /* owl (unchanged) */
+struct { u32 magic; s32 st, t, len, dir; float lx, lz; s32 atk, kb, hseen, again, zz, hidden; } AI;   /* 'ENAI' (dump) */
+/* Mini bosses (battle13, user design): per species {HP, circle radius, circle speed, circle min / extra frames,
+   wind-up, lunge, recover frames, % chain, max chain, lunge speed, push radius}. Below half HP they enrage: 1.3x
+   speed, 0.7x wind-up / recover, 0.6x circling time. Chihuahua easy and twitchy; tanuki the all-rounder with feints
+   and a smoke-puff vanish; lizard strong and fast with a tail whip up close; turtle the 3000 HP tank: chained shell
+   spins, armoured while tucked in (1/4 damage, a clink), full damage while dizzy afterwards. */
+static const struct { s16 hp; u8 cmin, cvar, wind, lunge, rec, again, chain; float r, tan, spd, push; } AIP[5] = {
+    { 1000, 25, 30, 16, 18, 22, 50, 2, 2.8f, 0.10f, 0.48f, 1.00f },   /* lizard */
+    {  300, 30, 30, 12, 10, 16, 70, 3, 2.6f, 0.12f, 0.50f, 0.55f },   /* chihuahua */
+    {  500, 40, 40, 26, 20, 26, 25, 1, 3.2f, 0.08f, 0.36f, 0.65f },   /* tanuki */
+    { 3000, 50, 40, 24, 36, 40, 60, 3, 3.5f, 0.05f, 0.30f, 1.30f },   /* turtle */
+    {  500, 40, 50, 18, 16, 30, 35, 2, 3.5f, 0.09f, 0.42f, 0.60f } }; /* owl */
 #define AI_HIT_KB  18                                    /* hit 3: knocked back, quick recovery (user) */
 #define AI_HIT_FL  10                                    /* hits 1-2: a flinch */
 struct { u32 magic; s32 sp, st, t, len, atk, kb; u32 clk; } PZ;   /* 'POSE': what the bone layer draws (dump) */
@@ -113,7 +117,8 @@ struct { u32 magic; s32 on, homing, starts; float hx, hz; u8 *who; } AG;   /* 'A
 static u8 *en_hid;                                       /* the draw instance we hid / tinted (it can outlive the day's
                                                              animal: memfix-era b3t, animals "gone" for days after a defeat) */
 static s32 en_today(void) { return (s32)((**(u32 **)0x80349218) / 864000u); }
-static s32 en_alive(void) { if (EN.day != en_today()) { EN.day = en_today(); EN.hp = EN_HP; EN.state = 0; EN.t = 0; EN.flash = 0; } return EN.state == 0; }
+static s32 en_alive(void) { if (EN.day != en_today()) { EN.day = en_today(); EN.hp = EN.maxhp = 0; EN.state = 0; EN.t = 0; EN.flash = 0; } return EN.state == 0; }
+/* HP is set on the first frame the day's animal is seen (en_frame: per species, battle13); 0 = not yet */
 #define SE_LOCK    238                                  /* lock on: vanilla sound 238 (user pick; 434 = our OoT-style flutter, still in the bank) */
 #define SE_FREE    239                                  /* lock off: vanilla 239 (435 = ours) */
 
@@ -245,6 +250,7 @@ static void zlog(s32 kind, s32 a, s32 b)
 static void release(void) { if (Z.target) zlog(7, Z.target, 0); Z.target = 0; Z.fvalid = 0; }
 static void let_go_why(s32 why) { if (Z.target) { zlog(why, Z.target, 0); sfx_play(*(u8 **)0x803491E4, SE_FREE, 0); } Z.target = 0; Z.fvalid = 0; }
 static void reticle(u8 *g);
+static s32 en_rage(void);
 
 /* ---- the reticle: 4 HUD quads (opguide.agc element 7, AGC_RET_Q) around the target's projected chest.
    Camera *(0x8034922C): +0x50 view matrix (3 x 4 rows), +0x34 aspect, +0x38 vertical FOV in degrees (30.2;
@@ -257,6 +263,7 @@ static void reticle(u8 *g);
 #define RET_DEPTH  12.0f                                /* ... and it scales with 1 / depth (clamped) */
 #define RET_ARM    12                                   /* bracket arm length */
 #define RET_W      4                                    /* bracket thickness */
+#define RET_BAR    7                                    /* enemy HP bar height (the box's bottom edge) */
 #define RET_SNAP   9.0f                                 /* frames to snap in (ease-out-back, overshoot 2) */
 static void quad(u8 *a, s32 k, s32 x0, s32 y0, s32 x1, s32 y1, const float *uv, u32 rgba)
 {
@@ -279,7 +286,7 @@ static void reticle(u8 *g)
 {
     u8 *a = AGC, *c = CAM;
     float x, y, z, w, sx, sy, t, k, h, sc;
-    s32 cx, cy, e7y, hx, hy, sxn, syn, n = 0;
+    s32 cx, cy, e7y, hx, hy, sxn, syn, n = 0, bar;
     u32 col;
     zt_dbg.agc_ok = 0;
     if ((u32)a < 0x80000000u || (u32)a >= 0x81800000u) return;
@@ -309,12 +316,19 @@ static void reticle(u8 *g)
     hx = (s32)(RET_H * sc * h); hy = (s32)(RET_H * 1.15f * sc * h);
     e7y = *(s16 *)(a + AGC_E7_Y); cx -= E7_X; cy -= e7y;
     col = RET_COL | (u32)Z.alpha;
+    bar = Z.target == ZT_WILD && EN.maxhp > 0 && en_alive();
     for (sxn = -1; sxn <= 1; sxn += 2)
         for (syn = -1; syn <= 1; syn += 2) {
             s32 x0 = cx + sxn * hx, y0 = cy + syn * hy;
-            quad(a, n++, x0, y0, x0 - sxn * RET_ARM, y0 - syn * RET_W, UV_WHITE, col);   /* horizontal arm */
+            if (!(bar && syn > 0)) quad(a, n++, x0, y0, x0 - sxn * RET_ARM, y0 - syn * RET_W, UV_WHITE, col);   /* horizontal arm */
             quad(a, n++, x0, y0, x0 - sxn * RET_W, y0 - syn * RET_ARM, UV_WHITE, col);   /* vertical arm */
         }
+    if (bar) {   /* enemy HP (battle13): the box's bottom edge is the bar - dark back, yellow fill (red when enraged) */
+        s32 y0 = cy + hy, w = 2 * hx - 2, f = (s32)((float)w * (float)EN.hp / (float)EN.maxhp);
+        if (f < 0) f = 0;
+        quad(a, n++, cx - hx, y0 - RET_BAR, cx + hx, y0, UV_WHITE, 0x28282800u | (u32)(Z.alpha * 3 / 4));
+        quad(a, n++, cx - hx + 1, y0 - RET_BAR + 1, cx - hx + 1 + f, y0 - 1, UV_WHITE, (en_rage() ? 0xFF4A2A00u : RET_COL) | (u32)Z.alpha);
+    }
 }
 
 static void swing_frame(s32 bpress, s32 free);
@@ -592,6 +606,7 @@ static float smooth01(float x) { if (x <= 0.0f) return 0.0f; if (x >= 1.0f) retu
 #define SE_SWING_H 437                                  /* hit 3 */
 #define SE_HIT_L   438
 #define SE_HIT_H   439
+#define SE_CLINK   -1                                   /* shell armour: set from the sound research (-1 = none) */
 #define SE_DEFEAT  222                                  /* defeat: an animal cry (user pick) */
 #define SE_VOICE1  440                                  /* Toan's voice (Dark Cloud): hit 1, hit 2, hit 3; 443 hurt / 444 dies for later */
 static const float sw_snap[3] = { 5.0f, 3.0f, 10.0f }, sw_strike[3] = { 8.0f, 6.0f, 13.0f };
@@ -607,13 +622,19 @@ static void en_hit(s32 h, float dx, float dz)
 {
     s32 w = sw_item == 0x4E3 ? 0 : sw_item == 0x4E4 ? 1 : sw_item == 0x4EA ? 2 : 3, dmg;
     float d2 = dx * dx + dz * dz, k;
-    if (!en_alive() || Z.target != ZT_WILD) return;
+    if (!en_alive() || Z.target != ZT_WILD || AI.hidden) return;   /* nothing to hit while the tanuki is a puff of smoke */
     dmg = en_dmg[w]; if (h == 2) dmg = dmg * 3 / 2;
+    {   u8 *a = wild_obj();                                  /* the turtle tucked in its shell: 1/4 damage, a clink */
+        EN.armour = a && en_ctl == a && *(s32 *)(a + 0x128) == 0x2F && AI.atk == ATK_LUNGE &&
+                    ((AI.st == AI_WINDUP && AI.t > 5) || AI.st == AI_LUNGE || (AI.st == AI_RECOVER && AI.t < 6));
+        if (EN.armour) { dmg = dmg / 4; if (dmg < 1) dmg = 1; EN.clinks++; if (SE_CLINK >= 0) sfx_play(*(u8 **)0x803491E4, SE_CLINK, 0); }
+    }
     EN.magic = 0x454E4D59u; EN.hits++; EN.last_dmg = dmg; EN.hp -= dmg;
     EN.flash = EN_FLASH;
     EN.lasth = h;
     k = d2 > 0.0001f ? (h == 2 ? 0.9f : 0.35f) * rsq(d2) : 0.0f;   /* knock back 0.35 (hit 3: 0.9) away from the player, over 4 frames */
     EN.kx = dx * k / 4.0f; EN.kz = dz * k / 4.0f;
+    if (EN.armour) EN.kx = EN.kz = 0.0f;                    /* the shell does not budge */
     if (EN.hp <= 0) {
         u8 *a = wild_obj();
         EN.hp = 0; EN.state = 1; EN.t = 0;
@@ -653,49 +674,91 @@ static void ai_mot(u8 *a, s32 m)                        /* motion request + play
     *(s32 *)(a + 0xD8) = m; *(s32 *)(a + 0xE0) = 0;
 }
 static u32 ai_rand(u32 n) { return F(0x8017D3E8, u32, (void))() % n; }   /* the game's rand() */
+static s32 en_rage(void) { return EN.maxhp > 0 && EN.hp * 2 < EN.maxhp; }   /* below half HP: enraged */
+static s32 ai_k(s32 n, float k) { s32 v = (s32)((float)n * k); return v < 1 ? 1 : v; }
+static void poof_fx(float x, float y, float z);
 static void ai_frame(u8 *g, u8 *a)
 {
     float *p = SLOT_POS(g, 0), x = *(float *)(a + 0x4C), z = *(float *)(a + 0x54);
     float dx = p[0] - x, dz = p[2] - z, d2 = dx * dx + dz * dz, inv = d2 > 0.0001f ? rsq(d2) : 0.0f, d = d2 * inv;
     float ux = dx * inv, uz = dz * inv;
-    s32 sp = *(s32 *)(a + 0x128) - 0x2C;
+    s32 sp = *(s32 *)(a + 0x128) - 0x2C, rage = en_rage();
+    float fs = rage ? 1.3f : 1.0f, ft = rage ? 0.7f : 1.0f;
     if (sp < 0 || sp > 4) sp = 4;
     AI.magic = 0x454E4149u; AI.t++;
     if (EN.hits != AI.hseen) {                               /* a new hit: flinch, or knocked back on hit 3 */
-        AI.hseen = EN.hits; AI.kb = EN.lasth == 2;
-        AI.st = AI_HIT; AI.t = 0; AI.len = AI.kb ? AI_HIT_KB : AI_HIT_FL;
+        AI.hseen = EN.hits;
+        if (!EN.armour && AI.st != AI_POOF) {                /* the turtle's shell shrugs it off */
+            AI.kb = EN.lasth == 2;
+            AI.st = AI_HIT; AI.t = 0; AI.len = AI.kb ? AI_HIT_KB : AI_HIT_FL;
+        }
     }
     switch (AI.st) {
     case AI_CIRCLE: {
-        float rad = (d - AI_R) * 0.08f, tan = AI_TAN * (float)AI.dir;
-        float cap = Z.target == ZT_WILD ? 0.12f : AI_CHASE;
+        float rad = (d - AIP[sp].r) * 0.08f, tan = AIP[sp].tan * fs * (float)AI.dir;
+        float cap = Z.target == ZT_WILD ? 0.12f * fs : AI_CHASE;
         if (rad > cap) rad = cap; if (rad < -cap) rad = -cap;
+        if (sp == 1 && --AI.zz <= 0) { AI.dir = -AI.dir; AI.zz = 12 + (s32)ai_rand(18); }   /* chihuahua: zig-zag */
         ai_move(a, x + ux * rad - uz * tan, z + uz * rad + ux * tan);
         ai_face(a, ux * rad - uz * tan, uz * rad + ux * tan);   /* runs the way it goes (user); the head tracks you */
         ai_mot(a, ai_go(a));
+        if (sp == 0 && d < 2.2f && ai_rand(100) < 5) {       /* lizard: you came close - tail whip */
+            AI.st = AI_WINDUP; AI.t = 0; AI.atk = ATK_WHIP; AI.len = 6; AI.again = 0; break;
+        }
         if (AI.t >= AI.len) {
-            AI.st = AI_WINDUP; AI.t = 0; AI.again = 0;
-            AI.atk = sp == 3 && ai_rand(100) < 40;           /* the turtle sometimes bites instead */
-            AI.len = AI.atk ? 10 : AIP[sp].wind;
+            AI.st = AI_WINDUP; AI.t = 0; AI.again = 0; AI.atk = ATK_LUNGE;
+            if (sp == 3 && d < 4.0f && ai_rand(100) < 40) AI.atk = ATK_BITE;
+            if (sp == 2) { u32 r = ai_rand(100); if (r < 25 && d > 1.5f) AI.atk = ATK_POOF; else if (r < 50) AI.atk = ATK_FEINT; }
+            if (AI.atk == ATK_POOF) { AI.st = AI_POOF; AI.len = 16; }
+            else AI.len = AI.atk == ATK_BITE ? 10 : ai_k(AIP[sp].wind, ft);
         }
         break; }
     case AI_WINDUP:
-        if (AI.t < 8 && sp != 3) ai_move(a, x - ux * 0.05f, z - uz * 0.05f);   /* a little hop back: the tell */
+        if (AI.t < 8 && sp != 3 && AI.atk != ATK_WHIP) ai_move(a, x - ux * 0.05f, z - uz * 0.05f);   /* a little hop back: the tell */
         ai_face(a, dx, dz); ai_mot(a, MOT_IDLE);
-        if (AI.t >= AI.len) { AI.st = AI_LUNGE; AI.t = 0; AI.lx = ux; AI.lz = uz; AI.len = AI.atk ? 12 : AIP[sp].lunge; }
+        if (AI.t >= AI.len) {
+            AI.st = AI_LUNGE; AI.t = 0; AI.lx = ux; AI.lz = uz;
+            AI.len = AI.atk == ATK_BITE ? 12 : AI.atk == ATK_WHIP || AI.atk == ATK_FEINT ? 14 : AIP[sp].lunge;
+        }
         break;
     case AI_LUNGE: {
-        float v = AI.atk ? 0.2f : AIP[sp].spd;
-        if (d > (AI.atk ? 1.2f : 0.7f)) ai_move(a, x + AI.lx * v, z + AI.lz * v);   /* stops at the player */
-        ai_face(a, AI.lx, AI.lz); ai_mot(a, sp <= 3 ? MOT_IDLE : ai_dash(a));   /* battle12: the leap's legs are drawn, not the run clip */
+        float v = AI.atk == ATK_BITE ? 0.2f : AI.atk == ATK_WHIP ? 0.0f : AI.atk == ATK_FEINT ? -0.22f : AIP[sp].spd * fs;
+        if (v < 0.0f || (v > 0.0f && d > (AI.atk == ATK_BITE ? 1.2f : 0.7f))) ai_move(a, x + AI.lx * v, z + AI.lz * v);
+        if (AI.atk != ATK_WHIP) ai_face(a, AI.lx, AI.lz);
+        ai_mot(a, sp <= 3 ? MOT_IDLE : ai_dash(a));
         if (AI.t >= AI.len) {
-            if (!AI.again && !AI.atk && ai_rand(100) < AIP[sp].again) { AI.st = AI_WINDUP; AI.again = 1; AI.len = AIP[sp].wind; AI.t = AI.len - 6; }   /* again! */
-            else { AI.st = AI_RECOVER; AI.t = 0; AI.len = AI.atk ? 16 : AIP[sp].rec; }
+            if (AI.atk == ATK_LUNGE && AI.again + 1 < AIP[sp].chain && ai_rand(100) < AIP[sp].again) {   /* again! */
+                AI.st = AI_WINDUP; AI.again++; AI.len = ai_k(AIP[sp].wind, ft); AI.t = AI.len - (sp == 3 ? 2 : 6);
+            } else {
+                AI.st = AI_RECOVER; AI.t = 0;
+                AI.len = AI.atk == ATK_BITE || AI.atk == ATK_WHIP ? 16 : AI.atk == ATK_FEINT ? 10 : ai_k(AIP[sp].rec, ft);
+            }
         }
         break; }
+    case AI_POOF:                                            /* tanuki: vanish in a puff, reappear behind you */
+        ai_mot(a, MOT_IDLE);
+        if (AI.t == 1) { poof_fx(x, *(float *)(a + 0x50), z); AI.hidden = 1; }
+        if (AI.t == 9) {
+            float *pd = (float *)(g + 0x29F84), fx = pd[0], fz = pd[2], l = fx * fx + fz * fz, nx, nz;
+            if (l < 0.0001f) { fx = -ux; fz = -uz; } else { l = rsq(l); fx *= l; fz *= l; }
+            nx = p[0] - fx * 2.2f; nz = p[2] - fz * 2.2f;
+            ai_move(a, nx, nz); ai_face(a, p[0] - nx, p[2] - nz);
+            poof_fx(nx, *(float *)(a + 0x50), nz); AI.hidden = 0;
+        }
+        if (AI.t >= AI.len) { AI.st = AI_WINDUP; AI.t = 0; AI.atk = ATK_LUNGE; AI.len = 8; }
+        break;
+    case AI_RETREAT:                                         /* chihuahua: hit, it skitters away */
+        ai_move(a, x - ux * 0.2f * fs, z - uz * 0.2f * fs); ai_face(a, dx, dz); ai_mot(a, ai_go(a));
+        if (AI.t >= AI.len) { AI.st = AI_CIRCLE; AI.t = 0; AI.len = ai_k(AIP[sp].cmin + (s32)ai_rand(AIP[sp].cvar), rage ? 0.6f : 1.0f); }
+        break;
     default:                                                 /* recover / hit */
         ai_mot(a, MOT_IDLE);
-        if (AI.t >= AI.len) { AI.st = AI_CIRCLE; AI.t = 0; AI.len = 40 + (s32)ai_rand(50); AI.atk = 0; if (ai_rand(2)) AI.dir = -AI.dir; }
+        if (AI.t >= AI.len) {
+            if (AI.st == AI_HIT && sp == 1 && ai_rand(100) < 70) { AI.st = AI_RETREAT; AI.t = 0; AI.len = 14; break; }
+            AI.st = AI_CIRCLE; AI.t = 0; AI.atk = ATK_LUNGE;
+            AI.len = ai_k(AIP[sp].cmin + (s32)ai_rand(AIP[sp].cvar), rage ? 0.6f : 1.0f);
+            if (ai_rand(2)) AI.dir = -AI.dir;
+        }
     }
 }
 #define EN_SCALE 2.0f                                   /* user: all wild animals 2x (skeleton instance scale +0x1C..+0x24) */
@@ -740,6 +803,28 @@ static void ai_home(u8 *a)
     ai_move(a, x + dx * inv * AG_HOME_V, z + dz * inv * AG_HOME_V);
     ai_face(a, dx, dz); ai_mot(a, ai_go(a));
 }
+/* Collision at 2x (battle13): the animal's own collider is still its 1x size, so the player is pushed out to the
+   species radius (AIP push, object units) each frame. Player object (logs.c pm_player) position +0x4C; a copy at
+   +0xFC (as the animals have) is moved too when it holds the same position. */
+extern u8 *pm_player;
+static void en_push(u8 *a)
+{
+    u8 *pl = pm_player;
+    float *pp, *pq, r, dx, dz, d2, k, ax = *(float *)(a + 0x4C), az = *(float *)(a + 0x54);
+    s32 sp = *(s32 *)(a + 0x128) - 0x2C;
+    if ((u32)pl < 0x80000000u || (u32)pl >= 0x81800000u || sp < 0 || sp > 4) return;
+    pp = (float *)(pl + 0x4C); pq = (float *)(pl + 0xFC); r = AIP[sp].push;
+    dx = pp[0] - ax; dz = pp[2] - az; d2 = dx * dx + dz * dz;
+    if (d2 >= r * r || d2 < 0.000001f) return;
+    k = r * rsq(d2);
+    if (pq[0] - pp[0] < 0.001f && pp[0] - pq[0] < 0.001f && pq[2] - pp[2] < 0.001f && pp[2] - pq[2] < 0.001f) { pq[0] = ax + dx * k; pq[2] = az + dz * k; }
+    pp[0] = ax + dx * k; pp[2] = az + dz * k;
+    EN.pushes++;
+}
+static void poof_fx(float x, float y, float z)              /* smoke puff: filled from the particle research */
+{
+    (void)x; (void)y; (void)z;
+}
 static void ht_want(u8 *g, u8 *a)                        /* the head's target: the player, relative to the facing */
 {
     float *p = SLOT_POS(g, 0), dx = p[0] - *(float *)(a + 0x4C), dz = p[2] - *(float *)(a + 0x54);
@@ -755,6 +840,11 @@ static void en_frame(u8 *g)
     en_scale(a);
     HT.magic = 0x4854524Bu; HT.phi += (HT.want - HT.phi) * HT_EASE; HT.want = 0.0f;   /* back to straight unless in battle */
     ag_frame(g, a);
+    if (en_alive() && !EN.maxhp) {                            /* today's animal: its HP (per species) */
+        s32 sp = *(s32 *)(a + 0x128) - 0x2C; if (sp < 0 || sp > 4) sp = 4;
+        EN.maxhp = EN.hp = AIP[sp].hp;
+    }
+    if (AI.hidden && !(AG.on && en_ctl == a)) AI.hidden = 0;
     if (en_alive() && AG.on) {                                /* in battle: our AI drives it */
         if (en_ctl != a || AG.on == 2) { en_ctl = a; AG.on = 1; AI.st = AI_CIRCLE; AI.t = 0; AI.len = 90; AI.dir = 1; AI.atk = 0; AI.hseen = EN.hits; }
         ai_frame(g, a);
@@ -774,6 +864,8 @@ static void en_frame(u8 *g)
             ai_move(a, *(float *)(a + 0x4C) + EN.kx, *(float *)(a + 0x54) + EN.kz);
             if (--EN.flash == 0) en_colour(in, 0, 255, 255, 255, 255);
         }
+        if (AI.hidden) { in[0x3C] = 0; en_hid = in; }        /* tanuki poof: gone for a moment */
+        else en_push(a);                                      /* 2x body: keep the player out of it */
         return;
     }
     if (EN.state == 1) {
@@ -923,7 +1015,7 @@ static void pose_legs(s32 n, PCX *c, s32 sp, s32 st, s32 t, float u, float ck)
     } else if (st == AI_WINDUP) {                                 /* crouch: legs load */
         k = smooth01((float)t / 6.0f);
         fu = -0.25f * k; fk = 0.5f * k; hu = -0.45f * k; hk = 0.8f * k;
-    } else if (st == AI_LUNGE) {                                  /* leap: front legs reach, hind legs kick back, then gather */
+    } else if (st == AI_LUNGE && PZ.atk != ATK_WHIP) {           /* leap: front legs reach, hind legs kick back, then gather */
         e = zsin(PI_F * u) * (sp == 1 ? 0.7f : 1.0f);
         fu = -0.9f * e; fk = 0.35f * e; hu = 0.85f * e; hk = 0.4f * e;
     } else if (sp == 2 && (st == AI_CIRCLE || st == AI_HOME)) {  /* tanuki hop: stretched in the air, gathered on landing */
@@ -961,6 +1053,9 @@ static void pose_apply(s32 n, PCX *c)
             if (n == 0) { p_mov(c, 0.0f, -0.08f * k, 0.0f); p_rot(c, 0, 0.10f * k); }
             if (n == 2) p_rot(c, 1, 0.35f * zsin(ck * 0.6f) * k);
             liz_gape(n, c, smooth01((float)(t - 4) / 8.0f));   /* hiss: the mouth opens wide and holds */
+        } else if (st == AI_LUNGE && PZ.atk == ATK_WHIP) {   /* tail whip: one fast full turn, tail raised */
+            if (n == 0) p_rot(c, 1, 6.2831853f * smooth01(u));
+            if (n == 2) p_rot(c, 0, 0.3f * zsin(PI_F * u));
         } else if (st == AI_LUNGE) {                    /* leaps, snapping its jaw mid-air */
             if (n == 0) { p_mov(c, 0.0f, 1.0f * zsin(PI_F * u), 0.0f); p_rot(c, 0, -0.35f + 0.6f * u); }
             liz_gape(n, c, zabs(zcos(u * 3.0f * PI_F)) * (1.0f - u * 0.3f));   /* wide open -> snap, 3 times */
@@ -1009,7 +1104,7 @@ static void pose_apply(s32 n, PCX *c)
             if (n == 13) p_scl(c, 1.0f - 0.7f * kr);
             if (n == 0) p_mov(c, 0.0f, -0.30f * kr, 0.0f);   /* the shell settles on the ground */
         }
-        if (!PZ.atk && st == AI_LUNGE && n == 0) p_rot(c, 1, (float)t * 0.55f);   /* spinning shell */
+        if (!PZ.atk && st == AI_LUNGE && n == 0) p_rot(c, 1, (float)t * 1.1f);    /* spinning shell (battle13: twice as fast, user) */
         if (!PZ.atk && st == AI_RECOVER && n == 0) p_rot(c, 2, 0.18f * zsin((float)t * 0.5f) * (1.0f - u));   /* dizzy */
         if (PZ.atk && n == 2) {                         /* bite: neck back, then out */
             if (st == AI_WINDUP) p_mov(c, 0.0f, 0.0f, -0.08f * smooth01((float)t / 6.0f));
