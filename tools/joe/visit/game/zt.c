@@ -43,8 +43,8 @@ static float aim_h(s32 id)                              /* reticle / visibility 
 {
     u8 *a;
     if (id != ZT_WILD || !(a = wild_obj())) return 0.85f;
-    switch (*(s32 *)(a + 0x128)) { case 0x2D: return 0.15f; case 0x2E: return 0.35f; case 0x30: return 0.3f; }
-    return 0.2f;                                        /* lizard, turtle */
+    switch (*(s32 *)(a + 0x128)) { case 0x2D: return 0.30f; case 0x2E: return 0.70f; case 0x30: return 0.6f; }
+    return 0.4f;                                        /* lizard, turtle (all x2: the animals are drawn 2x, EN_SCALE) */
 }
 /* ---- Enemy step 2: HP, damage, hit flash, FF7-style defeat (user design) ----
    Each enemy has its own HP (the day's wild animal: EN_HP); each weapon its damage per hit; the combo's 3rd hit
@@ -646,7 +646,8 @@ static void ai_frame(u8 *g, u8 *a)
         float rad = (d - AI_R) * 0.08f, tan = AI_TAN * (float)AI.dir;
         if (rad > 0.12f) rad = 0.12f; if (rad < -0.12f) rad = -0.12f;
         ai_move(a, x + ux * rad - uz * tan, z + uz * rad + ux * tan);
-        ai_face(a, dx, dz); ai_mot(a, ai_go(a));
+        ai_face(a, ux * rad - uz * tan, uz * rad + ux * tan);   /* runs the way it goes (user); the head will track you */
+        ai_mot(a, ai_go(a));
         if (AI.t >= AI.len) { AI.st = AI_WINDUP; AI.t = 0; }
         break; }
     case AI_WINDUP:
@@ -667,10 +668,22 @@ static void ai_frame(u8 *g, u8 *a)
         if (AI.t >= AI.len) { AI.st = AI_CIRCLE; AI.t = 0; AI.len = 40 + (s32)ai_rand(50); if (ai_rand(2)) AI.dir = -AI.dir; }
     }
 }
+#define EN_SCALE 2.0f                                   /* user: all wild animals 2x (skeleton instance scale +0x1C..+0x24) */
+static const u8 en_head[5] = { 19, 4, 5, 4, 0xFF };     /* head bone: lizard, chihuahua, tanuki, turtle, owl (none) */
+struct { u32 magic, n, bone, inst; u8 trs[96]; u8 trs0[96]; } HEADDBG;   /* 'HEAD': the head bone's pose data (layout probe) */
+static u8 *en_skel;                                      /* the day's animal's skeleton instance (for zt_bone) */
+static void en_scale(u8 *a)
+{
+    u8 *sk = *(u8 **)(a + 0x168);
+    if ((u32)sk < 0x80000000u || (u32)sk >= 0x81800000u) { en_skel = 0; return; }
+    en_skel = sk;
+    *(float *)(sk + 0x1C) = EN_SCALE; *(float *)(sk + 0x20) = EN_SCALE; *(float *)(sk + 0x24) = EN_SCALE;
+}
 static void en_frame(u8 *g)
 {
     u8 *a = wild_obj(), *in;
-    if (!a || !(in = wild_inst(a))) { en_ctl = 0; return; }
+    if (!a || !(in = wild_inst(a))) { en_ctl = 0; en_skel = 0; return; }
+    en_scale(a);
     if (en_alive() && Z.target == ZT_WILD) {                 /* in battle: our AI drives it */
         if (en_ctl != a) { en_ctl = a; AI.st = AI_CIRCLE; AI.t = 0; AI.len = 90; AI.dir = 1; }
         ai_frame(g, a);
@@ -760,6 +773,14 @@ static void swing_frame(s32 bpress, s32 free)
 s32 zt_bone(u8 *ctl, s32 n, u8 *trs, u8 *inst)
 {
     s32 r = anim_eval(ctl, n, trs);
+    if (inst && en_skel && (inst == en_skel || inst == *(u8 **)(en_skel + 0x14))) {                        /* layout probe: the animal's head bone (and bone 0) */
+        u8 *a = wild_obj(); s32 sp = a ? *(s32 *)(a + 0x128) - 0x2C : -1, k;
+        if (sp >= 0 && sp < 5 && (n == en_head[sp] || n == 0)) {
+            u8 *dst = n == 0 ? HEADDBG.trs0 : HEADDBG.trs;
+            for (k = 0; k < 96; k++) dst[k] = trs[k];
+            HEADDBG.magic = 0x48454144u; HEADDBG.n++; HEADDBG.bone = (u32)n; HEADDBG.inst = (u32)inst;
+        }
+    }
     if (r && SW.w > 0.0f && n >= 18 && sw_slot && inst == *(u8 **)(sw_slot + 0x14)) {
         anim_blend((u8 *)&SWC[SW.cur], n, trs, SW.w); sw_dbg.bones++;   /* the clips own the whole spine: full weight */
     }

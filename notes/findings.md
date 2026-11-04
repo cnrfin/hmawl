@@ -3494,3 +3494,10 @@ so, door fades are timed there, possibly per frame. Not traced yet.
   3 60/17 ...; mouse set 72: 0 90/0, 1 9/18, 2 60/7, 3 80/18, 4 107/17, 5 180/21; turtle set 69: 1 7/17, 2 60/17 ...;
   tanuki set 68: 0 60/24, 1 5/25, 2 11/25, 3 61/21 ...; owl set 70: all near-static (perched). battle4: circling
   clip 1 (tanuki 2), lunge clip 1, owl idle (ai_go / ai_dash).
+- battle5 (user: run the way they go, head tracks the player, all animals 2x). Head bones from the skeleton
+  hierarchy: lizard 19, chihuahua 4, tanuki 5, turtle 4, owl none (10 nodes, perched). Circling now faces the
+  movement vector. Scale: the scale table at lbl_8024A534 is only read for its name by the loaders, so the
+  skeleton instance (animal +0x168) scale +0x1C/+0x20/+0x24 is set to 2.0 every frame (en_scale); collision
+  radius is not scaled; aim_h doubled. Probe: zt_bone copies 96 B of the evaluated TRS for the head bone and bone 0
+  into HEADDBG ('HEAD') when inst is the animal's skeleton (or its +0x14 draw instance), to learn the layout
+  before rotating the head toward the player. pm test f9e6a42e, normal 4ec96111.
