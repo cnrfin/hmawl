@@ -3395,3 +3395,6 @@ so, door fades are timed there, possibly per frame. Not traced yet.
 - TV "To be continued": not in tv-console2.tpl (21 pictures decoded from dump dfd76891: 0 vignette, 1-3 drama couple,
   4-5 angel, 6 singer, 7 news, 8-13 weather / effects, 14-20 ours) nor in its agc; probably a drama caption line
   (game text encoding). Waiting for a screenshot.
+- memfix 20 dump 08c13861 (m20t, buildings + rucksack with Joe): arena / pool A start 0x8037C000 (OK), MGRD n_a 42,255 /
+  n_b 15,357, overlaps 0; chapter archive ends 0x808E8D80, B lowest ever 445 KB above it; MEMG gap min 214 KB.
+  m20t = the user's base from now on.
