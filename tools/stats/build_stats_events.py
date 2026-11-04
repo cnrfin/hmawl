@@ -5,7 +5,7 @@ usage: build_stats_events.py Common.arc debug.mes OUTDIR   (inputs: tools/joe/vi
 52b153f1 = the Joe talk build); needs scratchpad/event (scrasm, mesenc, clzc, clz, loadarc) via EVTOOLS.
 Level-up: message "Level up! Lv <n0>" + an option list (01 41 04 00, options split by 01, end 00; as takakura.mes 113)
 -> the answer (1..4) -> event counter 61 = 1..4 (pm.bin applies it). Stats: a message with number slots <2A:000n>
-(0x2A 00 nn; pm.bin fills them with func_80102300(*0x803491C4, n, v) before starting the event)."""
+(0x2A nn 00 = slot nn, no padding; pm.bin fills them with func_80102300(*0x803491C4, n, v) before starting the event)."""
 import sys, os, struct, hashlib
 EV = os.environ.get('EVTOOLS', '/tmp/claude-0/-home-user/93ad7071-c0f2-50fe-8edf-5fd70c4d5f13/scratchpad/event')
 sys.path.insert(0, EV); sys.path.insert(0, os.path.dirname(EV))
@@ -32,7 +32,7 @@ def body(s):                                   # text -> glyph bytes, no termina
         elif '0' <= c <= '9': out += struct.pack('>H', 0x8000 + ord(c) - 48)
         else: out += struct.pack('>H', PUNCT[c])
     return bytes(out)
-def num(n): return bytes([0x2A, 0x00, n])
+def num(n): return bytes([0x2A, n, 0x00])           # 2A <slot> <pad width> (stats1 had them swapped: every number read slot 0)
 def pad(b):
     b = bytearray(b) + b'\x00'
     while len(b) % 4: b.append(0)

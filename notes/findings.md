@@ -3697,3 +3697,6 @@ so, door fades are timed there, possibly per frame. Not traced yet.
   (needed 2000). stats2: need = 500 + 750 x (level - 1) (500, 1250, 2000, ...; ~Lv 9 by the end of chapter 1 as before).
 - stats2 dump 3bc40e96: EXP 183 / Lv 1 - a reloaded save (the 1084 was never saved); ~75 % of a bar of tool work = 183
   EXP. stats3: farming EXP x3 (stamina-work / 33), need = 500 + 1250 x (level - 1).
+- stats3 (user screenshot + dump 4b9bf67f): the stats view printed 1 everywhere with growing gaps - the number code is
+  `2A <slot> <pad width>` (0x0C5 "<2A:0004>" = slot 0, width 4), stats1 had slot / width swapped (all read slot 0 = Lv).
+  stats4: debug.mes rebuilt with 2A n 00 (Common.arc unchanged). Slots are cleared when the message closes.
