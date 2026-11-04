@@ -28,7 +28,7 @@ enum { C_MAGIC = 54, C_EXP, C_LV, C_HP, C_PWR, C_END, C_LCK, C_ANS, C_PTS };
 void skill_levelup(void);
 #define SH_DATA
 #include "stat_hud.h"
-struct { u32 magic; s32 ignore, acc, last, lastfull, menu, cool, gained, refund, wait; } ST;   /* 'STAT' (dump) */
+struct { u32 magic; s32 ignore, acc, last, lastfull, menu, cool, gained, refund, wait, fish_set; } ST;   /* 'STAT' (dump) */
 
 static s32 need(s32 lv) { return 500 + 1250 * (lv - 1); }   /* stats3: 500, 1750, 3000 ... (farming EXP x3); stats2: 500, 1250, 2000 ... (was 1500 + 500 lv: Lv 2 took 2000) */
 static s32 ready(u8 *g) { return OK(g) && CNT(g, C_MAGIC) == (s32)ST_MAGIC; }
@@ -101,6 +101,45 @@ static void stats_hud(u8 *g)
         sq_number(a + SQ_LVNUM, 2, SH_LV_X, CNT(g, C_LV), SH_LV_SC, 0);
     }
 }
+/* step 4: Luck, +5 % per point (x2 at 20).
+   Dig site (wlp2.rel, module id 3, loaded when needed; found through the OS module list at 0x800030C8): a dig at a
+   spot finds something when 1 + rand % 100 < 30.0 / (digs at that spot + 1) (wlp2 0x2450; 30.0 = .rodata section 4
+   +0x50, the roll's bounds 1 / 100 = .data section 5 +0xAD8 / +0xADC). The 30.0 becomes 30 x (1 + 0.05 Luck).
+   Fishing (main.dol func_8017346C / func_80173504): species = cumulative weights 0x802C91F8 [species 0-7][water 0-3]
+   (s16) against 0..100; the rare ones (weight 1-10) get x (1 + 0.05 Luck), taken from that water's most common
+   species. Big vs small: the even fish (table +0x1A weight 1) when 0..lbl_8034895C (100) <= 100 / (w_even + w_odd);
+   that bound becomes 100 / (1 + 0.05 Luck). */
+#define FISH_W   ((short *)0x802C91F8)
+#define FISH_BIG (*(s32 *)0x8034895C)
+static const short fish_w0[32] = { 50, 0, 0, 0,  45, 0, 0, 0,  5, 0, 10, 0,  0, 50, 0, 50,
+                                   0, 0, 5, 5,   0, 15, 0, 15,  0, 5, 0, 0,  0, 30, 85, 30 };
+static void stats_luck(s32 lck)
+{
+    s32 w, sp, i;
+    u32 m = *(u32 *)0x800030C8;
+    for (i = 0; i < 16 && OK(m); i++, m = *(u32 *)(m + 4)) {        /* dig site */
+        u32 st = *(u32 *)(m + 0x10), ro, da;
+        if (*(u32 *)m != 3 || *(u32 *)(m + 0xC) != 21 || !OK(st)) continue;
+        ro = *(u32 *)(st + 4 * 8) & ~1u; da = *(u32 *)(st + 5 * 8) & ~1u;
+        if (OK(ro) && OK(da) && *(s32 *)(da + 0xAD8) == 1 && *(s32 *)(da + 0xADC) == 100 && *(u32 *)(ro + 0x54) == 0)
+            *(float *)(ro + 0x50) = 30.0f + 1.5f * (float)lck;
+        break;
+    }
+    for (i = 0; i < 32; i++) if (FISH_W[i] != fish_w0[i]) break;   /* fishing (once the table is ours, or untouched) */
+    if (i < 32 && ST.fish_set != 1) return;
+    for (w = 0; w < 4; w++) {
+        s32 common = 0, add = 0;
+        for (sp = 0; sp < 8; sp++) if (fish_w0[sp * 4 + w] > fish_w0[common * 4 + w]) common = sp;
+        for (sp = 0; sp < 8; sp++) {
+            s32 v = fish_w0[sp * 4 + w], b = v > 0 && v <= 10 ? (v * 5 * lck + 50) / 100 : 0;
+            FISH_W[sp * 4 + w] = (short)(v + b); add += b;
+        }
+        FISH_W[common * 4 + w] = (short)(fish_w0[common * 4 + w] - add);
+    }
+    ST.fish_set = 1;
+    FISH_BIG = 10000 / (100 + 5 * lck);
+}
+
 void stats_frame(u8 *g, s32 map, volatile u32 *held, volatile u32 *press, s32 busy)
 {
     s32 cur, d, *pts;
@@ -114,6 +153,11 @@ void stats_frame(u8 *g, s32 map, volatile u32 *held, volatile u32 *press, s32 bu
     /* HP: max stamina */
     *(s32 *)(g + 0x11B88) = 100000 + 10000 * CNT(g, C_HP);
     stats_hud(g);
+#ifdef LUCK_TEST
+    stats_luck(STAT_MAX);                                   /* test build: Luck 20 effects */
+#else
+    stats_luck(CNT(g, C_LCK));
+#endif
     /* tool work: stamina drops (not enemy hits) -> EXP, End refunds part of it */
     cur = *(s32 *)(g + 0x11B84);
     if (busy == 2) { ST.last = cur; ST.ignore = 0; ST.lastfull = *(s32 *)(g + 0x11B94); return; }   /* collapsing: zt.c owns stamina */

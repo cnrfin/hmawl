@@ -3723,3 +3723,17 @@ so, door fades are timed there, possibly per frame. Not traced yet.
   fullness / 13500. EXP fill = EXP / need(level). Numbers: zero-width quads past the last digit.
 - hud1: commonall a101ca68, pm test c4532baa, normal 3fa3df6a.
 - hud1 tested (user screenshot): works; Lvl 2 with 1 HP point shows the blue layer's first few % over a full green bar.
+
+### 7.53 Luck (step 4 of notes/stats_design.md; luck1)
+- Dig site (wlp2.rel, module id 3, 21 sections; dig action 0x2248): 0x2450 = find check: 1 + rand % 100 (bounds .data
+  sec 5 +0xAD8 / +0xADC = 1 / 100) < 30.0 (.rodata sec 4 +0x50) / (digs at this spot + 1) (s16 game+0x14C0C + 2 x spot,
+  +1 per find). Then 0x2550 = the special table (func_801A8B48, 5 rows) when 1 + rand % 1000 < (s16 game+0x14D24)^2 / 20,
+  else 0x2754 picks a row of the normal table (lbl_802928C8) by weight. The REL is loaded only when needed: walk the OS
+  module list (*0x800030C8, +4 next; +0x10 section table = absolute { addr | exec, size } after linking) - dumps
+  08544169 / d8feee0a show id 3 at 0x808F0D80 with 30.0 / 1 / 100 in place. stats.c: 30.0 -> 30 + 1.5 x Luck.
+- Fishing (main.dol): func_8017346C picks the kind: cumulative s16 weights 0x802C91F8 [kind 0-7][water 0-3]
+  (50,0,0,0 / 45,0,0,0 / 5,0,10,0 / 0,50,0,50 / 0,0,5,5 / 0,15,0,15 / 0,5,0,0 / 0,30,85,30) against lbl_80348950..54
+  (0..100), none = 9. func_80173504 picks the size: fish 2k (table 0x802C9238 +0x1A weight 1, the big one) when
+  0..lbl_8034895C (100) <= 100 / (w_2k + w_2k+1), else 2k+1. stats.c: rare kinds (weight 1-10) x (1 + 0.05 Luck),
+  taken from the water's most common kind; lbl_8034895C = 10000 / (100 + 5 Luck). Both globals are only read there.
+- luck1: pm test b7f9d6ff, Luck-20 test 26500972, normal 6c83066f.
