@@ -738,7 +738,6 @@ static const s32 EN_DMG[5] = { 14000, 6000, 9000, 15000, 8000 };   /* lizard, ch
 #define DMG_WHIP  12000
 struct { u32 magic; s32 hits, last, inv, slide, stun, taken, collapses; float kx, kz; s32 flash; } PD;   /* 'PDMG' (dump) */
 static void collapse_start(u8 *g);
-static void pl_motion(u8 *pl, s32 m, s32 face);
 static void player_hurt(u8 *g, s32 dmg, float ux, float uz)
 {
     s32 *st = (s32 *)(g + 0x11B84);
@@ -812,11 +811,6 @@ static void hurt_frame(volatile u32 *held, volatile u32 *press)
 #define scene_map  F(0x8017775C, void, (u8 *, s32, s32, s32))
 #define fade_to    F(0x80189128, void, (u8 *, u32 *, u32 *, s32, s32, float))
 #define FADER_     (*(u8 **)0x803491B8)
-static void pl_motion(u8 *pl, s32 m, s32 face)           /* a one-shot motion, then back to free (state 0x1B) */
-{
-    *(s32 *)(pl + 0x1498) = m; *(s32 *)(pl + 0x149C) = 0; *(s32 *)(pl + 0x14A0) = face;
-    set_state(pl, 0x1B);
-}
 static void collapse_start(u8 *g)
 {
     u8 *pl = pm_player;
@@ -824,7 +818,16 @@ static void collapse_start(u8 *g)
     if (CL.st) return;
     CL.magic = 0x434C5053u; CL.st = 1; CL.t = 0; PD.collapses++;
     let_go_why(10); AG.on = 0; AG.homing = 1; bm_off(0);
-    if ((u32)pl >= 0x80000000u && (u32)pl < 0x81800000u) pl_motion(pl, 0x12, 0x26);
+    if ((u32)pl >= 0x80000000u && (u32)pl < 0x81800000u) {
+        /* battle23: the game's own exhausted kneel with the spinning stars (state 0x25: motion 0x14, face 7, SE 0xFD) as the
+           defeat animation (user). Its enter picks the carry pose from ctrl+0x144 (held item): shown an empty hand for the
+           call, so the weapon stays in the hand instead of held out like an item. */
+        u8 *ctrl = *(u8 **)(pl + 0x135C);
+        s32 held = 0;
+        if ((u32)ctrl >= 0x80000000u && (u32)ctrl < 0x81800000u) { held = *(s32 *)(ctrl + 0x144); *(s32 *)(ctrl + 0x144) = 0; }
+        set_state(pl, 0x25);
+        if ((u32)ctrl >= 0x80000000u && (u32)ctrl < 0x81800000u) *(s32 *)(ctrl + 0x144) = held;
+    }
 }
 static void collapse_frame(u8 *g, s32 map, volatile u32 *held, volatile u32 *press)
 {
@@ -832,7 +835,13 @@ static void collapse_frame(u8 *g, s32 map, volatile u32 *held, volatile u32 *pre
     if (!CL.st) return;
     CL.t++;
     if (CL.st < 3) { *press = 0; *held = 0; }
-    if (CL.st == 1 && CL.t >= 75) {                       /* lying down: fade to black */
+    if (CL.st < 3) *(s32 *)(g + 0x11B84) = *(s32 *)(g + 0x11B88) / 10;   /* held at 10 %: the kneel (state 0x25) ends itself at 30 % */
+    if ((CL.st == 2 && CL.t > 50) || (CL.st == 3 && map != 3)) {   /* stay black until the house is up (no flash back in) */
+        if ((u32)fd >= 0x80000000u && (u32)fd < 0x81800000u && *(u8 *)(fd + 0x60) != 1 && *(u8 *)(fd + 0x53) != 0xFF) {
+            u32 bk = 0x000000FF; fade_to(fd, &bk, &bk, 0, 0, 0.0f);
+        }
+    }
+    if (CL.st == 1 && CL.t >= 120) {                      /* kneeling with the stars: fade to black */
         u32 from = 0x00000000, to = 0x000000FF;
         if ((u32)fd >= 0x80000000u && (u32)fd < 0x81800000u) fade_to(fd, &from, &to, 0, 0, 0.8f);
         CL.st = 2; CL.t = 0;

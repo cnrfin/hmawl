@@ -3661,3 +3661,9 @@ so, door fades are timed there, possibly per frame. Not traced yet.
   +0x158 / +0x159 / +0x15B are held at 1 (no 20 % / 40 % tired or hungry motions); the HUD stays up: our main.dol cave HUD code
   (hud_slide, v03) 'moved -> still count 0' at 0x80003618 (li r12,0 = 0x39800000) is swapped for li r12,255 while fighting
   (dcbst / icbi), restored after. pm test 95bad8a0, normal 5ffea81e.
+- battle22 (user, dump 62695a05 taken mid-collapse: CL.st 3, stamina 50000, held item 0x4E4, map 1): two animations - the
+  fall-asleep motion (0x12 via 0x1B), a fade, back in on the exhausted kneel (state 0x25 started once 0x1B ended at 10 %),
+  then the warp; and the weapon held out in front (the motion state's carry pose from ctrl+0x144).
+- battle23: the defeat animation is state 0x25 itself (kneel + spinning stars + SE 0xFD, user's pick), entered with
+  ctrl+0x144 = 0 for the call (empty-hand pose, weapon left in the hand), HP held at 10 % until the warp (0x25 ends
+  itself at 30 %), fade out after 120 frames, and the fader is kept black (0 s black->black) from then until map 3 is up.
