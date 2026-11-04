@@ -641,7 +641,7 @@ static void ai_face(u8 *a, float dx, float dz)
 static s32 ai_go(u8 *a)                                  /* circling */
 {
     s32 sp = *(s32 *)(a + 0x128);
-    return sp == 0x2E ? 2 : sp == 0x30 ? MOT_IDLE : 1;
+    return sp == 0x2E || sp == 0x30 ? MOT_IDLE : 1;   /* battle12: the tanuki hops (drawn on idle, pose_legs) */
 }
 static s32 ai_dash(u8 *a)                                /* the lunge: the fastest cycle */
 {
@@ -687,7 +687,7 @@ static void ai_frame(u8 *g, u8 *a)
     case AI_LUNGE: {
         float v = AI.atk ? 0.2f : AIP[sp].spd;
         if (d > (AI.atk ? 1.2f : 0.7f)) ai_move(a, x + AI.lx * v, z + AI.lz * v);   /* stops at the player */
-        ai_face(a, AI.lx, AI.lz); ai_mot(a, sp == 3 ? MOT_IDLE : ai_dash(a));
+        ai_face(a, AI.lx, AI.lz); ai_mot(a, sp <= 3 ? MOT_IDLE : ai_dash(a));   /* battle12: the leap's legs are drawn, not the run clip */
         if (AI.t >= AI.len) {
             if (!AI.again && !AI.atk && ai_rand(100) < AIP[sp].again) { AI.st = AI_WINDUP; AI.again = 1; AI.len = AIP[sp].wind; AI.t = AI.len - 6; }   /* again! */
             else { AI.st = AI_RECOVER; AI.t = 0; AI.len = AI.atk ? 16 : AIP[sp].rec; }
@@ -892,6 +892,56 @@ static void p_scl(PCX *c, float k)
     if (k < 0.05f) k = 0.05f;
     if (c->trs[0] & 1) { sc[0] *= k; sc[1] *= k; sc[2] *= k; } else { sc[0] = sc[1] = sc[2] = k; c->trs[0] |= 1; }
 }
+/* Legs (battle12): upper bone (hip / shoulder) swings fore-aft and the knee / elbow bends, about the model X axis
+   (+ = the leg swings back, - = forward). {front upper L/R, front knee L/R, hind upper L/R, hind knee L/R} */
+static const u8 LEGS[4][8] = { { 29, 33, 30, 34,  9, 13, 10, 14 },    /* lizard */
+                               {  8, 11,  9, 12, 14, 17, 15, 18 },    /* chihuahua */
+                               { 11, 16, 12, 17, 21, 26, 22, 27 },    /* tanuki */
+                               { 17, 21, 18, 22, 25, 29, 26, 30 } };  /* turtle */
+static void legs(s32 n, PCX *c, s32 sp, float fu, float fk, float hu, float hk)
+{
+    const u8 *L = LEGS[sp];
+    if (n == L[0] || n == L[1]) p_rot(c, 0, fu);
+    else if (n == L[2] || n == L[3]) p_rot(c, 0, fk);
+    else if (n == L[4] || n == L[5]) p_rot(c, 0, hu);
+    else if (n == L[6] || n == L[7]) p_rot(c, 0, hk);
+}
+static void pose_legs(s32 n, PCX *c, s32 sp, s32 st, s32 t, float u, float ck)
+{
+    float fu = 0.0f, fk = 0.0f, hu = 0.0f, hk = 0.0f, e, k;
+    if (sp < 0 || sp > 3) return;
+    if (st == AI_HIT) {
+        float b = 1.0f - u;
+        if (PZ.kb) { float fl = 0.4f * zsin((float)t * 1.3f) * b;   /* hit 3: legs thrown forward, flailing */
+            fu = -0.6f * b + fl; hu = -0.4f * b - fl; fk = 0.5f * b; hk = 0.5f * b; }
+        else { fk = 0.3f * b; hk = 0.3f * b; }                    /* flinch: knees give */
+    } else if (sp == 3) {
+        if (PZ.atk && (st == AI_WINDUP || st == AI_LUNGE)) {      /* bite: front legs brace, hind legs push */
+            k = st == AI_WINDUP ? smooth01((float)t / 6.0f) : 1.0f;
+            fu = -0.3f * k; hu = 0.25f * k;
+        }
+    } else if (st == AI_WINDUP) {                                 /* crouch: legs load */
+        k = smooth01((float)t / 6.0f);
+        fu = -0.25f * k; fk = 0.5f * k; hu = -0.45f * k; hk = 0.8f * k;
+    } else if (st == AI_LUNGE) {                                  /* leap: front legs reach, hind legs kick back, then gather */
+        e = zsin(PI_F * u) * (sp == 1 ? 0.7f : 1.0f);
+        fu = -0.9f * e; fk = 0.35f * e; hu = 0.85f * e; hk = 0.4f * e;
+    } else if (sp == 2 && (st == AI_CIRCLE || st == AI_HOME)) {  /* tanuki hop: stretched in the air, gathered on landing */
+        e = zabs(zsin(ck * 0.30f));
+        fu = -0.55f * e + 0.15f; hu = 0.55f * e - 0.15f; fk = 0.25f * e; hk = 0.3f * (1.0f - e);
+    }
+    legs(n, c, sp, fu, fk, hu, hk);
+}
+/* Lizard gape (user: a super open mouth): lower jaw 21 down 1.0, upper jaw / snout 20 up 0.55, head 19 up 0.15
+   (~89 degrees, previews: past ~1.3 on the lower jaw alone it passes through the throat); the tongue 23 hangs from
+   the head, so it drops with the lower jaw or it would stick out like a rod. o = 0 shut .. 1 wide. */
+static void liz_gape(s32 n, PCX *c, float o)
+{
+    if (o <= 0.0f) return;
+    if (n == 21 || n == 23) p_rot(c, 0, 1.0f * o);
+    else if (n == 20) p_rot(c, 0, -0.55f * o);
+    else if (n == 19) p_rot(c, 0, -0.15f * o);
+}
 static void pose_apply(s32 n, PCX *c)
 {
     s32 sp = PZ.sp, st = PZ.st, t = PZ.t, len = PZ.len > 0 ? PZ.len : 1;
@@ -903,15 +953,17 @@ static void pose_apply(s32 n, PCX *c)
         if (PZ.kb) { p_rot(c, 0, -0.6f * b * b); p_mov(c, 0.0f, 0.35f * zsin(PI_F * u), 0.0f); }
         else p_rot(c, 0, -0.22f * b);
     }
+    pose_legs(n, c, sp, st, t, u, ck);
     switch (sp) {
     case 0:                                             /* lizard */
         if (st == AI_WINDUP) {                          /* crouch, tail swaying */
             float k = smooth01((float)t / 6.0f);
             if (n == 0) { p_mov(c, 0.0f, -0.08f * k, 0.0f); p_rot(c, 0, 0.10f * k); }
             if (n == 2) p_rot(c, 1, 0.35f * zsin(ck * 0.6f) * k);
+            liz_gape(n, c, smooth01((float)(t - 4) / 8.0f));   /* hiss: the mouth opens wide and holds */
         } else if (st == AI_LUNGE) {                    /* leaps, snapping its jaw mid-air */
             if (n == 0) { p_mov(c, 0.0f, 1.0f * zsin(PI_F * u), 0.0f); p_rot(c, 0, -0.35f + 0.6f * u); }
-            if (n == 21) p_rot(c, 0, 0.7f * zabs(zsin(u * 3.0f * PI_F)));
+            liz_gape(n, c, zabs(zcos(u * 3.0f * PI_F)) * (1.0f - u * 0.3f));   /* wide open -> snap, 3 times */
             if (n == 2) p_rot(c, 0, 0.25f * zsin(PI_F * u));
         } else if (st == AI_CIRCLE || st == AI_HOME) {  /* now and then a tongue flick */
             s32 f = (s32)(PZ.clk % 100u);

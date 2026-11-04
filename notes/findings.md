@@ -3559,3 +3559,17 @@ so, door fades are timed there, possibly per frame. Not traced yet.
   jump / hop gait while circling or walking home; turtle head, legs, tail into the shell (move + scale, shell
   lowered) / spin 0.55 rad per frame / dizzy roll on recovery; bite: neck back then out with the jaw.
 - pm battle11: test d9682bc6, normal 1f2d8850; pm.bin ends 0x8037A080 (arena 0x8037C000: ~8 KB left).
+- battle12 (user: legs stiff; a super-open lizard mouth). Leg layer pose_legs: upper bone swings and knee bends about
+  model X (+ back / - forward); LEGS {front upper, front knee, hind upper, hind knee} lizard 29/33 30/34 9/13 10/14,
+  chihuahua 8/11 9/12 14/17 15/18, tanuki 11/16 12/17 21/26 22/27, turtle 17/21 18/22 25/29 26/30. Crouch loads the
+  legs, leaps reach / kick / gather, hit-3 throws them forward with a flail, flinch bends the knees, turtle bite
+  braces, tanuki hop moves its legs. Lunges of lizard / chihuahua / tanuki and the tanuki's circling now play the
+  idle clip under the drawn legs (the run cycle fought the leap).
+- Lizard head bones corrected by skinned previews (each bone rotated alone): 19 head, 20 = upper jaw / snout (not a
+  head top), 21 lower jaw (58 of its vertices sit on child 22), 23-27 tongue, hanging from the head. Gape liz_gape:
+  21 +1.0, 20 -0.55, 19 -0.15 (~89 degrees; the lower jaw alone passes through the throat past ~1.3), tongue 23
+  follows the lower jaw. Crouch = hiss (opens and holds), leap = 3 wide snaps.
+- Previews: scratchpad anim_prev (prev.py / gif.py): mesh + skin + skeleton from the user's dumps, relocation undone
+  (gpl: header pointers file-relative, model block pointers relative to +0x1C; skn / tpl pointers file-relative;
+  turtle display lists use 7-byte vertices: pos, normal, colour u8, uv), bind positions from the skin sources, the
+  pose code ported 1:1. Not in the repo (disc data). pm battle12: test 4048d90e, normal 063b3e56.
