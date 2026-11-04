@@ -3675,3 +3675,5 @@ so, door fades are timed there, possibly per frame. Not traced yet.
   kneel's exit is imitated (0x8003470C: func_8004BD44(ctrl); func_8018CD6C(*(audio+0x54), 0xFD, 0) -> func_8018B25C stops
   the loop; ctrl+0x16C = 0), HP = half, house spot, func_8017775C(g_system, 6, 3, 0) with no fade of ours (fade-in
   fallback in the house kept).
+- battle24 (user): right animation (kneel + stars, weapon in hand), one fade home. Dump f64dabdb mid-collapse: player state
+  0x25, stamina 10337, CL st 1 t 58, HUD poke active, pool guard 0 overlaps. battle25: kneel 150 -> 95 frames (user: long).

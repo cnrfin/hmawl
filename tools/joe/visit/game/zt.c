@@ -831,7 +831,7 @@ static void collapse_frame(u8 *g, s32 map, volatile u32 *held, volatile u32 *pre
         *press = 0; *held = 0;
         *(s32 *)(g + 0x11B84) = *(s32 *)(g + 0x11B88) / 10 - 1;   /* under 10 %: the game kneels (state 0x25) via its own path, so the
                                                                     held weapon is handled; held there (0x25 ends itself at 30 %) */
-        if (CL.t >= 150) {                                /* stars for 2.5 s, then home: stop the kneel's loop sound as its exit does
+        if (CL.t >= 95) {                                 /* stars for ~1.6 s (battle25: 2.5 s felt long), then home: stop the kneel's loop sound as its exit does
                                                              (0x80034730..: func_8018CD6C(audio+0x54, 0xFD, 0) -> func_8018B25C), clear
                                                              ctrl+0x16C; no fade of our own - the house warp's transition fades */
             float *p = SLOT_POS(g, 0), *dr = (float *)(g + 0x29F84);
