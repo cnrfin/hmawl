@@ -79,7 +79,8 @@ static void en_setpos(u8 *a, float x, float y, float z)     /* both copies: the 
 }
 u8 *en_ctl;                                              /* the animal our battle AI drives (hook.s skips its own AI / movement) */
 /* Battle AI (battle test 1): circle at a distance, wind up, lunge, recover - repeat. The tanuki's motion request
-   obj+0xD8 = its clip n (0-8: 0-3, 7, 8 loop, 4-6 once; findings 7.46); idle 0 / walk 1 / run 2 assumed.
+   obj+0xD8 = its clip n (motion table per species family = species - 0x2C; findings 7.46), with the play state
+   obj+0xE0 = 0 (loop; 1 = once, 3 = stopped); idle 0 / walk 1 / run 2 (its movement code speeds up motion 2).
    Facing: +0xF0 sin / +0xF8 cos (copied to +0x58 / +0x60 every update). No damage to the player yet. */
 enum { AI_CIRCLE, AI_WINDUP, AI_LUNGE, AI_RECOVER };
 #define AI_R       3.5f                                 /* circling distance */
@@ -614,6 +615,10 @@ static void ai_face(u8 *a, float dx, float dz)
     if (r < 0.0001f) return;
     r = rsq(r); *(float *)(a + 0xF0) = dx * r; *(float *)(a + 0xF8) = dz * r;
 }
+static void ai_mot(u8 *a, s32 m)                        /* motion request + play state 0 (looping): its own AI sets that */
+{                                                         /* with each motion; left at 3 (stopped) the clip froze: sliding */
+    *(s32 *)(a + 0xD8) = m; *(s32 *)(a + 0xE0) = 0;
+}
 static u32 ai_rand(u32 n) { return F(0x8017D3E8, u32, (void))() % n; }   /* the game's rand() */
 static void ai_frame(u8 *g, u8 *a)
 {
@@ -627,24 +632,24 @@ static void ai_frame(u8 *g, u8 *a)
         float rad = (d - AI_R) * 0.08f, tan = AI_TAN * (float)AI.dir;
         if (rad > 0.12f) rad = 0.12f; if (rad < -0.12f) rad = -0.12f;
         ai_move(a, x + ux * rad - uz * tan, z + uz * rad + ux * tan);
-        ai_face(a, dx, dz); *(s32 *)(a + 0xD8) = MOT_RUN;
+        ai_face(a, dx, dz); ai_mot(a, MOT_RUN);
         if (AI.t >= AI.len) { AI.st = AI_WINDUP; AI.t = 0; }
         break; }
     case AI_WINDUP:
         if (AI.t < 8) ai_move(a, x - ux * 0.05f, z - uz * 0.05f);   /* a little hop back: the tell */
-        ai_face(a, dx, dz); *(s32 *)(a + 0xD8) = MOT_IDLE;
+        ai_face(a, dx, dz); ai_mot(a, MOT_IDLE);
         if (AI.t >= AI_WIND) { AI.st = AI_LUNGE; AI.t = 0; AI.lx = ux; AI.lz = uz; }
         break;
     case AI_LUNGE:
         if (d > 0.7f) ai_move(a, x + AI.lx * AI_LSPEED, z + AI.lz * AI_LSPEED);   /* stops at the player */
-        ai_face(a, AI.lx, AI.lz); *(s32 *)(a + 0xD8) = MOT_RUN;
+        ai_face(a, AI.lx, AI.lz); ai_mot(a, MOT_RUN);
         if (AI.t >= AI_LUNGE_T) {
             if (ai_rand(100) < AI_AGAIN && AI.len != -1) { AI.st = AI_WINDUP; AI.t = AI_WIND - 6; AI.len = -1; }   /* again! */
             else { AI.st = AI_RECOVER; AI.t = 0; AI.len = AI_REC; }
         }
         break;
     default:
-        *(s32 *)(a + 0xD8) = MOT_IDLE;
+        ai_mot(a, MOT_IDLE);
         if (AI.t >= AI.len) { AI.st = AI_CIRCLE; AI.t = 0; AI.len = 40 + (s32)ai_rand(50); if (ai_rand(2)) AI.dir = -AI.dir; }
     }
 }

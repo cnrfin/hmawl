@@ -3455,3 +3455,7 @@ so, door fades are timed there, possibly per frame. Not traced yet.
   no ground follow), slow and dull. battle2: every AI move snaps to ground_y (func_8001CB54(*0x80349204, pos)),
   circling 0.09 / frame at 3.5 (run clip), 40-90 frames; wind up 18 frames with a small hop back; lunge 16 frames at
   0.42 (~6.7 units); 35 % chance of a second lunge at once; recover 30; stagger 24.
+- battle2 (user): sliding, no animation in any phase. Cause: play state obj+0xE0 (0 loop, 1 once -> 3 when done,
+  3 stopped: the update only advances the clip while < 3); its own AI sets it with each motion. Motion family
+  (obj+0xD4) = species - 0x2C; lizard table lbl_8029C844: motion n = clip n (0-5, 9-11 loop, 6-8 once); tanuki
+  lbl_8029CA54: 0-3, 7, 8 loop, 4-6 once. battle3: ai_mot sets +0xD8 and +0xE0 = 0.
