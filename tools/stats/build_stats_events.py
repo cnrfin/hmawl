@@ -19,7 +19,7 @@ common_in, mes_in, outdir = sys.argv[1:4]
 os.makedirs(outdir, exist_ok=True)
 DEBUG = 0x32
 CHOICE_CNT = 61
-OPTS = ['HP  (more health)', 'Pwr  (damage, tools)', 'End  (tool cost, hunger)', 'Lck  (digging, fishing)']
+OPTS = ['HP', 'Attack', 'Endurance', 'Luck']           # user: names only (the guide explains them)
 
 from mesenc import P as PUNCT
 def body(s):                                   # text -> glyph bytes, no terminator (mesenc.enc's rules)
@@ -37,11 +37,11 @@ def pad(b):
     b = bytearray(b) + b'\x00'
     while len(b) % 4: b.append(0)
     return bytes(b)
-LVUP = pad(body('Level up!  You are now Lv ') + num(0) + body('.\nWhich will you raise?') +
+LVUP = pad(body('Level up!\nYou are now Lvl ') + num(0) + body('.\nWhich will you raise?') +
            b'\x01\x41\x04\x00' + b'\x01'.join(body(o) for o in OPTS))
-STATS = pad(body('Lv ') + num(0) + body('    EXP ') + num(1) + body(' / ') + num(2) + b'\x01' +
-            body('HP ') + num(3) + body('    Pwr ') + num(4) + b'\x01' +
-            body('End ') + num(5) + body('    Lck ') + num(6) + b'\x30')
+STATS = pad(body('Lvl ') + num(0) + body('    EXP ') + num(1) + body(' / ') + num(2) + b'\x01' +
+            body('HP ') + num(3) + body('    Attack ') + num(4) + b'\x01' +
+            body('Endurance ') + num(5) + body('    Luck ') + num(6) + b'\x30')
 
 ev = open(mes_in, 'rb').read(); ents = mes_entries(ev)
 assert mes_build(ents) == ev

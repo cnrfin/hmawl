@@ -25,7 +25,7 @@ enum { C_MAGIC = 54, C_EXP, C_LV, C_HP, C_PWR, C_END, C_LCK, C_ANS, C_PTS };
 #define EV_STATS  411
 #define STAT_MAX  20
 void skill_levelup(void);
-struct { u32 magic; s32 ignore, acc, last, lastfull, menu, cool, gained, refund; } ST;   /* 'STAT' (dump) */
+struct { u32 magic; s32 ignore, acc, last, lastfull, menu, cool, gained, refund, wait; } ST;   /* 'STAT' (dump) */
 
 static s32 need(s32 lv) { return 500 + 1250 * (lv - 1); }   /* stats3: 500, 1750, 3000 ... (farming EXP x3); stats2: 500, 1250, 2000 ... (was 1500 + 500 lv: Lv 2 took 2000) */
 static s32 ready(u8 *g) { return OK(g) && CNT(g, C_MAGIC) == (s32)ST_MAGIC; }
@@ -86,27 +86,40 @@ void stats_frame(u8 *g, s32 map, volatile u32 *held, volatile u32 *press, s32 bu
     while (CNT(g, C_EXP) >= need(CNT(g, C_LV))) {
         CNT(g, C_EXP) -= need(CNT(g, C_LV)); CNT(g, C_LV)++; (*pts)++;
         skill_levelup();
-        ST.cool = 150;                                          /* let the pop-up play before the menu */
+        ST.cool = 80;                                           /* the pop-up (75 frames), then the menu (stats5: was 150) */
     }
     if (ST.cool > 0) ST.cool--;
     /* the level-up menu (event 410) */
-    if (ST.menu) {
+    if (ST.menu == 1) {                                     /* stats5: wait until it is really running (it starts a frame or more
+                                                               later; stats4 took that for 'ended', so the answer was lost and the
+                                                               menu came back for ever) */
         u8 *ev = EVMGR;
-        if (OK(ev) && *(s32 *)(ev + 0x680) == -1) {            /* the event has ended */
+        if (OK(ev) && *(s32 *)(ev + 0x680) != -1) ST.menu = 2;
+        else if (++ST.wait > 300) { ST.menu = 0; ST.wait = 0; }   /* never started: try again later */
+        return;
+    }
+    if (ST.menu == 2) {
+        u8 *ev = EVMGR;
+        if (OK(ev) && *(s32 *)(ev + 0x680) == -1 && !*(s32 *)(ev + 0x58C)) {   /* the event has ended */
             s32 v = CNT(g, C_ANS), k = v > 4 ? v / 128 : v, *st = 0;
             if (k >= 1 && k <= 4) {
                 st = &CNT(g, C_HP + k - 1);
                 if (*st < STAT_MAX && *pts > 0) { (*st)++; (*pts)--; }
             }
-            CNT(g, C_ANS) = 0; ST.menu = 0; ST.cool = 30;
+            CNT(g, C_ANS) = 0; ST.menu = 0; ST.wait = 0; ST.cool = 30;
         }
         return;
+    }
+    if (CNT(g, C_ANS) && *pts > 0) {                       /* an answer stored but not applied yet (e.g. a reload) */
+        s32 v = CNT(g, C_ANS), k = v > 4 ? v / 128 : v;
+        if (k >= 1 && k <= 4 && CNT(g, C_HP + k - 1) < STAT_MAX) { CNT(g, C_HP + k - 1)++; (*pts)--; }
+        CNT(g, C_ANS) = 0;
     }
     if (*pts > 0 && !busy && !ST.cool && map >= 0 && event_free()) {
         u8 *mm = MSGMGR;
         if (CNT(g, C_HP) >= STAT_MAX && CNT(g, C_PWR) >= STAT_MAX && CNT(g, C_END) >= STAT_MAX && CNT(g, C_LCK) >= STAT_MAX) { *pts = 0; return; }
         if (OK(mm)) msg_num(mm, 0, CNT(g, C_LV));
-        CNT(g, C_ANS) = 0; ST.menu = 1;
+        CNT(g, C_ANS) = 0; ST.menu = 1; ST.wait = 0;
         event_start(EVMGR, EV_LVUP, 0, 0);
         return;
     }

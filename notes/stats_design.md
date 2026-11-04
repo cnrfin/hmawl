@@ -20,9 +20,9 @@
 - Stats, max 20 points each:
   - **HP**: more max HP. Extra HP shows as a second layer over the green bar: blue, then purple at
     max (3 bars in all). Damage empties the top layer first.
-  - **Pwr**: extra weapon damage, and tool efficiency on the farm (field and animal tools).
-  - **End**: slows hunger (fullness drain) and reduces how much HP tool use takes.
-  - **Lck**: raises the chance that digging at the dig site finds an item, and the chance of rare
+  - **Attack** (was "Pwr"): extra weapon damage, and tool efficiency on the farm (field and animal tools).
+  - **Endurance**: slows hunger (fullness drain) and reduces how much HP tool use takes.
+  - **Luck**: raises the chance that digging at the dig site finds an item, and the chance of rare
     fish (for the planned goddess quest).
 - Balance must carry through all chapters (levels mostly gained over the whole game).
 

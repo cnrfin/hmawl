@@ -3700,3 +3700,10 @@ so, door fades are timed there, possibly per frame. Not traced yet.
 - stats3 (user screenshot + dump 4b9bf67f): the stats view printed 1 everywhere with growing gaps - the number code is
   `2A <slot> <pad width>` (0x0C5 "<2A:0004>" = slot 0, width 4), stats1 had slot / width swapped (all read slot 0 = Lv).
   stats4: debug.mes rebuilt with 2A n 00 (Common.arc unchanged). Slots are cleared when the message closes.
+- stats4 (user screenshot + dump c57cb7b7): the menu works but looped - counters: Lv 2, 1 point unspent, answer 0; event mgr
+  +0x680 -1 with +0x58C 1. The event starts a frame or more after event_start, and stats.c read '+0x680 == -1' as 'ended' at
+  once, so the answer was cleared and the menu reopened after each pick. Also: the menu came ~5 s after the pop-up, and
+  "now" wrapped. stats5: the menu waits to see the event running (+0x680 != -1), then for +0x680 == -1 and +0x58C == 0; a stored
+  answer is applied before any new menu; menu 80 frames after the pop-up; texts "Level up! / You are now Lvl n. / Which will you
+  raise?" with HP / Attack / Endurance / Luck (user), stats view "Lvl", "Attack", "Endurance", "Luck". debug.mes 0eae6cb9,
+  pm test 54ebf1d9, normal 92517abc.
