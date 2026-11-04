@@ -3,7 +3,7 @@
    54 'ST01' marker, 55 EXP into the current level, 56 level (from 1), 57 HP, 58 Pwr, 59 End, 60 Lck, 61 the level-up
    menu's answer (set by event 410: 1..4, raw or x128), 62 points not yet spent.
    EXP: stamina spent on tools (any stamina drop that is not an enemy hit: zt.c reports those), 1 EXP per 100 stamina;
-   the day's wild animal on defeat (zt.c). Next level needs 1500 + 500 x level. Each level: "Level up!" (skill.c, SE 216)
+   the day's wild animal on defeat (zt.c). Next level needs 500 + 750 x (level - 1) (stats2). Each level: "Level up!" (skill.c, SE 216)
    and one point, chosen in event 410 (Common.arc) once the player is free and not fighting.
    Effects: HP +10 % max stamina per point (max 20 -> 3 bars); End: tool HP cost -2 % and hunger -2.5 % per point;
    Pwr: weapon damage +5 % per point (zt.c); tool efficiency and Lck come later. Stats view: Z + D-pad Up (event 411,
@@ -27,7 +27,7 @@ enum { C_MAGIC = 54, C_EXP, C_LV, C_HP, C_PWR, C_END, C_LCK, C_ANS, C_PTS };
 void skill_levelup(void);
 struct { u32 magic; s32 ignore, acc, last, lastfull, menu, cool, gained, refund; } ST;   /* 'STAT' (dump) */
 
-static s32 need(s32 lv) { return 1500 + 500 * lv; }
+static s32 need(s32 lv) { return 500 + 750 * (lv - 1); }   /* stats2: 500, 1250, 2000 ... (was 1500 + 500 lv: Lv 2 took 2000) */
 static s32 ready(u8 *g) { return OK(g) && CNT(g, C_MAGIC) == (s32)ST_MAGIC; }
 s32 stats_pwr(void) { u8 *g = *(u8 **)0x803491CC; return ready(g) ? CNT(g, C_PWR) : 0; }
 void stats_ignore(s32 dmg) { ST.ignore += dmg; }            /* zt.c: an enemy hit, not tool work */

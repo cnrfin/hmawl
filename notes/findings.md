@@ -3693,3 +3693,5 @@ so, door fades are timed there, possibly per frame. Not traced yet.
   HP: max stamina 100000 + 10000 / point (our HUD bar clamps at 100000 until the new HUD). End: 2 % of tool stamina cost
   refunded and 2.5 % of each fullness drop per point. Pwr: weapon damage +5 % / point (zt.c en_hit). Stats max 20.
 - pm.bin now links stats.o (link line: ... tile.o toolfix.o clips.o stats.o). pm test ef490425, normal a8f8fefe.
+- stats1 results (dumps 08544169 / d8feee0a): EXP 0 -> 1084 (chihuahua 800 + farming 284 for ~64 % stamina spent), Lv 1
+  (needed 2000). stats2: need = 500 + 750 x (level - 1) (500, 1250, 2000, ...; ~Lv 9 by the end of chapter 1 as before).
