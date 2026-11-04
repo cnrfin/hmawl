@@ -3762,3 +3762,4 @@ so, door fades are timed there, possibly per frame. Not traced yet.
 - gold3 (user dump 402eb2e8): still skipped. The real cause: the text. Every message ends with code 30 (wait for A);
   debug.mes 30 was "You found <n0> G!" with no 30, so the box closed as soon as the text was out (the stats view text
   ends in 30 and stays). gold4: debug.mes 30 + 30 (8cf553f9); pm.bin stays gold3 (b4391e56), whose waits are kept.
+- gold4 tested (user): works - gold box stays until A, then Level up!, then the stat menu.
