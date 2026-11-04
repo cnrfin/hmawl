@@ -3628,3 +3628,6 @@ so, door fades are timed there, possibly per frame. Not traced yet.
 - battle19: the '?' on the A button removed (user; the item description is on R). func_80083378 (every HUD button label
   caller) maps action -> label through lbl_8024F638+0x5C; action 0x18 (description) is the only one -> label 0x01; that
   byte (0x8024F6AC) is zeroed each frame (zt_frame). A's case 24 already did nothing (R patch).
+- battle20: battle19's byte made action 0x18 show label 0 = the pulsing yellow "nothing here" marker (user screenshot).
+  None of the 38 label pictures (opguide.agc group 1, one quad each, texture 0) is blank, so the table is left alone and
+  label 1's quad (agc +0x728: box -12..12, colours +0x734..+0x743) gets alpha 0 each frame (checked geometry first).

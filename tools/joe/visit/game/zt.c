@@ -407,8 +407,15 @@ void zt_frame(u8 *g, s32 map, volatile u32 *held, volatile u32 *press)
            3 drops the owl (0x30). A day already rolled owl is re-rolled (takes effect when the valley next loads). */
         u8 *tm = *(u8 **)0x80349194;
         *(s32 *)0x803469D0 = 3; *(s32 *)0x803469D8 = 3;
-        *(u8 *)0x8024F6AC = 0;   /* battle19 (user): no '?' on the A button - action 0x18 (item description, moved to R) had label
-                                    0x01 in func_80083378's action->label table lbl_8024F638+0x5C (only 0x18 maps to 0x01) */
+        {   /* battle20 (user): no '?' on the A button, and not the pulsing yellow "nothing" marker (label 0) either. Action
+               0x18 (item description, moved to R) is the only action with label 1 (func_80083378's table lbl_8024F638+0x5C), so
+               label 1's one quad (opguide.agc group 1 entry 1, file offset 0x728, a 24 x 24 box) is made transparent. */
+            u8 *a = AGC;
+            if ((u32)a >= 0x80000000u && (u32)a < 0x81800000u && *(u32 *)a == 0xC1C7C3C6u &&
+                *(u32 *)(a + 0x72C) == 0xFFF4FFF4u && *(u32 *)(a + 0x730) == 0x000C000Cu) {
+                s32 k; for (k = 0; k < 4; k++) *(u32 *)(a + 0x734 + 4 * k) = 0xFFFFFF00u;
+            }
+        }
         if ((u32)tm >= 0x80000000u && (u32)tm < 0x81800000u && *(s32 *)(tm + 0x3F8) == 0x30) *(s32 *)(tm + 0x3F8) = 0x2C + (s32)(F(0x8017D3E8, u32, (void))() % 4u);
     }
     stance_frame(g, map);
