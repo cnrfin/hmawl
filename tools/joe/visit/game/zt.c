@@ -80,7 +80,7 @@ static void en_setpos(u8 *a, float x, float y, float z)     /* both copies: the 
 u8 *en_ctl;                                              /* the animal our battle AI drives (hook.s skips its own AI / movement) */
 /* Battle AI (battle test 1): circle at a distance, wind up, lunge, recover - repeat. The tanuki's motion request
    obj+0xD8 = its clip n (motion table per species family = species - 0x2C; findings 7.46), with the play state
-   obj+0xE0 = 0 (loop; 1 = once, 3 = stopped); idle 0 / walk 1 / run 2 (its movement code speeds up motion 2).
+   obj+0xE0 = 0 (loop; 1 = once, 3 = stopped); idle 0; the moving clips per species: ai_go / ai_dash.
    Facing: +0xF0 sin / +0xF8 cos (copied to +0x58 / +0x60 every update). No damage to the player yet. */
 enum { AI_CIRCLE, AI_WINDUP, AI_LUNGE, AI_RECOVER };
 #define AI_R       3.5f                                 /* circling distance */
@@ -91,8 +91,6 @@ enum { AI_CIRCLE, AI_WINDUP, AI_LUNGE, AI_RECOVER };
 #define AI_REC     30
 #define AI_AGAIN   35                                   /* % chance of a second lunge straight after */
 #define MOT_IDLE   0
-#define MOT_WALK   1
-#define MOT_RUN    2
 struct { u32 magic; s32 st, t, len, dir; float lx, lz; } AI;   /* 'ENAI' (dump) */
 static u8 *en_hid;                                       /* the draw instance we hid / tinted (it can outlive the day's
                                                              animal: memfix-era b3t, animals "gone" for days after a defeat) */
@@ -617,11 +615,19 @@ static void ai_face(u8 *a, float dx, float dz)
     if (r < 0.0001f) return;
     r = rsq(r); *(float *)(a + 0xF0) = dx * r; *(float *)(a + 0xF8) = dz * r;
 }
-static s32 ai_go(u8 *a)                                  /* the moving clip: run, but the turtle / owl walk (turtle clip 2
-                                                             is not a gait: user saw no walk cycle) */
+/* The moving clips, measured from the clips themselves (user dumps 85f7c986 etc.: frames / animated bones):
+   the walk/run cycles are the short clips that move nearly every bone. Lizard set 67: 1 = 11 f / 26 b; "mouse"
+   (a chihuahua) set 72: 1 = 9 f / 18 b (its 2 = 60 f / 7 b, the old guess: sliding); turtle set 69: 1 = 7 f / 17 b;
+   tanuki set 68: 2 = 11 f / 25 b, 1 = 5 f / 25 b (fast); owl set 70: no gait (perched clips only). */
+static s32 ai_go(u8 *a)                                  /* circling */
 {
     s32 sp = *(s32 *)(a + 0x128);
-    return sp == 0x2F || sp == 0x30 ? MOT_WALK : MOT_RUN;
+    return sp == 0x2E ? 2 : sp == 0x30 ? MOT_IDLE : 1;
+}
+static s32 ai_dash(u8 *a)                                /* the lunge: the fastest cycle */
+{
+    s32 sp = *(s32 *)(a + 0x128);
+    return sp == 0x30 ? MOT_IDLE : 1;
 }
 static void ai_mot(u8 *a, s32 m)                        /* motion request + play state 0 (looping): its own AI sets that */
 {                                                         /* with each motion; left at 3 (stopped) the clip froze: sliding */
@@ -650,7 +656,7 @@ static void ai_frame(u8 *g, u8 *a)
         break;
     case AI_LUNGE:
         if (d > 0.7f) ai_move(a, x + AI.lx * AI_LSPEED, z + AI.lz * AI_LSPEED);   /* stops at the player */
-        ai_face(a, AI.lx, AI.lz); ai_mot(a, ai_go(a));
+        ai_face(a, AI.lx, AI.lz); ai_mot(a, ai_dash(a));
         if (AI.t >= AI_LUNGE_T) {
             if (ai_rand(100) < AI_AGAIN && AI.len != -1) { AI.st = AI_WINDUP; AI.t = AI_WIND - 6; AI.len = -1; }   /* again! */
             else { AI.st = AI_RECOVER; AI.t = 0; AI.len = AI_REC; }

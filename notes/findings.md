@@ -3487,3 +3487,10 @@ so, door fades are timed there, possibly per frame. Not traced yet.
   it - if that instance outlives the day's object, every later animal of that species stays invisible. battle3c:
   en_hid remembers the hidden / tinted instance; a living animal on it gets +0x3C = 1 and normal colour back.
   (Unconfirmed: needs a dump on a day with no visible animal.)
+- Sliding, solved (dumps 85f7c986 / 1f7c8451, the "mouse" = a chihuahua model, by the dig site): the clip DID play
+  (motion player +0x1A8 descs = clip 2; mixer obj+0x1E8 {n, N=10, ctl +8 current, +0xC previous, +0x10, weight
+  +0x14 = n/N while blending, state +0x18: 2 blending / 1 done}; vanilla dumps have the same layout). The guess
+  "2 = run" was wrong. Clips measured (frames / rotation-keyed bones): lizard set 67: 0 60/0, 1 11/26, 2 60/17,
+  3 60/17 ...; mouse set 72: 0 90/0, 1 9/18, 2 60/7, 3 80/18, 4 107/17, 5 180/21; turtle set 69: 1 7/17, 2 60/17 ...;
+  tanuki set 68: 0 60/24, 1 5/25, 2 11/25, 3 61/21 ...; owl set 70: all near-static (perched). battle4: circling
+  clip 1 (tanuki 2), lunge clip 1, owl idle (ai_go / ai_dash).
