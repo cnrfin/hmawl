@@ -3722,3 +3722,4 @@ so, door fades are timed there, possibly per frame. Not traced yet.
   100000 / 200000), cropped by x1 and u1; the green layer uses v03's yellow / red rows at <= 50000 / 25000. Fullness % =
   fullness / 13500. EXP fill = EXP / need(level). Numbers: zero-width quads past the last digit.
 - hud1: commonall a101ca68, pm test c4532baa, normal 3fa3df6a.
+- hud1 tested (user screenshot): works; Lvl 2 with 1 HP point shows the blue layer's first few % over a full green bar.
