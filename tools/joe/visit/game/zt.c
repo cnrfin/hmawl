@@ -12,6 +12,7 @@ typedef int s32;
 typedef unsigned char u8;
 typedef short s16;
 #include "skill_hud.h"                                  /* AGC_RET_Q, UV_TRI, element 7 (the HUD quads) */
+#include "stat_hud.h"                                   /* E7_TOTAL: element 7 with the stat HUD (step 3) */
 #define F(addr, ret, args) ((ret (*) args)(addr))
 #define sfx_play   F(0x8012A52C, s32, (u8 *, s32, s32))
 #define CONTROL    (*(u8 *)(*(u8 **)0x80349218 + 8))      /* 1 = player free */
@@ -303,7 +304,7 @@ static void reticle(u8 *g)
     zt_dbg.agc_ok = 1;
     if (*(u32 *)a != 0xC1C7C3C6u) return;
     zt_dbg.agc_ok = 2;
-    if (*(u32 *)(a + AGC_E7_COUNT) != E7_COUNT) return;   /* our opguide.agc */
+    if (*(u32 *)(a + AGC_E7_COUNT) != E7_TOTAL) return;   /* our opguide.agc */
     zt_dbg.agc_ok = 3;
     if (Z.target) { if (Z.alpha < 255) Z.alpha += 51; if (Z.alpha > 255) Z.alpha = 255; }
     else { Z.alpha -= 64; if (Z.alpha < 0) Z.alpha = 0; Z.r = -1; }

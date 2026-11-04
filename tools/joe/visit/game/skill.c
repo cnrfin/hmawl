@@ -14,6 +14,7 @@ typedef unsigned short u16;
 typedef unsigned char u8;
 
 #include "skill_hud.h"
+#include "stat_hud.h"                                  /* E7_TOTAL: element 7 with the stat HUD (step 3) */
 #include "level_word.h"
 
 #define F(addr, ret, args) ((ret (*) args)(addr))
@@ -106,7 +107,7 @@ void skill_frame(u8 *g, u32 pad_held, u32 pad_press)
     u8 *a = AGC;
     s32 item, pool, lv, k, alpha, slide;
     if ((u32)a < 0x80000000u || (u32)a >= 0x81800000u) return;
-    if (*(u32 *)a != 0xC1C7C3C6u || *(u32 *)(a + AGC_E7_COUNT) != E7_COUNT) return;   /* our opguide.agc */
+    if (*(u32 *)a != 0xC1C7C3C6u || *(u32 *)(a + AGC_E7_COUNT) != E7_TOTAL) return;   /* our opguide.agc */
 
     for (k = 0; k < 2; k++) {                                /* level-ups (no pop-up for the first look) */
         lv = level_of(g, k);
@@ -133,7 +134,7 @@ void skill_frame(u8 *g, u32 pad_held, u32 pad_press)
     item = *(s32 *)(g + 0x11CC4); pool = pool_of(item);
     slide = SLIDE; if (slide < 0) slide = 0;
     alpha = slide >= 90 ? 0 : 0xF0 - slide * 0xF0 / 90;     /* fades as the bars slide away */
-    if (pool < 0) alpha = 0;
+    alpha = 0;                                           /* step 3: the stat HUD replaces the tool-skill row */
     lv = pool < 0 ? 0 : level_of(g, pool);
     {
         u8 *q = QUAD(a, AGC_ROW_Q, 0);

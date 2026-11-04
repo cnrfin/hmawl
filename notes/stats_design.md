@@ -30,7 +30,7 @@
 - Like the current HUD: "HP" in the game's own lettering replaces the face, the HP bar beside it,
   a thinner EXP bar with the level under it; next to the HP bar the apple and the fullness %.
 
-## Order
+## Order (step 3 HUD: hud1; no name, "EXP" under "HP", cyan EXP bar, small "Lvl N" at its end)
 1. Player damage, collapse -> wake at home with half HP, food-based recovery (battle21, in progress).
 2. EXP / levels, level-up pop-up and sound, stat choice and view menus, Pwr / End effects.
 3. The new HUD.

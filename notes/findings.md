@@ -3707,3 +3707,18 @@ so, door fades are timed there, possibly per frame. Not traced yet.
   answer is applied before any new menu; menu 80 frames after the pop-up; texts "Level up! / You are now Lvl n. / Which will you
   raise?" with HP / Attack / Endurance / Luck (user), stats view "Lvl", "Attack", "Endurance", "Luck". debug.mes 0eae6cb9,
   pm test 54ebf1d9, normal 92517abc.
+
+### 7.52 Stat HUD (step 3 of notes/stats_design.md; hud1)
+- Layout agreed on a mock-up made from the real textures (user): no farmer name; "HP" (HUD font, texture 3) where the face was,
+  the HP bar beside it, the apple and the fullness % right of it; "EXP" under "HP" with a thinner cyan bar and a small "Lvl N"
+  at its end. The tool-skill row (icon + 5 gems) goes: one level system now.
+- tools/hud/build_stat_hud.py on the HUD commonall (textures 0-4, element 7 = 37 quads): opguide.tpl + texture 5 (RGB5A3
+  256 x 80: digits 0-9 and '%' from the dialogue font (codes 0-9, 215) at 0.75 with a 1 px outline like texture 3; the v03
+  green fill recoloured blue / purple; the thin orange fill recoloured cyan). opguide.agc: elements 1-6 -> 0 quads (v03's
+  main.dol code keeps writing them, harmless; its pointer check reads the fill quad 0xEC0's texture 2, unchanged); the 12
+  name quads get alpha 0 (v03 hud_name writes only their x and UVs - RAM dump c57cb7b7 shows the file's colours); 21 quads
+  appended to element 7 (58 in all, E7_TOTAL; skill.c / zt.c check it). Element 7 y base -204 (the v03 slide moves it).
+- stats.c stats_hud (every frame): HP layers 100000 raw each (green 0-100000, blue / purple only when max HP passes
+  100000 / 200000), cropped by x1 and u1; the green layer uses v03's yellow / red rows at <= 50000 / 25000. Fullness % =
+  fullness / 13500. EXP fill = EXP / need(level). Numbers: zero-width quads past the last digit.
+- hud1: commonall a101ca68, pm test c4532baa, normal 3fa3df6a.

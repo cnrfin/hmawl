@@ -11,6 +11,7 @@
 typedef unsigned int u32;
 typedef int s32;
 typedef unsigned char u8;
+typedef short s16;
 #define F(addr, ret, args) ((ret (*) args)(addr))
 #define CNT(g, i)     (*(s32 *)((g) + 0x12194 + 4 * (i)))
 #define EVMGR         (*(u8 **)0x803491BC)
@@ -25,6 +26,8 @@ enum { C_MAGIC = 54, C_EXP, C_LV, C_HP, C_PWR, C_END, C_LCK, C_ANS, C_PTS };
 #define EV_STATS  411
 #define STAT_MAX  20
 void skill_levelup(void);
+#define SH_DATA
+#include "stat_hud.h"
 struct { u32 magic; s32 ignore, acc, last, lastfull, menu, cool, gained, refund, wait; } ST;   /* 'STAT' (dump) */
 
 static s32 need(s32 lv) { return 500 + 1250 * (lv - 1); }   /* stats3: 500, 1750, 3000 ... (farming EXP x3); stats2: 500, 1250, 2000 ... (was 1500 + 500 lv: Lv 2 took 2000) */
@@ -42,6 +45,62 @@ static s32 event_free(void)
     u8 *ev = EVMGR;
     return OK(ev) && *(s32 *)(ev + 0x680) == -1 && !*(s32 *)(ev + 0x58C) && CONTROL == 1;
 }
+
+/* step 3: the stat HUD (tools/hud/build_stat_hud.py: quads appended to opguide.agc element 7, rewritten here) */
+#define AGC (*(u8 **)0x80349110)
+static void sq_set(u8 *q, s32 x0, s32 w, s32 h, const float *uv, float ufrac)
+{
+    *(s16 *)(q + 4) = x0; *(s16 *)(q + 8) = x0 + w;
+    if (h >= 0) *(s16 *)(q + 10) = *(s16 *)(q + 6) + h;
+    if (uv) {
+        float *u = (float *)(q + 0x1C);
+        u[0] = uv[0]; u[1] = uv[1]; u[2] = uv[0] + (uv[2] - uv[0]) * ufrac; u[3] = uv[3];
+    }
+}
+static void sq_fill(u8 *q, s32 full_w, s32 num, s32 den, const float *uv)   /* a bar cropped to num / den */
+{
+    s32 w;
+    if (num < 0) num = 0;
+    if (num > den) num = den;
+    w = full_w * num / den;
+    sq_set(q, *(s16 *)(q + 4), w, -1, uv, (float)num / (float)den);
+}
+static s32 sq_number(u8 *q, s32 nq, s32 x, s32 v, s32 sc, s32 pct)          /* digits (+ '%'); the rest zero width */
+{
+    s32 d[4], n = 0, i, h = 21 * sc / 100;
+    if (v < 0) v = 0;
+    do { d[n++] = v % 10; v /= 10; } while (v && n < 3);
+    for (i = 0; i < nq; i++) {
+        u8 *qq = q + 0x2C * i;
+        s32 k = i < n ? d[n - 1 - i] : (pct && i == n) ? 10 : -1;
+        if (k < 0) { sq_set(qq, x, 0, -1, 0, 1); continue; }
+        *(s16 *)(qq + 6) = *(s16 *)(q + 6);
+        sq_set(qq, x, SH_DIG_W[k] * sc / 100, h, SH_DIG[k], 1.0f);
+        x += SH_DIG_W[k] * sc / 100 - 1;
+    }
+    return x;
+}
+static void stats_hud(u8 *g)
+{
+    static const float UV_GREEN[4] = {0.0f, 0.1875f, 0.65625f, 0.3125f};
+    static const float UV_YELLOW[4] = {0.0f, 0.333333f, 0.65625f, 0.458333f};
+    static const float UV_RED[4] = {0.0f, 0.479167f, 0.65625f, 0.604167f};
+    u8 *a = AGC;
+    s32 cur, max, k;
+    if (!OK(a) || *(u32 *)a != 0xC1C7C3C6u || *(u32 *)(a + 0xE88) != E7_TOTAL) return;   /* our opguide.agc */
+    cur = *(s32 *)(g + 0x11B84); max = *(s32 *)(g + 0x11B88);
+    /* HP: 100000 per layer (green, blue, purple); the top layer empties first. Green alone turns yellow / red when low (as v03) */
+    sq_fill(a + SQ_GREEN, SH_BAR_W, cur, 100000, cur > 50000 ? UV_GREEN : cur > 25000 ? UV_YELLOW : UV_RED);
+    for (k = 1; k <= 2; k++)
+        sq_fill(a + (k == 1 ? SQ_BLUE : SQ_PURPLE), SH_BAR_W, max > 100000 * k ? cur - 100000 * k : 0, 100000, k == 1 ? SH_UV_BLUE : SH_UV_PURPLE);
+    /* fullness % */
+    sq_number(a + SQ_PCT, 4, SH_PCT_X, *(s32 *)(g + 0x11B94) / 13500, SH_PCT_SC, 1);
+    /* EXP into the level, and the level */
+    if (ready(g)) {
+        sq_fill(a + SQ_CYAN, SH_EXP_W, CNT(g, C_EXP), need(CNT(g, C_LV)), SH_UV_CYAN);
+        sq_number(a + SQ_LVNUM, 2, SH_LV_X, CNT(g, C_LV), SH_LV_SC, 0);
+    }
+}
 void stats_frame(u8 *g, s32 map, volatile u32 *held, volatile u32 *press, s32 busy)
 {
     s32 cur, d, *pts;
@@ -54,6 +113,7 @@ void stats_frame(u8 *g, s32 map, volatile u32 *held, volatile u32 *press, s32 bu
     pts = &CNT(g, C_PTS);
     /* HP: max stamina */
     *(s32 *)(g + 0x11B88) = 100000 + 10000 * CNT(g, C_HP);
+    stats_hud(g);
     /* tool work: stamina drops (not enemy hits) -> EXP, End refunds part of it */
     cur = *(s32 *)(g + 0x11B84);
     if (busy == 2) { ST.last = cur; ST.ignore = 0; ST.lastfull = *(s32 *)(g + 0x11B94); return; }   /* collapsing: zt.c owns stamina */
