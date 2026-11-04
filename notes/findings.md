@@ -3451,3 +3451,7 @@ so, door fades are timed there, possibly per frame. Not traced yet.
   wind up 30 frames (idle, facing), lunge 14 frames at 0.28/frame toward where the player was (run), recover 45
   (idle; a hit = 30-frame stagger). Motion request +0xD8 = clip (idle 0 / walk 1 / run 2 assumed); facing via
   +0xF0 / +0xF8. Lock let go -> en_ctl 0 (its own AI again); dying / gone -> still held.
+- battle test 1 (user, lizard): circles / winds up / lunges; sank under the ground (our moves skip its movement:
+  no ground follow), slow and dull. battle2: every AI move snaps to ground_y (func_8001CB54(*0x80349204, pos)),
+  circling 0.09 / frame at 3.5 (run clip), 40-90 frames; wind up 18 frames with a small hop back; lunge 16 frames at
+  0.42 (~6.7 units); 35 % chance of a second lunge at once; recover 30; stagger 24.

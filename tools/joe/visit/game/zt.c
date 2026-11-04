@@ -82,11 +82,13 @@ u8 *en_ctl;                                              /* the animal our battl
    obj+0xD8 = its clip n (0-8: 0-3, 7, 8 loop, 4-6 once; findings 7.46); idle 0 / walk 1 / run 2 assumed.
    Facing: +0xF0 sin / +0xF8 cos (copied to +0x58 / +0x60 every update). No damage to the player yet. */
 enum { AI_CIRCLE, AI_WINDUP, AI_LUNGE, AI_RECOVER };
-#define AI_R       3.0f                                 /* circling distance */
-#define AI_WIND    30
-#define AI_LUNGE_T 14
-#define AI_LSPEED  0.28f                                /* per frame: ~3.9 units */
-#define AI_REC     45
+#define AI_R       3.5f                                 /* circling distance */
+#define AI_TAN     0.09f                                /* circling speed (per frame) */
+#define AI_WIND    18                                   /* wind up: 0.3 s, hopping back a little */
+#define AI_LUNGE_T 16
+#define AI_LSPEED  0.42f                                /* per frame: ~6.7 units */
+#define AI_REC     30
+#define AI_AGAIN   35                                   /* % chance of a second lunge straight after */
 #define MOT_IDLE   0
 #define MOT_WALK   1
 #define MOT_RUN    2
@@ -600,39 +602,50 @@ static void en_hit(s32 h, float dx, float dz)
     }
 }
 /* every frame (zt_frame): flash / knockback while alive, the defeat animation, then hidden for the day */
+#define ground_at  F(0x8001CB54, float, (void *, float *))   /* ground height under a point (pm.c ground_y) */
+static void ai_move(u8 *a, float x, float z)                  /* our moves skip its movement code: keep it on the ground */
+{
+    float v[3]; v[0] = x; v[1] = *(float *)(a + 0x50) + 1.0f; v[2] = z;
+    en_setpos(a, x, ground_at(*(void **)0x80349204, v), z);
+}
 static void ai_face(u8 *a, float dx, float dz)
 {
     float r = dx * dx + dz * dz;
     if (r < 0.0001f) return;
     r = rsq(r); *(float *)(a + 0xF0) = dx * r; *(float *)(a + 0xF8) = dz * r;
 }
+static u32 ai_rand(u32 n) { return F(0x8017D3E8, u32, (void))() % n; }   /* the game's rand() */
 static void ai_frame(u8 *g, u8 *a)
 {
-    float *p = SLOT_POS(g, 0), x = *(float *)(a + 0x4C), y = *(float *)(a + 0x50), z = *(float *)(a + 0x54);
+    float *p = SLOT_POS(g, 0), x = *(float *)(a + 0x4C), z = *(float *)(a + 0x54);
     float dx = p[0] - x, dz = p[2] - z, d2 = dx * dx + dz * dz, inv = d2 > 0.0001f ? rsq(d2) : 0.0f, d = d2 * inv;
     float ux = dx * inv, uz = dz * inv;
     AI.magic = 0x454E4149u; AI.t++;
-    if (EN.flash > 0 && AI.st != AI_RECOVER) { AI.st = AI_RECOVER; AI.t = 0; AI.len = 30; }   /* hit: stagger */
+    if (EN.flash > 0 && AI.st != AI_RECOVER) { AI.st = AI_RECOVER; AI.t = 0; AI.len = 24; }   /* hit: stagger */
     switch (AI.st) {
     case AI_CIRCLE: {
-        float rad = (d - AI_R) * 0.04f, tan = 0.035f * (float)AI.dir;
-        if (rad > 0.06f) rad = 0.06f; if (rad < -0.06f) rad = -0.06f;
-        en_setpos(a, x + ux * rad - uz * tan, y, z + uz * rad + ux * tan);
-        ai_face(a, dx, dz); *(s32 *)(a + 0xD8) = MOT_WALK;
+        float rad = (d - AI_R) * 0.08f, tan = AI_TAN * (float)AI.dir;
+        if (rad > 0.12f) rad = 0.12f; if (rad < -0.12f) rad = -0.12f;
+        ai_move(a, x + ux * rad - uz * tan, z + uz * rad + ux * tan);
+        ai_face(a, dx, dz); *(s32 *)(a + 0xD8) = MOT_RUN;
         if (AI.t >= AI.len) { AI.st = AI_WINDUP; AI.t = 0; }
         break; }
     case AI_WINDUP:
+        if (AI.t < 8) ai_move(a, x - ux * 0.05f, z - uz * 0.05f);   /* a little hop back: the tell */
         ai_face(a, dx, dz); *(s32 *)(a + 0xD8) = MOT_IDLE;
         if (AI.t >= AI_WIND) { AI.st = AI_LUNGE; AI.t = 0; AI.lx = ux; AI.lz = uz; }
         break;
     case AI_LUNGE:
-        if (d > 0.7f) en_setpos(a, x + AI.lx * AI_LSPEED, y, z + AI.lz * AI_LSPEED);   /* stops at the player */
+        if (d > 0.7f) ai_move(a, x + AI.lx * AI_LSPEED, z + AI.lz * AI_LSPEED);   /* stops at the player */
         ai_face(a, AI.lx, AI.lz); *(s32 *)(a + 0xD8) = MOT_RUN;
-        if (AI.t >= AI_LUNGE_T) { AI.st = AI_RECOVER; AI.t = 0; AI.len = AI_REC; }
+        if (AI.t >= AI_LUNGE_T) {
+            if (ai_rand(100) < AI_AGAIN && AI.len != -1) { AI.st = AI_WINDUP; AI.t = AI_WIND - 6; AI.len = -1; }   /* again! */
+            else { AI.st = AI_RECOVER; AI.t = 0; AI.len = AI_REC; }
+        }
         break;
     default:
         *(s32 *)(a + 0xD8) = MOT_IDLE;
-        if (AI.t >= AI.len) { AI.st = AI_CIRCLE; AI.t = 0; AI.len = 75 + (s32)(F(0x8017D3E8, u32, (void))() % 75u); AI.dir = -AI.dir;   /* game rand() */ }
+        if (AI.t >= AI.len) { AI.st = AI_CIRCLE; AI.t = 0; AI.len = 40 + (s32)ai_rand(50); if (ai_rand(2)) AI.dir = -AI.dir; }
     }
 }
 static void en_frame(u8 *g)
@@ -647,7 +660,7 @@ static void en_frame(u8 *g)
     if (en_alive()) {
         if (EN.flash > 0) {                                  /* the flat colour multiplies the texture: a light red flash */
             en_colour(in, 1, 255, 120, 120, 255);
-            en_setpos(a, *(float *)(a + 0x4C) + EN.kx, *(float *)(a + 0x50), *(float *)(a + 0x54) + EN.kz);
+            ai_move(a, *(float *)(a + 0x4C) + EN.kx, *(float *)(a + 0x54) + EN.kz);
             if (--EN.flash == 0) en_colour(in, 0, 255, 255, 255, 255);
         }
         return;
