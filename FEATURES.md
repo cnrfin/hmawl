@@ -27,7 +27,7 @@ a session's temporary folder; the ones still only there are marked.
 | $JOE dig-site share 10 % halving per chapter; x2 at full Joe friendship | joetv.c joe_dig_frame | |
 | Lumber item (0x51C) | make_pm_dol.py data patch | |
 | Van only on the 3rd and 7th | make_pm_dol.py (0x802952D4) | tools/van |
-| Bench "sit until evening/morning" (time skip, shipping, rest; ends with a valley reload like waking from bed: villagers placed for the time, the day's wild animal, battle8, untested) | pm.c, Common.arc event 407 | tools/benchsit |
+| Bench "sit until evening/morning" (time skip, shipping, rest; game's per-minute time skip so villagers keep their schedules (battle9, confirmed), screen held black, a new day re-rolls the wild animal, then a valley reload (battle10, untested)) | pm.c, Common.arc event 407 | tools/benchsit |
 | Joe speaks as character 0x23 (Mukumuku's slot): name "Joe" in Message.arc people.mes, hearts from his gifts | events 408/409 speaker 0x23, pm.c joe_hearts | tools/joe/visit test 12 (HOOK12 stub unused, site restored) |
 | Joe's visit, trade, talk, gifts | pm.c joe_* , events 408/409 | tools/joe (DESIGN.md, visit/README.md) |
 | Joe's faces (blink, angry/happy/neutral per line), mouth flaps + talk gestures timed to the typing, gift take-and-pocket | pm.c joe_face / joe_talk_frame, joe_lines.h, counters 49/50 | visit/README.md test 13 |

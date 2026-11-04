@@ -119,3 +119,12 @@ scene load (func_80079974) from that persistent state. Test 13: the bench runs t
 a frame (1 through the farm windows), with Takakura's plan / ship_check / trade_update every minute; the prompt needs
 CONTROL == 1. The wild-animal pick is not traced yet (loader func_80154604 -> func_8002B9F8, species table
 lbl_8024A534); to check whether the simulated day change fixes it. pm test fd1f132f, normal e308c4d9.
+
+## Bench sit test 13 result / test 14 (battle10)
+Test 13 (user): villagers now where their schedules put them. The sky showed through the skip, changing at 2-4 fps;
+the day's wild animal never changed over bench nights (the bed's morning changed it). The species lives at
+lbl_80349194 +0x3F8 (read by the valley set-up at 0x80014358 -> func_80159A28) and is rolled 0x2C + rand() %
+(lbl_803469D8 + 1) (= 4: lizard, mouse, tanuki, owl, turtle) at 0x80013B64..B88 (the morning after the bed) and at
+0x800132AC..CC (another scene set-up). Test 14: a bench skip that crosses midnight rolls it the same way before the
+reload (bench_rolls); each skip frame snaps the fader to black (0 s, black -> black) if its target is not black.
+pm test ee451861, normal 09c4273e.

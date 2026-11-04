@@ -74,7 +74,7 @@ typedef struct { float x, y, z; } Vec;
 #define clk_add   F(0x800101FC, void, (u8 *, s32))          /* clock object (*0x80349218) += minutes */
 #define clk_align F(0x80010158, s32, (u8 *))                /* clock up to the next whole minute */
 #define tsk_after F(0x80015760, void, (u8 *, u32))
-u32 bench_minutes;   /* g_system, scene (4 = field), flag */
+u32 bench_minutes, bench_rolls;   /* g_system, scene (4 = field), flag */
 u32 bench_reloads; static s32 bench_wait;   /* frames left to check that the reloaded valley faded in */
 static u32 bench_target, bench_start, bench_cool, bench_taka_day = 0xFFFFFFFFu;       /* bench time skip: clock target (0 = idle), clock at the start */
 #define BENCH_CNT 40                        /* event counter 40: set by the bench script on Yes (0-29 count up daily) */
@@ -1031,6 +1031,10 @@ void pm_frame(void)
                 n = ((tod >= 178800u && tod < 207000u) || (tod >= 430800u && tod < 453000u)) ? 1 : 60;
                 if (old % 600u) { clk_align(ck); n--; }        /* onto a whole minute first (counts as one) */
                 ck[8] = 1;                                     /* as the game's skip */
+                if (FADER && *(u8 *)(FADER + 0x53) != 0xFF) {  /* keep the screen black through the skip (user: the sky
+                                                                  showed, changing at a few frames a second) */
+                    u32 bk = 0x000000FF; fade_start(FADER, &bk, &bk, 0, 0, 0.0f);
+                }
                 for (k = 0; k < n && *clk < bench_target; k++) {
                     u32 f = tsk_flags() | 0x400u;
                     w_upd1(w, f); w_upd2(w, f); w_upd3(w, f); w_upd4(w + 0x74); w_upd5(w + 0x48);
@@ -1064,6 +1068,12 @@ void pm_frame(void)
             if ((u32)tm >= 0x80000000u && (u32)tm < 0x81800000u && *(u32 *)(tm + 0x404) == old) *(u32 *)(tm + 0x404) = *clk;
             if (*clk >= bench_target) {
                 bench_target = 0;
+                if (*clk / T_DAY != bench_start / T_DAY && (u32)tm >= 0x80000000u && (u32)tm < 0x81800000u) {
+                    /* a new day: roll the day's wild animal as the morning after the bed does (0x80013B64..B88:
+                       lbl_80349194 +0x3F8 = 0x2C + rand() % (lbl_803469D8 + 1)); the valley reload builds it from that */
+                    *(s32 *)(tm + 0x3F8) = 0x2C + (s32)(F(0x8017D3E8, u32, (void))() % (u32)(*(s32 *)0x803469D8 + 1));
+                    bench_rolls++;
+                }
                 *(s32 *)(g + 0x11B84) = *(s32 *)(g + 0x11B88);   /* stamina full */
                 *(unsigned short *)(g + 0x11BB0) = 0;            /* sleepiness, as in rested dumps */
                 *(s32 *)(g + 0x11BB8) = 0;

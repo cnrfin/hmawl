@@ -3537,3 +3537,6 @@ so, door fades are timed there, possibly per frame. Not traced yet.
 - Bench test 13 (battle9): the bench skip runs the game's own per-minute time-skip body (lbl_80109E44) instead of
   writing the clock, so villagers are simulated through their schedules; prompt only with CONTROL == 1 (not over the
   X menu). See tools/benchsit/README.md test 13.
+- Day's wild animal: lbl_80349194 +0x3F8 = species (0x2C lizard .. 0x30 turtle), rolled 0x2C + rand() % (lbl_803469D8 + 1)
+  at 0x80013B88 (the morning after the bed) / 0x800132CC; the valley set-up builds the animal from it (0x80014358).
+  battle10: the bench rolls it when its skip crosses midnight, and holds the screen black through the skip.
