@@ -3595,3 +3595,7 @@ so, door fades are timed there, possibly per frame. Not traced yet.
   28 washing, 0x18 lure splash. Footstep SE 291-297 by ground. No vanilla stone "clink": 246 kama_ng used for the shell,
   247 kiyurasi for the poof (unverified names). Event cmd_75(char, fx, f) spawns an effect on a character.
 - Arena start 0x8037C000 -> 0x80384000 (+32 KB code room; pools -32 KB). pm battle13: test 584a7aa4, normal 20fdda56.
+- battle13 results (user): no crashes over 10+ days of fights (arena 0x80384000 fine); the poof's centre graphic (id 15)
+  wrong. Dump 6c868b39 (player running): ~90 live particle records (stride 0x110) hold the player's +0x4C / +0x58
+  pointers and effect table entry 0x80251278 (= id 4): the running puffs are id 4. battle14: poof = 11 id-4 puffs
+  (ring of 8 + column of 3), no id 15. pm test 6327291b, normal c429c6b8.

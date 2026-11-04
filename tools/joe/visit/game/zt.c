@@ -822,9 +822,10 @@ static void en_push(u8 *a)
     pp[0] = ax + dx * k; pp[2] = az + dz * k;
     EN.pushes++;
 }
-/* Smoke puff (battle13): func_800DD3BC(effect mgr *0x80349234, id, pos*, dir*, pos copy*, dir copy*, f1) - the copy
-   pair is taken at once, so locals do. Id 15 = the vanish puff objects spawn on message 0x1C (0x800987C0, at +0.4 y),
-   id 4 = the player's walking dust (0x8014BF3C) - a ring of it bulks the puff out. */
+/* Smoke puff (battle13/14): func_800DD3BC(effect mgr *0x80349234, id, pos*, dir*, pos copy*, dir copy*, f1) - the copy
+   pair is taken at once, so locals do. Id 4 = the player's running puffs (user's pick; dump 6c868b39: every particle
+   following the player uses effect table entry 0x80251278 = id 4). battle13's centre id 15 looked wrong (user): the
+   cloud is now id 4 only - a ring of 8 on the ground and a column of 3. */
 #define fx_spawn F(0x800DD3BC, void, (void *, s32, const float *, const float *, const float *, const float *, float))
 static void poof_fx(float x, float y, float z)
 {
@@ -832,12 +833,10 @@ static void poof_fx(float x, float y, float z)
     float pos[3], dir[3];
     s32 k;
     if ((u32)m < 0x80000000u || (u32)m >= 0x81800000u) return;
-    dir[0] = 0.0f; dir[1] = 0.0f; dir[2] = 1.0f;
-    pos[0] = x; pos[1] = y + 0.4f; pos[2] = z;
-    fx_spawn(m, 15, 0, 0, pos, dir, 1.0f);
-    for (k = 0; k < 6; k++) {                               /* dust ring */
-        float an = (float)k * 1.0471976f;
-        pos[0] = x + 0.5f * zsin(an); pos[1] = y + 0.05f; pos[2] = z + 0.5f * zsin(an + 1.5707964f);
+    dir[1] = 0.0f;
+    for (k = 0; k < 11; k++) {
+        float an = (float)k * 0.7853982f, r = k < 8 ? 0.55f : 0.0f;
+        pos[0] = x + r * zsin(an); pos[1] = y + (k < 8 ? 0.05f : 0.3f * (float)(k - 7)); pos[2] = z + r * zsin(an + 1.5707964f);
         dir[0] = zsin(an); dir[2] = zsin(an + 1.5707964f);
         fx_spawn(m, 4, 0, 0, pos, dir, 0.0f);
     }
