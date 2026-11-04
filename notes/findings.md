@@ -3540,3 +3540,22 @@ so, door fades are timed there, possibly per frame. Not traced yet.
 - Day's wild animal: lbl_80349194 +0x3F8 = species (0x2C lizard .. 0x30 turtle), rolled 0x2C + rand() % (lbl_803469D8 + 1)
   at 0x80013B88 (the morning after the bed) / 0x800132CC; the valley set-up builds the animal from it (0x80014358).
   battle10: the bench rolls it when its skip crosses midnight, and holds the screen black through the skip.
+
+### 7.48 Attack poses (battle11, static + skeletons from dumps)
+- Rest skeletons (relocated .act in RAM, node 3x4 rest matrices composed): every animal faces model +Z, up +Y.
+  Lizard (0601e020, 36): 0 root, 1 pelvis, 2-7 tail, 8-15 hind legs, 16 spine, 17 chest (front legs 28-35), 18 neck,
+  19 head, 20 head top, 21-22 lower jaw (hangs below the head), 23-27 tongue (runs past the snout).
+  Chihuahua (041fd6dd, 23): 1 hips, 2 chest, 3 neck, 4 head, 5/6 ears, 7 snout, 8-13 front legs, 14-19 hind, 20-22 tail.
+  Tanuki (0a7466aa, 37): 1 hips (spine 2, hind legs 20-29, tail 30-36), 2-4 spine/chest, 5 head, 6-7 jaw, 8/9 ears,
+  10-19 front legs. Turtle 0x2F (055b67cc, 33): 1 shell, 2-3 neck, 4 head, 5-8 jaw, 9 head top (11/12 eyes), 13-15
+  tail, 16-23 front legs, 24-31 hind legs, 32 shell bottom. Species 0x30 (07ddffcb, 10 nodes) = the owl.
+- Pose layer (zt.c pose_apply, called from ht_bone for every animal bone): model-space rotation about a bone's pivot
+  (axis k in the parent frame = row k of the parent's model rotation; q' = axis(a) * q), model-space pivot offsets
+  (parent-frame translation += M^T v) and scale (flag 1). Bones without a track get their rest pose as a record.
+- AI (per species AIP {wind, lunge, rec, again %, speed}); new AI_HIT: hits 1-2 flinch 10 frames, hit 3 knockback
+  18 frames (+ 0.9 slide); the turtle bites 40 % of the time (atk 1). PZ ('POSE') holds what is drawn.
+- Poses: lizard crouch + tail sway / leap with 3 jaw snaps / tongue flick every 100 frames while circling;
+  chihuahua play bow + wag / dart hop / wagging; tanuki butt wiggle (hips vs spine counter-swing, tail, ears back) /
+  jump / hop gait while circling or walking home; turtle head, legs, tail into the shell (move + scale, shell
+  lowered) / spin 0.55 rad per frame / dizzy roll on recovery; bite: neck back then out with the jaw.
+- pm battle11: test d9682bc6, normal 1f2d8850; pm.bin ends 0x8037A080 (arena 0x8037C000: ~8 KB left).

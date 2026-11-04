@@ -58,7 +58,7 @@ static float aim_h(s32 id)                              /* reticle / visibility 
 #define EN_TINT     15                                  /* defeat: frames white -> red */
 #define EN_FADE     45                                  /* then frames red -> transparent */
 static const u8 en_dmg[4] = { 10, 13, 20, 40 };         /* Stick, Wooden Sword, Farmer's Sword, H.M Murasama */
-struct { u32 magic; s32 hp, day, state, t, flash, last_dmg, hits; float x, y, z, kx, kz; } EN;   /* 'ENMY' (dump) */
+struct { u32 magic; s32 hp, day, state, t, flash, last_dmg, hits; float x, y, z, kx, kz; s32 lasth; } EN;   /* 'ENMY' (dump) */
 static u8 *wild_inst(u8 *a)
 {
     u8 *sk = *(u8 **)(a + 0x168), *in;
@@ -82,7 +82,7 @@ u8 *en_ctl;                                              /* the animal our battl
    obj+0xD8 = its clip n (motion table per species family = species - 0x2C; findings 7.46), with the play state
    obj+0xE0 = 0 (loop; 1 = once, 3 = stopped); idle 0; the moving clips per species: ai_go / ai_dash.
    Facing: +0xF0 sin / +0xF8 cos (copied to +0x58 / +0x60 every update). No damage to the player yet. */
-enum { AI_CIRCLE, AI_WINDUP, AI_LUNGE, AI_RECOVER };
+enum { AI_CIRCLE, AI_WINDUP, AI_LUNGE, AI_RECOVER, AI_HIT, AI_HOME = 100 };
 #define AI_R       3.5f                                 /* circling distance */
 #define AI_TAN     0.09f                                /* circling speed (per frame) */
 #define AI_WIND    18                                   /* wind up: 0.3 s, hopping back a little */
@@ -91,7 +91,18 @@ enum { AI_CIRCLE, AI_WINDUP, AI_LUNGE, AI_RECOVER };
 #define AI_REC     30
 #define AI_AGAIN   35                                   /* % chance of a second lunge straight after */
 #define MOT_IDLE   0
-struct { u32 magic; s32 st, t, len, dir; float lx, lz; } AI;   /* 'ENAI' (dump) */
+struct { u32 magic; s32 st, t, len, dir; float lx, lz; s32 atk, kb, hseen, again; } AI;   /* 'ENAI' (dump) */
+/* Attack moves (battle11, user design): per species {wind-up, lunge, recover frames, % second lunge, lunge speed};
+   atk 1 = the turtle's bite (wind-up 10, a 12-frame step in at 0.2 with the neck strike, recover 16). */
+static const struct { u8 wind, lunge, rec, again; float spd; } AIP[5] = {
+    { 18, 18, 26, 35, 0.40f },                           /* lizard: crouch, jump + jaw snaps */
+    { 16, 12, 22, 40, 0.45f },                           /* chihuahua: play bow, dart */
+    { 26, 20, 26, 25, 0.36f },                           /* tanuki: butt wiggle, jump */
+    { 24, 36, 34,  0, 0.28f },                           /* turtle: into the shell, spin; dizzy after */
+    { 18, 16, 30, 35, 0.42f } };                         /* owl (unchanged) */
+#define AI_HIT_KB  18                                    /* hit 3: knocked back, quick recovery (user) */
+#define AI_HIT_FL  10                                    /* hits 1-2: a flinch */
+struct { u32 magic; s32 sp, st, t, len, atk, kb; u32 clk; } PZ;   /* 'POSE': what the bone layer draws (dump) */
 /* Aggro (battle7, user design): locking on starts the fight; letting go of the lock does not end it. It ends when
    the player gets more than ZT_LEASH away (or it is led AG_HOME_MAX from home while not locked on); then it walks
    back to where it was first seen today, and only a new lock-on starts it again. The battle music follows AG.on. */
@@ -600,7 +611,8 @@ static void en_hit(s32 h, float dx, float dz)
     dmg = en_dmg[w]; if (h == 2) dmg = dmg * 3 / 2;
     EN.magic = 0x454E4D59u; EN.hits++; EN.last_dmg = dmg; EN.hp -= dmg;
     EN.flash = EN_FLASH;
-    k = d2 > 0.0001f ? 0.35f * rsq(d2) : 0.0f;             /* knock back 0.35 away from the player, over 4 frames */
+    EN.lasth = h;
+    k = d2 > 0.0001f ? (h == 2 ? 0.9f : 0.35f) * rsq(d2) : 0.0f;   /* knock back 0.35 (hit 3: 0.9) away from the player, over 4 frames */
     EN.kx = dx * k / 4.0f; EN.kz = dz * k / 4.0f;
     if (EN.hp <= 0) {
         u8 *a = wild_obj();
@@ -646,34 +658,44 @@ static void ai_frame(u8 *g, u8 *a)
     float *p = SLOT_POS(g, 0), x = *(float *)(a + 0x4C), z = *(float *)(a + 0x54);
     float dx = p[0] - x, dz = p[2] - z, d2 = dx * dx + dz * dz, inv = d2 > 0.0001f ? rsq(d2) : 0.0f, d = d2 * inv;
     float ux = dx * inv, uz = dz * inv;
+    s32 sp = *(s32 *)(a + 0x128) - 0x2C;
+    if (sp < 0 || sp > 4) sp = 4;
     AI.magic = 0x454E4149u; AI.t++;
-    if (EN.flash > 0 && AI.st != AI_RECOVER) { AI.st = AI_RECOVER; AI.t = 0; AI.len = 24; }   /* hit: stagger */
+    if (EN.hits != AI.hseen) {                               /* a new hit: flinch, or knocked back on hit 3 */
+        AI.hseen = EN.hits; AI.kb = EN.lasth == 2;
+        AI.st = AI_HIT; AI.t = 0; AI.len = AI.kb ? AI_HIT_KB : AI_HIT_FL;
+    }
     switch (AI.st) {
     case AI_CIRCLE: {
         float rad = (d - AI_R) * 0.08f, tan = AI_TAN * (float)AI.dir;
         float cap = Z.target == ZT_WILD ? 0.12f : AI_CHASE;
         if (rad > cap) rad = cap; if (rad < -cap) rad = -cap;
         ai_move(a, x + ux * rad - uz * tan, z + uz * rad + ux * tan);
-        ai_face(a, ux * rad - uz * tan, uz * rad + ux * tan);   /* runs the way it goes (user); the head will track you */
+        ai_face(a, ux * rad - uz * tan, uz * rad + ux * tan);   /* runs the way it goes (user); the head tracks you */
         ai_mot(a, ai_go(a));
-        if (AI.t >= AI.len) { AI.st = AI_WINDUP; AI.t = 0; }
+        if (AI.t >= AI.len) {
+            AI.st = AI_WINDUP; AI.t = 0; AI.again = 0;
+            AI.atk = sp == 3 && ai_rand(100) < 40;           /* the turtle sometimes bites instead */
+            AI.len = AI.atk ? 10 : AIP[sp].wind;
+        }
         break; }
     case AI_WINDUP:
-        if (AI.t < 8) ai_move(a, x - ux * 0.05f, z - uz * 0.05f);   /* a little hop back: the tell */
+        if (AI.t < 8 && sp != 3) ai_move(a, x - ux * 0.05f, z - uz * 0.05f);   /* a little hop back: the tell */
         ai_face(a, dx, dz); ai_mot(a, MOT_IDLE);
-        if (AI.t >= AI_WIND) { AI.st = AI_LUNGE; AI.t = 0; AI.lx = ux; AI.lz = uz; }
+        if (AI.t >= AI.len) { AI.st = AI_LUNGE; AI.t = 0; AI.lx = ux; AI.lz = uz; AI.len = AI.atk ? 12 : AIP[sp].lunge; }
         break;
-    case AI_LUNGE:
-        if (d > 0.7f) ai_move(a, x + AI.lx * AI_LSPEED, z + AI.lz * AI_LSPEED);   /* stops at the player */
-        ai_face(a, AI.lx, AI.lz); ai_mot(a, ai_dash(a));
-        if (AI.t >= AI_LUNGE_T) {
-            if (ai_rand(100) < AI_AGAIN && AI.len != -1) { AI.st = AI_WINDUP; AI.t = AI_WIND - 6; AI.len = -1; }   /* again! */
-            else { AI.st = AI_RECOVER; AI.t = 0; AI.len = AI_REC; }
+    case AI_LUNGE: {
+        float v = AI.atk ? 0.2f : AIP[sp].spd;
+        if (d > (AI.atk ? 1.2f : 0.7f)) ai_move(a, x + AI.lx * v, z + AI.lz * v);   /* stops at the player */
+        ai_face(a, AI.lx, AI.lz); ai_mot(a, sp == 3 ? MOT_IDLE : ai_dash(a));
+        if (AI.t >= AI.len) {
+            if (!AI.again && !AI.atk && ai_rand(100) < AIP[sp].again) { AI.st = AI_WINDUP; AI.again = 1; AI.len = AIP[sp].wind; AI.t = AI.len - 6; }   /* again! */
+            else { AI.st = AI_RECOVER; AI.t = 0; AI.len = AI.atk ? 16 : AIP[sp].rec; }
         }
-        break;
-    default:
+        break; }
+    default:                                                 /* recover / hit */
         ai_mot(a, MOT_IDLE);
-        if (AI.t >= AI.len) { AI.st = AI_CIRCLE; AI.t = 0; AI.len = 40 + (s32)ai_rand(50); if (ai_rand(2)) AI.dir = -AI.dir; }
+        if (AI.t >= AI.len) { AI.st = AI_CIRCLE; AI.t = 0; AI.len = 40 + (s32)ai_rand(50); AI.atk = 0; if (ai_rand(2)) AI.dir = -AI.dir; }
     }
 }
 #define EN_SCALE 2.0f                                   /* user: all wild animals 2x (skeleton instance scale +0x1C..+0x24) */
@@ -734,12 +756,16 @@ static void en_frame(u8 *g)
     HT.magic = 0x4854524Bu; HT.phi += (HT.want - HT.phi) * HT_EASE; HT.want = 0.0f;   /* back to straight unless in battle */
     ag_frame(g, a);
     if (en_alive() && AG.on) {                                /* in battle: our AI drives it */
-        if (en_ctl != a || AG.on == 2) { en_ctl = a; AG.on = 1; AI.st = AI_CIRCLE; AI.t = 0; AI.len = 90; AI.dir = 1; }
+        if (en_ctl != a || AG.on == 2) { en_ctl = a; AG.on = 1; AI.st = AI_CIRCLE; AI.t = 0; AI.len = 90; AI.dir = 1; AI.atk = 0; AI.hseen = EN.hits; }
         ai_frame(g, a);
         ht_want(g, a);
-    } else if (en_alive() && AG.homing) { en_ctl = a; ai_home(a); }   /* de-aggro: walk back home */
+    } else if (en_alive() && AG.homing) { en_ctl = a; ai_home(a); PZ.st = AI_HOME; }   /* de-aggro: walk back home */
     else if (en_alive()) en_ctl = 0;                         /* its own wandering */
     else en_ctl = a;                                         /* dying / gone: keep it still */
+    PZ.magic = 0x504F5345u; PZ.clk++;
+    PZ.sp = *(s32 *)(a + 0x128) - 0x2C;
+    if (en_alive() && AG.on) { PZ.st = AI.st; PZ.t = AI.t; PZ.len = AI.len; PZ.atk = AI.atk; PZ.kb = AI.kb; }
+    else if (!(en_alive() && AG.homing)) PZ.st = -1;         /* its own AI / dying: no pose layer */
     if (en_alive()) {
         if (en_hid == in && EN.flash == 0) { in[0x3C] = 1; en_colour(in, 0, 255, 255, 255, 255); en_hid = 0; }   /* a live animal:
                                                                  visible and normal colour again */
@@ -821,17 +847,138 @@ static void swing_frame(s32 bpress, s32 free)
     swing_sounds(c->frame, c->frame + 1.0f);
     c->frame += 1.0f;
 }
+/* Pose layer (battle11): attack / hit poses drawn on top of the clips, per bone, in MODEL space (the rest skeletons
+   from the dumps: +Z forward, +Y up, +X the animal's left). Rotations turn a bone (and everything below it) about a
+   model axis through its own pivot: axis k in the parent's frame = row k of the parent's model rotation (ht_m),
+   q' = axis(angle) * q. Angles: about X + = nose down; about Y + = turn left; about Z = roll. Moves are model-space
+   offsets of the bone's pivot (the root's in object units). Bones (rest-position reading, notes 7.48): lizard 0 root,
+   2 tail, 19 head, 21 lower jaw, 23 tongue; chihuahua 2 chest, 4 head, 20 tail; tanuki 1 hips (spine 2, hind legs,
+   tail), 2 spine, 5 head, 7 jaw, 8/9 ears, 30 tail; turtle 1 shell, 2 neck, 4 head, 5 jaw, 13 tail, 16/20/24/28 legs. */
+#define PI_F 3.14159265f
+typedef struct { u8 *trs; float *pm; } PCX;
+static float zcos(float x) { return zsin(x + 1.57079637f); }
+static float zabs(float x) { return x < 0.0f ? -x : x; }
+static void q_pre(float *q, float ax, float ay, float az, float ang)
+{
+    float h = 0.5f * ang, sh = zsin(h), ch = zcos(h), bx = q[0], by = q[1], bz = q[2], bw = q[3];
+    ax *= sh; ay *= sh; az *= sh;
+    q[0] = ch * bx + ax * bw + ay * bz - az * by;
+    q[1] = ch * by - ax * bz + ay * bw + az * bx;
+    q[2] = ch * bz + ax * by - ay * bx + az * bw;
+    q[3] = ch * bw - ax * bx - ay * by - az * bz;
+}
+static void p_rot(PCX *c, s32 k, float ang)
+{
+    float ax = k == 0, ay = k == 1, az = k == 2, l;
+    if (ang > -0.0001f && ang < 0.0001f) return;
+    if (c->pm) { ax = c->pm[k * 3]; ay = c->pm[k * 3 + 1]; az = c->pm[k * 3 + 2]; }
+    l = ax * ax + ay * ay + az * az; if (l < 0.0001f) return;
+    l = rsq(l);
+    q_pre((float *)(c->trs + 0x10), ax * l, ay * l, az * l, ang);
+}
+static void p_mov(PCX *c, float vx, float vy, float vz)
+{
+    float *t = (float *)(c->trs + 0x20);
+    if (!(c->trs[0] & 8)) { t[0] = t[1] = t[2] = 0.0f; c->trs[0] |= 8; }   /* no record: translation 0 (func_801A20B4) */
+    if (c->pm) {
+        float *m = c->pm;
+        t[0] += m[0] * vx + m[3] * vy + m[6] * vz; t[1] += m[1] * vx + m[4] * vy + m[7] * vz; t[2] += m[2] * vx + m[5] * vy + m[8] * vz;
+    } else { t[0] += vx; t[1] += vy; t[2] += vz; }
+}
+static void p_scl(PCX *c, float k)
+{
+    float *sc = (float *)(c->trs + 4);
+    if (k > 0.999f && k < 1.001f) return;
+    if (k < 0.05f) k = 0.05f;
+    if (c->trs[0] & 1) { sc[0] *= k; sc[1] *= k; sc[2] *= k; } else { sc[0] = sc[1] = sc[2] = k; c->trs[0] |= 1; }
+}
+static void pose_apply(s32 n, PCX *c)
+{
+    s32 sp = PZ.sp, st = PZ.st, t = PZ.t, len = PZ.len > 0 ? PZ.len : 1;
+    float u = (float)t / (float)len, ck = (float)PZ.clk;
+    if (st < 0) return;
+    if (u > 1.0f) u = 1.0f;
+    if (st == AI_HIT && n == 0) {                       /* every species: flinch / hit-3 knockback (quick recovery) */
+        float b = 1.0f - u;
+        if (PZ.kb) { p_rot(c, 0, -0.6f * b * b); p_mov(c, 0.0f, 0.35f * zsin(PI_F * u), 0.0f); }
+        else p_rot(c, 0, -0.22f * b);
+    }
+    switch (sp) {
+    case 0:                                             /* lizard */
+        if (st == AI_WINDUP) {                          /* crouch, tail swaying */
+            float k = smooth01((float)t / 6.0f);
+            if (n == 0) { p_mov(c, 0.0f, -0.08f * k, 0.0f); p_rot(c, 0, 0.10f * k); }
+            if (n == 2) p_rot(c, 1, 0.35f * zsin(ck * 0.6f) * k);
+        } else if (st == AI_LUNGE) {                    /* leaps, snapping its jaw mid-air */
+            if (n == 0) { p_mov(c, 0.0f, 1.0f * zsin(PI_F * u), 0.0f); p_rot(c, 0, -0.35f + 0.6f * u); }
+            if (n == 21) p_rot(c, 0, 0.7f * zabs(zsin(u * 3.0f * PI_F)));
+            if (n == 2) p_rot(c, 0, 0.25f * zsin(PI_F * u));
+        } else if (st == AI_CIRCLE || st == AI_HOME) {  /* now and then a tongue flick */
+            s32 f = (s32)(PZ.clk % 100u);
+            if (n == 23 && f < 12) p_mov(c, 0.0f, 0.0f, 0.10f * zsin(PI_F * (float)f / 12.0f));
+        }
+        break;
+    case 1:                                             /* chihuahua */
+        if (st == AI_WINDUP) {                          /* play bow: front down, rear up; tail going */
+            float k = smooth01((float)t / 5.0f);
+            if (n == 0) { p_rot(c, 0, 0.30f * k); p_mov(c, 0.0f, 0.04f * k, 0.0f); }
+            if (n == 20) p_rot(c, 1, 0.6f * zsin(ck * 1.3f));
+        } else if (st == AI_LUNGE) {                    /* a quick dart with a little hop */
+            if (n == 0) { p_mov(c, 0.0f, 0.35f * zsin(PI_F * u), 0.0f); p_rot(c, 0, -0.2f + 0.3f * u); }
+        } else if (n == 20) p_rot(c, 1, 0.4f * zsin(ck * 1.1f));   /* wagging */
+        break;
+    case 2:                                             /* tanuki */
+        if (st == AI_WINDUP) {                          /* butt wiggle: hips swing, the spine counters so the front stays */
+            float k = smooth01((float)t / 6.0f), w = 0.35f * zsin(ck * 0.9f) * k;
+            if (n == 0) p_rot(c, 0, 0.18f * k);
+            if (n == 1) p_rot(c, 1, w);
+            if (n == 2) p_rot(c, 1, -w);
+            if (n == 30) p_rot(c, 1, 0.6f * zsin(ck * 0.9f + 1.0f) * k);
+            if (n == 8 || n == 9) p_rot(c, 0, -0.6f * k);   /* ears back */
+        } else if (st == AI_LUNGE) {                    /* jumping lunge */
+            if (n == 0) { p_mov(c, 0.0f, 1.1f * zsin(PI_F * u), 0.0f); p_rot(c, 0, -0.3f + 0.5f * u); }
+            if (n == 8 || n == 9) p_rot(c, 0, -0.5f);
+            if (n == 30) p_rot(c, 0, 0.4f * zsin(PI_F * u));
+        } else if ((st == AI_CIRCLE || st == AI_HOME) && n == 0) {   /* hop, not walk */
+            p_mov(c, 0.0f, 0.16f * zabs(zsin(ck * 0.30f)), 0.0f);
+            p_rot(c, 0, -0.06f * zsin(ck * 0.60f));
+        }
+        break;
+    case 3: {                                           /* turtle */
+        float kr = 0.0f;                                /* into the shell: 0 out .. 1 in */
+        if (!PZ.atk) {
+            if (st == AI_WINDUP) kr = smooth01((float)t / 10.0f);
+            else if (st == AI_LUNGE) kr = 1.0f;
+            else if (st == AI_RECOVER) kr = 1.0f - smooth01((float)t / 12.0f);
+        }
+        if (kr > 0.0f) {
+            if (n == 2) { p_mov(c, 0.0f, 0.0f, -0.30f * kr); p_scl(c, 1.0f - 0.55f * kr); }
+            if (n == 16 || n == 20 || n == 24 || n == 28) p_scl(c, 1.0f - 0.75f * kr);
+            if (n == 13) p_scl(c, 1.0f - 0.7f * kr);
+            if (n == 0) p_mov(c, 0.0f, -0.30f * kr, 0.0f);   /* the shell settles on the ground */
+        }
+        if (!PZ.atk && st == AI_LUNGE && n == 0) p_rot(c, 1, (float)t * 0.55f);   /* spinning shell */
+        if (!PZ.atk && st == AI_RECOVER && n == 0) p_rot(c, 2, 0.18f * zsin((float)t * 0.5f) * (1.0f - u));   /* dizzy */
+        if (PZ.atk && n == 2) {                         /* bite: neck back, then out */
+            if (st == AI_WINDUP) p_mov(c, 0.0f, 0.0f, -0.08f * smooth01((float)t / 6.0f));
+            else if (st == AI_LUNGE) p_mov(c, 0.0f, 0.0f, 0.22f * zsin(PI_F * u));
+        }
+        if (PZ.atk && n == 5 && st == AI_LUNGE) p_rot(c, 0, 0.5f * zsin(PI_F * u));   /* jaw */
+        break; }
+    }
+}
 static s32 ht_bone(s32 n, u8 *trs, s32 r)                /* r: anim_eval's result (0: the pose build uses the rest matrix) */
 {
     u8 *act = *(u8 **)en_skel, *node, *par, *a = wild_obj();
     float *m = ht_m[n], *pm = 0, L[9], *q = (float *)(trs + 0x10), *t = (float *)(trs + 0x20), *rm;
     s32 i, cnt, sp = a ? *(s32 *)(a + 0x128) - 0x2C : -1;
+    PCX c;
     if ((u32)act < 0x80000000u || (u32)act >= 0x81800000u || n < 0 || n >= HT_BONES) return r;
     cnt = *(s32 *)(act + 4); if (n >= cnt) return r;
     node = *(u8 **)(act + 0xC) + n * 0x1C; par = *(u8 **)(node + 0xC); rm = *(float **)node;
     if ((u32)rm < 0x80000000u || (u32)rm >= 0x81800000u) return r;
     if (par) { i = (s32)(par - *(u8 **)(act + 0xC)) / 0x1C; if (i >= 0 && i < n) pm = ht_m[i]; }
-    if (n == 0 && !r) {                                 /* root without a track: its rest pose as a record, so it can scale */
+    if (!r) {                                           /* no track: its rest pose as a record (same pose), so it can move */
         float tr = rm[0] + rm[5] + rm[10], k;           /* rotation matrix -> quaternion */
         if (tr > -0.99f) { k = 0.5f * rsq(1.0f + tr); q[3] = 0.25f / k; q[0] = (rm[9] - rm[6]) * k; q[1] = (rm[2] - rm[8]) * k; q[2] = (rm[4] - rm[1]) * k; }
         else if (rm[0] >= rm[5] && rm[0] >= rm[10]) { k = 0.5f * rsq(1.0f + rm[0] - rm[5] - rm[10]); q[0] = 0.25f / k; q[1] = (rm[1] + rm[4]) * k; q[2] = (rm[2] + rm[8]) * k; q[3] = (rm[9] - rm[6]) * k; }
@@ -839,19 +986,8 @@ static s32 ht_bone(s32 n, u8 *trs, s32 r)                /* r: anim_eval's resul
         else { k = 0.5f * rsq(1.0f + rm[10] - rm[0] - rm[5]); q[2] = 0.25f / k; q[0] = (rm[2] + rm[8]) * k; q[1] = (rm[6] + rm[9]) * k; q[3] = (rm[4] - rm[1]) * k; }
         t[0] = rm[3]; t[1] = rm[7]; t[2] = rm[11]; trs[0] = 4 | 8; r = 1;
     }
-    if (r && (trs[0] & 4)) {                            /* pose rotation -> matrix (column vectors) */
-        float x = q[0], y = q[1], z = q[2], w = q[3];
-        L[0] = 1 - 2 * (y * y + z * z); L[1] = 2 * (x * y - z * w); L[2] = 2 * (x * z + y * w);
-        L[3] = 2 * (x * y + z * w); L[4] = 1 - 2 * (x * x + z * z); L[5] = 2 * (y * z - x * w);
-        L[6] = 2 * (x * z - y * w); L[7] = 2 * (y * z + x * w); L[8] = 1 - 2 * (x * x + y * y);
-    } else if (r) {                                     /* a record without rotation: identity (func_801A20B4) */
-        for (i = 0; i < 9; i++) L[i] = (i % 4) ? 0.0f : 1.0f;
-    } else {                                            /* no record: the rest matrix's rotation part */
-        for (i = 0; i < 3; i++) { L[i * 3] = rm[i * 4]; L[i * 3 + 1] = rm[i * 4 + 1]; L[i * 3 + 2] = rm[i * 4 + 2]; }
-    }
-    if (pm) { for (i = 0; i < 9; i++) { s32 rr = i / 3, c = i % 3; m[i] = pm[rr * 3] * L[c] + pm[rr * 3 + 1] * L[3 + c] + pm[rr * 3 + 2] * L[6 + c]; } }
-    else for (i = 0; i < 9; i++) m[i] = L[i];
-    if (n == 0 && r) {                                  /* user: every animal 2x. Scale (flag 1, +4) the root; its translation
+    if (!(trs[0] & 4)) { q[0] = q[1] = q[2] = 0.0f; q[3] = 1.0f; trs[0] |= 4; }   /* a record without rotation: identity */
+    if (n == 0) {                                       /* user: every animal 2x. Scale (flag 1, +4) the root; its translation
                                                            doubles too, so the model grows about the object's origin (feet) */
         float *sc = (float *)(trs + 4);
         if (trs[0] & 1) { sc[0] *= EN_SCALE; sc[1] *= EN_SCALE; sc[2] *= EN_SCALE; }
@@ -859,21 +995,19 @@ static s32 ht_bone(s32 n, u8 *trs, s32 r)                /* r: anim_eval's resul
         if (trs[0] & 8) { t[0] *= EN_SCALE; t[1] *= EN_SCALE; t[2] *= EN_SCALE; }
         HT.scaled++;
     }
-    if (sp < 0 || sp >= 5 || n != en_head[sp] || !pm || !r || !(trs[0] & 4)) return r;
-    if (HT.phi > -0.01f && HT.phi < 0.01f) return r;
-    {   /* model up (0,1,0) in the parent's frame = row 1 of its model rotation */
-        float ax = pm[3], ay = pm[4], az = pm[5], l = ax * ax + ay * ay + az * az, h, sh, ch;
-        float bx = q[0], by = q[1], bz = q[2], bw = q[3];
-        if (l < 0.0001f) return r;
-        l = rsq(l); ax *= l; ay *= l; az *= l;
-        h = 0.5f * HT_SIGN * HT.phi; sh = zsin(h); ch = zsin(h + 1.57079637f);
-        ax *= sh; ay *= sh; az *= sh;                   /* q' = axis(phi) * q */
-        q[0] = ch * bx + ax * bw + ay * bz - az * by;
-        q[1] = ch * by - ax * bz + ay * bw + az * bx;
-        q[2] = ch * bz + ax * by - ay * bx + az * bw;
-        q[3] = ch * bw - ax * bx - ay * by - az * bz;
+    c.trs = trs; c.pm = pm;
+    pose_apply(n, &c);                                  /* attack / hit poses */
+    if (sp >= 0 && sp < 5 && n == en_head[sp] && pm && !(HT.phi > -0.01f && HT.phi < 0.01f)) {
+        p_rot(&c, 1, HT_SIGN * HT.phi);                 /* head tracking: about the model's up axis */
         HT.turns++;
     }
+    {   float x = q[0], y = q[1], z = q[2], w = q[3];   /* this bone's rotation -> matrix (column vectors), model rotation */
+        L[0] = 1 - 2 * (y * y + z * z); L[1] = 2 * (x * y - z * w); L[2] = 2 * (x * z + y * w);
+        L[3] = 2 * (x * y + z * w); L[4] = 1 - 2 * (x * x + z * z); L[5] = 2 * (y * z - x * w);
+        L[6] = 2 * (x * z - y * w); L[7] = 2 * (y * z + x * w); L[8] = 1 - 2 * (x * x + y * y);
+    }
+    if (pm) { for (i = 0; i < 9; i++) { s32 rr = i / 3, cc = i % 3; m[i] = pm[rr * 3] * L[cc] + pm[rr * 3 + 1] * L[3 + cc] + pm[rr * 3 + 2] * L[6 + cc]; } }
+    else for (i = 0; i < 9; i++) m[i] = L[i];
     return r;
 }
 s32 zt_bone(u8 *ctl, s32 n, u8 *trs, u8 *inst)
