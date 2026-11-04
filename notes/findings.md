@@ -3695,3 +3695,5 @@ so, door fades are timed there, possibly per frame. Not traced yet.
 - pm.bin now links stats.o (link line: ... tile.o toolfix.o clips.o stats.o). pm test ef490425, normal a8f8fefe.
 - stats1 results (dumps 08544169 / d8feee0a): EXP 0 -> 1084 (chihuahua 800 + farming 284 for ~64 % stamina spent), Lv 1
   (needed 2000). stats2: need = 500 + 750 x (level - 1) (500, 1250, 2000, ...; ~Lv 9 by the end of chapter 1 as before).
+- stats2 dump 3bc40e96: EXP 183 / Lv 1 - a reloaded save (the 1084 was never saved); ~75 % of a bar of tool work = 183
+  EXP. stats3: farming EXP x3 (stamina-work / 33), need = 500 + 1250 x (level - 1).

@@ -27,7 +27,7 @@ enum { C_MAGIC = 54, C_EXP, C_LV, C_HP, C_PWR, C_END, C_LCK, C_ANS, C_PTS };
 void skill_levelup(void);
 struct { u32 magic; s32 ignore, acc, last, lastfull, menu, cool, gained, refund; } ST;   /* 'STAT' (dump) */
 
-static s32 need(s32 lv) { return 500 + 750 * (lv - 1); }   /* stats2: 500, 1250, 2000 ... (was 1500 + 500 lv: Lv 2 took 2000) */
+static s32 need(s32 lv) { return 500 + 1250 * (lv - 1); }   /* stats3: 500, 1750, 3000 ... (farming EXP x3); stats2: 500, 1250, 2000 ... (was 1500 + 500 lv: Lv 2 took 2000) */
 static s32 ready(u8 *g) { return OK(g) && CNT(g, C_MAGIC) == (s32)ST_MAGIC; }
 s32 stats_pwr(void) { u8 *g = *(u8 **)0x803491CC; return ready(g) ? CNT(g, C_PWR) : 0; }
 void stats_ignore(s32 dmg) { ST.ignore += dmg; }            /* zt.c: an enemy hit, not tool work */
@@ -68,7 +68,7 @@ void stats_frame(u8 *g, s32 map, volatile u32 *held, volatile u32 *press, s32 bu
                 u8 *c = g + 0x11B80; s32 cat = *(s32 *)(c + 0x160), lv = cat == 1 ? c[0x2E] : cat == 2 ? c[0x32] : 0;
                 if (lv >= 1 && lv <= 5) ST.acc += d * 400 / (3450 - 650 * lv); else ST.acc += d;
             }
-            if (ST.acc >= 100) { CNT(g, C_EXP) += ST.acc / 100; ST.gained += ST.acc / 100; ST.acc %= 100; }
+            if (ST.acc >= 33) { CNT(g, C_EXP) += ST.acc / 33; ST.gained += ST.acc / 33; ST.acc %= 33; }   /* stats3: x3 (~1 level per bar early) */
         }
     }
     ST.last = cur; ST.ignore = 0;
