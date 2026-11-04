@@ -3464,10 +3464,15 @@ so, door fades are timed there, possibly per frame. Not traced yet.
   (ai_go): walk (1) for turtle / owl, run (2) for lizard / mouse / tanuki.
 
 ### 7.47 Lore sweep (all 71 US .mes files, 17,469 messages; dump only in the user's zip)
-- Decoder: scratchpad mesread.py (notes 7.6 table), tolerant of the character files' extra control codes.
+- Decoder: scratchpad mesread.py (notes 7.6 table) + control 0x50 with 3 argument bytes (<50:1D 00 xx>, 2,521 messages
+  start with it; xx looks like the speaker's expression: 04 / 07 angry, 0A happy). Without it those were cut short.
 - Dr. Hardy = badog.mes. 0x0CE (graveyard line, after 0x0CD "Visiting a graveyard..."): "I was walking around here a
   few nights ago, and heard a girl screaming...". No "red light(s)" line in the US text (only the milk tank, system
-  0x0BD); the JP files use the game's own glyph numbering (not SJIS), not decoded yet.
+  0x0BD). The red light is VESTA's: 0x14A "I hear there's a mysterious red light that appears in the night... How
+  creepy!" -> 0x14B "Dr. Hardy's going to the graveyard in the dead of night!"; 0x148 "When I went to the graveyard at
+  night, there was something glowing strangely!" -> 0x149 "It turned out to be just Dr. Hardy's eye!"; Hardy 0x0B3
+  "You're wondering about my left eye...? I'll tell you about it sometime." The JP files use the game's own glyph
+  numbering (not SJIS), not decoded yet.
 - "Red stars": kate 0x096 (beach at night), gustafa 0x09A (southern ocean). Code: ObjectStar.cpp (main.dol, data
   0x802C3BF0): the night sky, star1-4.oqt / star0-1..4.oqt picked by season (func_80010004), star.tpl (commonall).
 - Grave keeper: path_GraveKeeper.pth (main.dol 0x802C3764) and hakamori.arc (wlp0 / wlp2 room lists, between the
@@ -3475,3 +3480,5 @@ so, door fades are timed there, possibly per frame. Not traced yet.
 - Others: white-haired being in the north forest (daryl 0x002/0x050/0x0E8, hugh 0x0E7/0x0ED; = Mukumuku), King's
   Hall / Tomb of the King curse (carter 0x019-0x022, flora 0x02A-0x039; Carter "the descendant of the ancient
   dynasty" 0x087), "strange mushroom. Eat it?" (event 0x009), Muffy followed by "someone strange" (muumuu 0x07C).
+  Son's rumours (son_npccom): 0x01D "<20:23> (Mukumuku) was once a human!", 0x017 "<20:06> can talk to the spirits of
+  the wind", 0x00A "<20:11> (Galen) is not scared of graveyards"; tai/tay 0x125 crops disappearing from the common garden.
