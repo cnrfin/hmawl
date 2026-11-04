@@ -105,3 +105,17 @@ the player spawns at position entry 0 (game+0x29C78 / +0x29F84 = where he stands
 on the valley, scene_req(g_system, 4, 0) instead of our fade-in. The field load fades in itself (func_80012900,
 0x80012984, 1 s); fallback: 60-600 frames later, valley up and fader idle with its last target black
 (fader +0x50 = to colour, alpha +0x53) -> fade in. bench_reloads counts reloads. pm test 237a4738, normal 5b76ae08.
+
+## Bench sit test 12 result / test 13 (battle9)
+Test 12 (user): times right, fade clean, shipping OK; but villagers stay where they were (e.g. still walking out of
+the valley the next morning), Joe (ours, time-driven) right; after defeating the day's animal the bench brings the
+same species back every day; and the prompt opened while the X item menu was up (CONTROL 0), leaving a second menu.
+Cause of the villagers: writing the clock does not simulate them. The game's event time skip (func_80109E00 while an
+event runs adds to lbl_80349334; at event end func_8000CC94(lbl_80109E44) registers the callback) runs, per minute:
+f = func_80012568() | 0x400 (sda2 lbl_8034AFC8); func_8017CD7C / CDC0 / CE04(lbl_8034923C, f); func_8017CFD4(+0x74);
+func_8017CF2C(+0x48); func_800101FC(clock obj *0x80349218, 1); func_80015760(lbl_803491D4, f); clock obj +8 (control)
+held 1 meanwhile (func_80010158 first rounds the clock up to a whole minute). Villager objects are rebuilt on every
+scene load (func_80079974) from that persistent state. Test 13: the bench runs this per-minute body itself, 60 minutes
+a frame (1 through the farm windows), with Takakura's plan / ship_check / trade_update every minute; the prompt needs
+CONTROL == 1. The wild-animal pick is not traced yet (loader func_80154604 -> func_8002B9F8, species table
+lbl_8024A534); to check whether the simulated day change fixes it. pm test fd1f132f, normal e308c4d9.

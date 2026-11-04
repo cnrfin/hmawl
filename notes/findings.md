@@ -3534,3 +3534,6 @@ so, door fades are timed there, possibly per frame. Not traced yet.
 - Bench test 12 (battle8): the bench skip ends with a valley scene reload (func_8017767C(g_system, 4, 0), the event
   warp's path for map 1) so villagers / the day's wild animal are set up as after the bed. Fader: +0x4C from colour,
   +0x50 to colour, +0x58 ms, +0x5C start, +0x60 busy. Details: tools/benchsit/README.md test 12.
+- Bench test 13 (battle9): the bench skip runs the game's own per-minute time-skip body (lbl_80109E44) instead of
+  writing the clock, so villagers are simulated through their schedules; prompt only with CONTROL == 1 (not over the
+  X menu). See tools/benchsit/README.md test 13.

@@ -64,7 +64,17 @@ typedef struct { float x, y, z; } Vec;
 #define ANIMSET   71
 #define VALLEY    1
 #define EVENT     406
-#define scene_req F(0x8017767C, void, (u8 *, s32, s32))   /* g_system, scene (4 = field), flag */
+#define scene_req F(0x8017767C, void, (u8 *, s32, s32))
+#define tsk_flags F(0x80012568, u32, (void))                /* the game's time skip, one minute (lbl_80109E44) */
+#define w_upd1    F(0x8017CD7C, void, (u8 *, u32))
+#define w_upd2    F(0x8017CDC0, void, (u8 *, u32))
+#define w_upd3    F(0x8017CE04, void, (u8 *, u32))
+#define w_upd4    F(0x8017CFD4, void, (u8 *))
+#define w_upd5    F(0x8017CF2C, void, (u8 *))
+#define clk_add   F(0x800101FC, void, (u8 *, s32))          /* clock object (*0x80349218) += minutes */
+#define clk_align F(0x80010158, s32, (u8 *))                /* clock up to the next whole minute */
+#define tsk_after F(0x80015760, void, (u8 *, u32))
+u32 bench_minutes;   /* g_system, scene (4 = field), flag */
 u32 bench_reloads; static s32 bench_wait;   /* frames left to check that the reloaded valley faded in */
 static u32 bench_target, bench_start, bench_cool, bench_taka_day = 0xFFFFFFFFu;       /* bench time skip: clock target (0 = idle), clock at the start */
 #define BENCH_CNT 40                        /* event counter 40: set by the bench script on Yes (0-29 count up daily) */
@@ -984,7 +994,7 @@ void pm_frame(void)
         float dx = BENCH_X - p[0], dz = BENCH_Z - p[2], d2 = dx * dx + dz * dz;
         if (d2 < 1.6f * 1.6f && d2 > 0.0001f && (dx * d[0] + dz * d[2]) * rsqrt(d2) > 0.5f) {
             u8 *ev = EVMGR;
-            if (ev && *(s32 *)(ev + 0x680) == -1 && !*(s32 *)(ev + 0x58C) && CONTROL != 3) {
+            if (ev && *(s32 *)(ev + 0x680) == -1 && !*(s32 *)(ev + 0x58C) && CONTROL == 1) {   /* free: not in the X menu (CONTROL 0) */
                 PAD_PRESS &= ~0x100u; PAD_HELD &= ~0x100u;   /* the player does not act on this A */
                 event_start(ev, BENCH_EVENT, 0, 0);
             }
@@ -1010,34 +1020,46 @@ void pm_frame(void)
             u32 *clk = *(u32 **)0x80349218, old = *clk, step;
             u8 *tm = *(u8 **)0x80349194;
             PAD_PRESS = 0; PAD_HELD = 0;
-            {   /* jump the clock (villagers place themselves for the new time, as with one jump) except through the farm's
-                   windows, stepped 1 game minute a frame: 4:58-5:45 (Takakura's plan, pickup 5:10-5:40) and
-                   11:58-12:35 (payout 12:00-12:30) */
-                u32 tod = old % T_DAY, base = old - tod, nxt;
-                if ((tod >= 178800u && tod < 207000u) || (tod >= 430800u && tod < 453000u)) nxt = old + 600u;
-                else nxt = tod < 178800u ? base + 178800u : tod < 430800u ? base + 430800u : base + T_DAY + 178800u;
-                step = (nxt < bench_target ? nxt : bench_target) - old;
-            }
-            *clk = old + step;
-            {   /* Takakura (villager 7) plans the day's trade jobs (pickup 5:10, payout 12:00) when he wakes at ~5:00,
-                   but not while the player is off the farm. Once per day of the skip, at 5:00+, run his daily plan
-                   (func_80060EF8 only reads state+8 = the villager object; NPC manager *0x8034916C +4 per id) */
-                u32 now = *clk, d = now / T_DAY, tod = now % T_DAY;
-                u8 *npc = *(u8 **)0x8034916C, *tk;
-                if (tod >= 180000u && tod < 186000u && d != bench_taka_day && (u32)npc >= 0x80000000u && (u32)npc < 0x81800000u) {
-                    tk = *(u8 **)(npc + 4 * 7);
-                    bench_taka_day = d;
-                    if ((u32)tk >= 0x80000000u && (u32)tk < 0x81800000u && *(s32 *)(tk + 0xBC) == 7) {
-                        u8 *st[3]; st[0] = 0; st[1] = 0; st[2] = tk;
-                        day_plan((u8 *)st);
+            {   /* battle9: run the game's own time skip, minute by minute (the event skip lbl_80109E44: per minute the
+                   world updates func_8017CD7C / CDC0 / CE04 (lbl_8034923C, flags func_80012568() | 0x400), +0x74
+                   func_8017CFD4, +0x48 func_8017CF2C, clock + 1 minute, func_80015760(lbl_803491D4, flags)); that moves
+                   every villager through its schedule (writing the clock only left them where they stood). 60 minutes a
+                   frame, 1 a frame through the farm's windows 4:58-5:45 (Takakura's plan, pickup 5:10-5:40) and
+                   11:58-12:35 (payout 12:00-12:30), with our farm-side extras every minute. */
+                u8 *ck = *(u8 **)0x80349218, *w = *(u8 **)0x8034923C, ctl = ck[8];
+                u32 tod = old % T_DAY, n, k;
+                n = ((tod >= 178800u && tod < 207000u) || (tod >= 430800u && tod < 453000u)) ? 1 : 60;
+                if (old % 600u) { clk_align(ck); n--; }        /* onto a whole minute first (counts as one) */
+                ck[8] = 1;                                     /* as the game's skip */
+                for (k = 0; k < n && *clk < bench_target; k++) {
+                    u32 f = tsk_flags() | 0x400u;
+                    w_upd1(w, f); w_upd2(w, f); w_upd3(w, f); w_upd4(w + 0x74); w_upd5(w + 0x48);
+                    clk_add(ck, 1);
+                    tsk_after(*(u8 **)0x803491D4, f);
+                    bench_minutes++;
+                    {   /* Takakura (villager 7) plans the day's trade jobs (pickup 5:10, payout 12:00) when he wakes at
+                           ~5:00, but not while the player is off the farm: once per day of the skip, at 5:00+, his daily
+                           plan (func_80060EF8 only reads state+8 = the villager object; NPC manager *0x8034916C +4 per id) */
+                        u32 now = *clk, d = now / T_DAY, td = now % T_DAY;
+                        u8 *npc = *(u8 **)0x8034916C, *tk;
+                        if (td >= 180000u && td < 186000u && d != bench_taka_day && (u32)npc >= 0x80000000u && (u32)npc < 0x81800000u) {
+                            tk = *(u8 **)(npc + 4 * 7);
+                            bench_taka_day = d;
+                            if ((u32)tk >= 0x80000000u && (u32)tk < 0x81800000u && *(s32 *)(tk + 0xBC) == 7) {
+                                u8 *st[3]; st[0] = 0; st[1] = 0; st[2] = tk;
+                                day_plan((u8 *)st);
+                            }
+                        }
+                    }
+                    ship_check(*(u8 **)0x803491CC);          /* farm-side timed checks (pickup 5:10-5:40, payout 12:00-12:30): only wlp2 calls it */
+                    {   /* the trade manager (*0x803491EC, vtable 0x802C1940 at +0x10): its update runs the day's timed trade
+                           jobs and queues the next day's; it only runs on the farm */
+                        u8 *tr = *(u8 **)0x803491EC;
+                        if ((u32)tr >= 0x80000000u && (u32)tr < 0x81800000u && *(u32 *)(tr + 0x10) == 0x802C1940u) trade_update(tr, 0);
                     }
                 }
-            }
-            ship_check(*(u8 **)0x803491CC);                  /* farm-side timed checks (shipping pickup 5:10-5:40, payout 12:00-12:30); only wlp2 (farm/house) calls this */
-            {   /* the trade manager (*0x803491EC, vtable 0x802C1940 at +0x10): its update (slot 0x10, 0x80134104) runs the
-                   day's timed trade jobs and queues the next day's; it only runs on the farm, so its times froze on the bench */
-                u8 *tr = *(u8 **)0x803491EC;
-                if ((u32)tr >= 0x80000000u && (u32)tr < 0x81800000u && *(u32 *)(tr + 0x10) == 0x802C1940u) trade_update(tr, 0);
+                ck[8] = ctl;
+                (void)step;
             }
             if ((u32)tm >= 0x80000000u && (u32)tm < 0x81800000u && *(u32 *)(tm + 0x404) == old) *(u32 *)(tm + 0x404) = *clk;
             if (*clk >= bench_target) {
