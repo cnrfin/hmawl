@@ -3411,3 +3411,10 @@ so, door fades are timed there, possibly per frame. Not traced yet.
   +0x3C = 0); tpos(ZT_WILD) refuses unless alive (no lock on a defeated animal). Reset each new day.
   Unknowns for the test: whether the channel takes the material colour from the register (tint visible) and
   whether TEV passes its alpha (fade), and whether the game rewrites +0x3C every frame.
+- enemy2 test (user, tanuki; dump 6eeeb7cb): HP right; no visible white flash (flat colour MULTIPLIES the texture:
+  white = just unlit); no shake (the animal moves itself from its +0xFC position copy, overwriting +0x4C); red tint
+  works; no fade (the colour's alpha is ignored), then hidden (+0x3C = 0 works); still solid after (collider).
+  enemy2b: flash = light red (255,120,120); positions written to +0x4C and +0xFC; fade = flicker out (shown on
+  fewer of each 16 frames); defeated = hidden and moved to (-5000, y, -5000).
+- The invisible Z target in the dump: event slot 5 at (274.9, 126.1) = moi_0.arc = MURREY (grass skirt, bare feet;
+  body texture decoded): his actor has the 0x2000 "out on this map" flag but his model is not drawn.

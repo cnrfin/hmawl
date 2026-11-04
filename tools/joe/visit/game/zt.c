@@ -72,6 +72,11 @@ static void en_colour(u8 *in, s32 on, u32 r, u32 g, u32 b, u32 al)
     in[0x3D] = (u8)on;
     in[0x3E] = (u8)r; in[0x3F] = (u8)g; in[0x40] = (u8)b; in[0x41] = (u8)al;
 }
+static void en_setpos(u8 *a, float x, float y, float z)     /* both copies: the animal moves itself from +0xFC */
+{
+    *(float *)(a + 0x4C) = x; *(float *)(a + 0x50) = y; *(float *)(a + 0x54) = z;
+    *(float *)(a + 0xFC) = x; *(float *)(a + 0x100) = y; *(float *)(a + 0x104) = z;
+}
 static s32 en_today(void) { return (s32)((**(u32 **)0x80349218) / 864000u); }
 static s32 en_alive(void) { if (EN.day != en_today()) { EN.day = en_today(); EN.hp = EN_HP; EN.state = 0; EN.t = 0; EN.flash = 0; } return EN.state == 0; }
 #define SE_LOCK    238                                  /* lock on: vanilla sound 238 (user pick; 434 = our OoT-style flutter, still in the bank) */
@@ -534,9 +539,9 @@ static void en_frame(void)
     u8 *a = wild_obj(), *in;
     if (!a || !(in = wild_inst(a))) return;
     if (en_alive()) {
-        if (EN.flash > 0) {
-            en_colour(in, 1, 255, 255, 255, 255);
-            *(float *)(a + 0x4C) += EN.kx; *(float *)(a + 0x54) += EN.kz;
+        if (EN.flash > 0) {                                  /* the flat colour multiplies the texture: a light red flash */
+            en_colour(in, 1, 255, 120, 120, 255);
+            en_setpos(a, *(float *)(a + 0x4C) + EN.kx, *(float *)(a + 0x50), *(float *)(a + 0x54) + EN.kz);
             if (--EN.flash == 0) en_colour(in, 0, 255, 255, 255, 255);
         }
         return;
@@ -544,17 +549,19 @@ static void en_frame(void)
     if (EN.state == 1) {
         s32 t = ++EN.t;
         float sh = (t & 2) ? 0.07f : -0.07f;                /* rapid side-to-side shake, in place */
-        *(float *)(a + 0x4C) = EN.x + sh * *(float *)(a + 0x60);
-        *(float *)(a + 0x54) = EN.z - sh * *(float *)(a + 0x58);
-        *(float *)(a + 0x50) = EN.y;
-        if (t <= EN_TINT) { u32 c = 255 - (u32)(t * 225 / EN_TINT); en_colour(in, 1, 255, c, c, 255); }
-        else if (t <= EN_TINT + EN_FADE) en_colour(in, 1, 255, 30, 30, (u32)(255 * (EN_TINT + EN_FADE - t) / EN_FADE));
-        else EN.state = 2;
+        en_setpos(a, EN.x + sh * *(float *)(a + 0x60), EN.y, EN.z - sh * *(float *)(a + 0x58));
         if (t == 1) sfx_play(*(u8 **)0x803491E4, SE_DEFEAT, 0);
+        if (t <= EN_TINT) { u32 c = 255 - (u32)(t * 225 / EN_TINT); en_colour(in, 1, 255, c, c, 255); in[0x3C] = 1; }
+        else if (t <= EN_TINT + EN_FADE) {                   /* flicker out (the model ignores the colour's alpha): */
+            s32 k = (t - EN_TINT) * 16 / EN_FADE;            /* shown on fewer and fewer frames of each 16 */
+            en_colour(in, 1, 255, 30, 30, 255);
+            in[0x3C] = (u8)(((t * 7) & 15) >= k);
+        }
+        else EN.state = 2;
         return;
     }
-    in[0x3C] = 0;                                            /* defeated: not drawn for the rest of the day */
-    en_colour(in, 1, 255, 30, 30, 0);
+    in[0x3C] = 0;                                            /* defeated: not drawn, and far off the map (no collision) */
+    en_setpos(a, -5000.0f, EN.y, -5000.0f);
 }
 static void swing_sounds(float f0, float f1)
 {
