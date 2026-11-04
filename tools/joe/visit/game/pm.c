@@ -64,6 +64,8 @@ typedef struct { float x, y, z; } Vec;
 #define ANIMSET   71
 #define VALLEY    1
 #define EVENT     406
+#define scene_req F(0x8017767C, void, (u8 *, s32, s32))   /* g_system, scene (4 = field), flag */
+u32 bench_reloads; static s32 bench_wait;   /* frames left to check that the reloaded valley faded in */
 static u32 bench_target, bench_start, bench_cool, bench_taka_day = 0xFFFFFFFFu;       /* bench time skip: clock target (0 = idle), clock at the start */
 #define BENCH_CNT 40                        /* event counter 40: set by the bench script on Yes (0-29 count up daily) */
 #define BENCH_EVENT 407                     /* bench: sit until evening / morning */
@@ -969,6 +971,12 @@ void pm_frame(void)
        ("Sit until the evening?" / "Sit until the morning?", Common.arc entry 107, debug.mes 9/10).
        The player's own map (game+0x2A290) is used, not the field check: after the event the latter can differ. */
     if (bench_cool) bench_cool--;
+    if (bench_wait && --bench_wait < 540 && map == 1 && FADER && *(u8 *)(FADER + 0x60) != 1) {
+        bench_wait = 0;                       /* the valley is back and nothing is fading: if the last fade ended on black */
+        if (*(u8 *)(FADER + 0x53) == 0xFF) {  /* (to colour +0x50, alpha +0x53), fade in ourselves */
+            u32 from = 0x000000FF, to = 0x00000000; fade_start(FADER, &from, &to, 0, 0, 0.5f);
+        }
+    }
     if ((PAD_PRESS & 0x100) && !(PAD_HELD & 0x10) && *(s32 *)(g + 0x2A290) == 1 && !S.talking && !joe_here
         && !bench_target && !bench_cool && !*(s32 *)(g + 0x12194 + BENCH_CNT * 4)
         && !(FADER && *(u8 *)(FADER + 0x60))) {   /* not during a skip, a pending request, a fade, or just after */
@@ -1042,7 +1050,15 @@ void pm_frame(void)
                 *(u32 *)(g + 0x11C9C) = *clk;                   /* last time woken up: now - tiredness counts from here */
                 *(u32 *)(g + 0x11CB4) = *clk + 16 * 36000u;     /* sleepy from: woke + 16 h (as the bed sets it) */
                 *(u32 *)(g + 0x11CAC) = *clk + 60 * 36000u;     /* the later limit: woke + 60 h (as the bed sets it) */
-                if (FADER) { u32 from = 0x000000FF, to = 0x00000000; fade_start(FADER, &from, &to, 0, 0, 0.5f); }
+                {   /* user: wake up as from the bed: reload the valley scene (the event warp 0x2C's path for map 1,
+                       func_8010D5A8 -> func_8017767C(g_system, 4, 0): next scene 4 = the field, map 1). The new scene
+                       places every villager for the time, picks the day's wild animal and fades in itself; the player
+                       comes back where he stands (position entry 0, game+0x29C78 / +0x29F84). */
+                    u8 *gs = *(u8 **)0x80349208;
+                    if ((u32)gs >= 0x80000000u && (u32)gs < 0x81800000u && *(s32 *)(g + 0x2A290) == 1) {
+                        scene_req(gs, 4, 0); bench_reloads++; bench_wait = 600;
+                    } else if (FADER) { u32 from = 0x000000FF, to = 0x00000000; fade_start(FADER, &from, &to, 0, 0, 0.5f); }
+                }
                 bench_cool = 60;                                 /* ~1 s after the fade-in: no new prompt */
             }
         }

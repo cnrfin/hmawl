@@ -3531,3 +3531,6 @@ so, door fades are timed there, possibly per frame. Not traced yet.
   that only pool B's own records reference (leaked, so harmless). Not traced to our code; watch for repeats.
   Invariant correction: outdoors, pool A also holds this 1.2 MB tpl above the chapter archive.
   pm battle7: test da5f3974, normal c88dc283.
+- Bench test 12 (battle8): the bench skip ends with a valley scene reload (func_8017767C(g_system, 4, 0), the event
+  warp's path for map 1) so villagers / the day's wild animal are set up as after the bed. Fader: +0x4C from colour,
+  +0x50 to colour, +0x58 ms, +0x5C start, +0x60 busy. Details: tools/benchsit/README.md test 12.

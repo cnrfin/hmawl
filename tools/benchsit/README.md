@@ -95,3 +95,13 @@ the 1-minute steps, trade_update and ship_check then run the 5:10 pickup. Code e
 Stepping the whole skip left villagers where they stood (test 1's single jump placed them right). Test 14 jumps
 the clock except through two stepped windows (1 game minute per frame): 4:58-5:45 (Takakura's plan + pickup) and
 11:58-12:35 (payout). The van test 5 day logger is removed (space: code now ends 0x80365BC4; plan log at 0x803656B8).
+
+## Bench sit test 12 (battle8): reload the valley at the end
+User: after a bench night the animals did not respawn and villagers stay where they were; the bed's morning
+reloads the field when the player walks out. The event warp (cmd 0x2C, func_8010D5A8) for maps -1..2 / 0x52 calls
+func_8017767C(g_system, 4, 0) (g_system+0x58 = next scene 4 = field, +0x64 = 1, +0x78 = flag) and then sends
+message 0x1F (func_8004579C(msg, receiver 1, 0, 0x1F, record, 0) + func_80011680) to place the player; without it
+the player spawns at position entry 0 (game+0x29C78 / +0x29F84 = where he stands). pm.c: at the end of the skip,
+on the valley, scene_req(g_system, 4, 0) instead of our fade-in. The field load fades in itself (func_80012900,
+0x80012984, 1 s); fallback: 60-600 frames later, valley up and fader idle with its last target black
+(fader +0x50 = to colour, alpha +0x53) -> fade in. bench_reloads counts reloads. pm test 237a4738, normal 5b76ae08.
