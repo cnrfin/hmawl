@@ -3749,3 +3749,7 @@ so, door fades are timed there, possibly per frame. Not traced yet.
   debug.mes 30 "You found <n0> G!" in mode 1, CONTROL 0. The defeat's EXP is added when the box closes (mgr+0x48 0),
   so the level-up pop-up and menu come after it; while a reward waits, levels / menus / the stats view wait too.
 - gold1: debug.mes 3513c028 (Common.arc unchanged 5f1848b3), pm test 78640463, normal ca08914b.
+- gold1 (user): gold given, the mode 1 box showed, then closed by itself at once (opened straight from pm.bin with
+  CONTROL 0, no player state). gold2: the box comes from player state 0x2A (player+0x14C0 file 0x32, +0x14C4 msg 30,
+  pl_state func_80031D7C; as the tested R item description), started only when the player is free (state 1); done when
+  the box is closed and the player has left 0x2A. pm test 96da791e, normal e14914b7 (debug.mes as gold1).

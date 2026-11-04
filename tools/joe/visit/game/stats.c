@@ -40,10 +40,15 @@ void stats_exp(s32 n)                                        /* EXP gained (zt.c
     if (!ready(g) || n <= 0) return;
     CNT(g, C_EXP) += n; ST.gained += n;
 }
-/* step 4: a defeated animal's reward (zt.c). Gold first, in the game's info box (func_801020E4 mode 1, as player state
-   0x2A: file, msg, speaker -1, 0x70, 0, 0) with the cash sound; its EXP is only added once that box has closed, so
-   "Level up!" and the stat menu always come after it, never together. */
-#define msg_open  F(0x801020E4, s32, (u8 *, s32, s32, s32, s32, s32, s32, s32))
+/* step 4: a defeated animal's reward (zt.c). Gold first, in the game's info box with the cash sound; its EXP is only
+   added once that box has closed, so "Level up!" and the stat menu always come after it, never together.
+   gold2: the box is opened by the game's own player state 0x2A (as the R item description: file player+0x14C0, msg
+   +0x14C4; it opens func_801020E4 mode 1, holds the player and waits for A). gold1 opened the box directly from
+   here: it showed, then closed by itself at once. */
+#define pl_state  F(0x80031D7C, void, (u8 *, s32))
+#define ST_MSG    0x2A
+#define ST_FREE   1
+extern u8 *pm_player;
 #define gold_add  F(0x80113234, void, (u8 *, s32))
 #define sfx_play  F(0x8012A52C, s32, (u8 *, s32, s32))
 #define MES_DEBUG 0x32
@@ -204,20 +209,23 @@ void stats_frame(u8 *g, s32 map, volatile u32 *held, volatile u32 *press, s32 bu
     }
     /* a defeat's reward: gold box, then its EXP (levels and menus wait) */
     if (ST.r_open) {
-        u8 *mm = MSGMGR;
-        if (OK(mm) && *(s32 *)(mm + 0x48)) return;           /* still open */
-        ST.r_open = 0; CONTROL = 1; ST.cool = 20;
+        u8 *mm = MSGMGR, *pl = pm_player;
+        if ((OK(mm) && *(s32 *)(mm + 0x48)) || (OK(pl) && *(s32 *)(pl + 0x1364) == ST_MSG)) return;   /* until A closes it */
+        ST.r_open = 0; ST.cool = 20;
     }
     if (ST.r_gold || ST.r_exp) {
         u8 *mm = MSGMGR;
         if (ST.r_wait > 0) { ST.r_wait--; return; }
         if (ST.r_gold > 0) {
-            if (busy || map < 0 || skill_pop_on || !event_free() || !OK(mm) || *(s32 *)(mm + 0x48)) return;
+            u8 *pl = pm_player;
+            if (busy || map < 0 || skill_pop_on || !event_free() || !OK(mm) || *(s32 *)(mm + 0x48) ||
+                !OK(pl) || *(s32 *)(pl + 0x1364) != ST_FREE) return;
             gold_add(g + 0x11A14, ST.r_gold);
             sfx_play(*(u8 **)0x803491E4, SE_CASH, 0);
             msg_num(mm, 0, ST.r_gold);
-            if (msg_open(mm, 1, MES_DEBUG, M_GOLD, -1, 0x70, 0, 0)) { ST.r_open = 1; CONTROL = 0; }
-            ST.r_gold = 0;
+            *(s32 *)(pl + 0x14C0) = MES_DEBUG; *(s32 *)(pl + 0x14C4) = M_GOLD;
+            pl_state(pl, ST_MSG);
+            ST.r_gold = 0; ST.r_open = 1;
             return;
         }
         CNT(g, C_EXP) += ST.r_exp; ST.gained += ST.r_exp; ST.r_exp = 0;
