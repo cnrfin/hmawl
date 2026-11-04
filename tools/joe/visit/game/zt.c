@@ -818,39 +818,31 @@ static void collapse_start(u8 *g)
     if (CL.st) return;
     CL.magic = 0x434C5053u; CL.st = 1; CL.t = 0; PD.collapses++;
     let_go_why(10); AG.on = 0; AG.homing = 1; bm_off(0);
-    if ((u32)pl >= 0x80000000u && (u32)pl < 0x81800000u) {
-        /* battle23: the game's own exhausted kneel with the spinning stars (state 0x25: motion 0x14, face 7, SE 0xFD) as the
-           defeat animation (user). Its enter picks the carry pose from ctrl+0x144 (held item): shown an empty hand for the
-           call, so the weapon stays in the hand instead of held out like an item. */
-        u8 *ctrl = *(u8 **)(pl + 0x135C);
-        s32 held = 0;
-        if ((u32)ctrl >= 0x80000000u && (u32)ctrl < 0x81800000u) { held = *(s32 *)(ctrl + 0x144); *(s32 *)(ctrl + 0x144) = 0; }
-        set_state(pl, 0x25);
-        if ((u32)ctrl >= 0x80000000u && (u32)ctrl < 0x81800000u) *(s32 *)(ctrl + 0x144) = held;
-    }
+    (void)pl;   /* battle24: the game starts its own exhausted kneel (stars, weapon handled) once stamina is under 10 % (collapse_frame) */
 }
+#define se_find  F(0x8018CD6C, void *, (u8 *, s32, s32))
+#define se_stop  F(0x8018B25C, void, (void *))
 static void collapse_frame(u8 *g, s32 map, volatile u32 *held, volatile u32 *press)
 {
     u8 *fd = FADER_, *gs = *(u8 **)0x80349208;
     if (!CL.st) return;
     CL.t++;
-    if (CL.st < 3) { *press = 0; *held = 0; }
-    if (CL.st < 3) *(s32 *)(g + 0x11B84) = *(s32 *)(g + 0x11B88) / 10;   /* held at 10 %: the kneel (state 0x25) ends itself at 30 % */
-    if ((CL.st == 2 && CL.t > 50) || (CL.st == 3 && map != 3)) {   /* stay black until the house is up (no flash back in) */
-        if ((u32)fd >= 0x80000000u && (u32)fd < 0x81800000u && *(u8 *)(fd + 0x60) != 1 && *(u8 *)(fd + 0x53) != 0xFF) {
-            u32 bk = 0x000000FF; fade_to(fd, &bk, &bk, 0, 0, 0.0f);
+    if (CL.st == 1) {
+        *press = 0; *held = 0;
+        *(s32 *)(g + 0x11B84) = *(s32 *)(g + 0x11B88) / 10 - 1;   /* under 10 %: the game kneels (state 0x25) via its own path, so the
+                                                                    held weapon is handled; held there (0x25 ends itself at 30 %) */
+        if (CL.t >= 150) {                                /* stars for 2.5 s, then home: stop the kneel's loop sound as its exit does
+                                                             (0x80034730..: func_8018CD6C(audio+0x54, 0xFD, 0) -> func_8018B25C), clear
+                                                             ctrl+0x16C; no fade of our own - the house warp's transition fades */
+            float *p = SLOT_POS(g, 0), *dr = (float *)(g + 0x29F84);
+            u8 *au = *(u8 **)0x803491E4, *pl = pm_player;
+            if ((u32)au >= 0x80000000u && (u32)au < 0x81800000u) { void *h = se_find(*(u8 **)(au + 0x54), 0xFD, 0); if (h) se_stop(h); }
+            if ((u32)pl >= 0x80000000u && (u32)pl < 0x81800000u) { u8 *ctrl = *(u8 **)(pl + 0x135C); if ((u32)ctrl >= 0x80000000u && (u32)ctrl < 0x81800000u) ctrl[0x16C] = 0; }
+            *(s32 *)(g + 0x11B84) = *(s32 *)(g + 0x11B88) / 2;
+            p[0] = -1.0f; p[1] = 0.0f; p[2] = -5.2f; dr[0] = 0.0f; dr[1] = 0.0f; dr[2] = 1.0f;
+            if ((u32)gs >= 0x80000000u && (u32)gs < 0x81800000u) scene_map(gs, 6, 3, 0);
+            CL.st = 3; CL.t = 0;
         }
-    }
-    if (CL.st == 1 && CL.t >= 120) {                      /* kneeling with the stars: fade to black */
-        u32 from = 0x00000000, to = 0x000000FF;
-        if ((u32)fd >= 0x80000000u && (u32)fd < 0x81800000u) fade_to(fd, &from, &to, 0, 0, 0.8f);
-        CL.st = 2; CL.t = 0;
-    } else if (CL.st == 2 && CL.t >= 55) {                /* black: half HP, into the house */
-        float *p = SLOT_POS(g, 0), *dr = (float *)(g + 0x29F84);
-        *(s32 *)(g + 0x11B84) = *(s32 *)(g + 0x11B88) / 2;
-        p[0] = -1.0f; p[1] = 0.0f; p[2] = -5.2f; dr[0] = 0.0f; dr[1] = 0.0f; dr[2] = 1.0f;
-        if ((u32)gs >= 0x80000000u && (u32)gs < 0x81800000u) scene_map(gs, 6, 3, 0);
-        CL.st = 3; CL.t = 0;
     } else if (CL.st == 3 && CL.t > 60) {                 /* in the house: make sure the screen comes back */
         if (map == 3 && (u32)fd >= 0x80000000u && (u32)fd < 0x81800000u && *(u8 *)(fd + 0x60) != 1) {
             if (*(u8 *)(fd + 0x53) == 0xFF) { u32 from = 0x000000FF, to = 0x00000000; fade_to(fd, &from, &to, 0, 0, 0.6f); }

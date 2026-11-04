@@ -3667,3 +3667,11 @@ so, door fades are timed there, possibly per frame. Not traced yet.
 - battle23: the defeat animation is state 0x25 itself (kneel + spinning stars + SE 0xFD, user's pick), entered with
   ctrl+0x144 = 0 for the call (empty-hand pose, weapon left in the hand), HP held at 10 % until the warp (0x25 ends
   itself at 30 %), fade out after 120 frames, and the fader is kept black (0 s black->black) from then until map 3 is up.
+- battle23 (user): worse - forcing state 0x25 ourselves gave no motion, no stars, the weapon gone, its loop SE 0xFD kept
+  playing after the warp, and the double fade remained (so it was never the motion: our fade-out + the room warp's own
+  transition). In battle21 the game's own path (func_800326B4 -> 0x25, or 0x23 -> 0x24 -> 0x25 holding) showed the kneel,
+  the stars and the weapon right.
+- battle24: collapse = stamina held just under 10 % with input locked, so the game starts its own kneel; after 150 frames the
+  kneel's exit is imitated (0x8003470C: func_8004BD44(ctrl); func_8018CD6C(*(audio+0x54), 0xFD, 0) -> func_8018B25C stops
+  the loop; ctrl+0x16C = 0), HP = half, house spot, func_8017775C(g_system, 6, 3, 0) with no fade of ours (fade-in
+  fallback in the house kept).
