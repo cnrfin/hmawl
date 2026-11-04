@@ -3737,3 +3737,4 @@ so, door fades are timed there, possibly per frame. Not traced yet.
   0..lbl_8034895C (100) <= 100 / (w_2k + w_2k+1), else 2k+1. stats.c: rare kinds (weight 1-10) x (1 + 0.05 Luck),
   taken from the water's most common kind; lbl_8034895C = 10000 / (100 + 5 Luck). Both globals are only read there.
 - luck1: pm test b7f9d6ff, Luck-20 test 26500972, normal 6c83066f.
+- luck1 tested (user, Luck-20 test build): dig site and fishing both yield clearly more; feels rewarding, not game-breaking.
