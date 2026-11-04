@@ -286,12 +286,64 @@ static void swing_frame(s32 bpress, s32 free);
 static s32 sw_item; static u8 *sw_g;
 struct { u32 magic, n, lastm, bpress, tries, fail, starts, bones, slot, arc, anim; float w, frame, len; u32 ring[8][4]; u32 item, kids[4], kbone[4]; } sw_dbg;   /* 'SWDB' (dump) */
 static void en_frame(void);
+/* ---- Battle music (Breeze battle v12, user design): locking onto a living enemy fades the field song out (MusyX
+   music master, func_80189DD8) and starts the DTK stream /battle/BATTLE.adp through the game's own stream player
+   (func_80129928(audio + 0x80, file, 0, 0, file, 0, loop): play the whole file once, then loop from 9 x 32 KB =
+   the end of the 4-bar rise; tools/sound/stream). Its volume fades in on the stream faders (audio + 0x160 / 0x170,
+   func_8018A08C(fader, 0..255, ms)). Defeat, or more than ZT_LEASH from the enemy, fades it out and the field
+   song back in; a scene change stops it at once. */
+#define AUDIO        (*(u8 **)0x803491E4)
+#define stream_play  F(0x80129928, s32, (u8 *, const char *, u32, u32, const char *, u32, u32))
+#define stream_stop  F(0x8012A8E4, void, (u8 *))
+#define fader_to     F(0x8018A08C, void, (u8 *, u32, u32))
+#define music_vol    F(0x80189DD8, void, (u8 *, u32, u32))
+#define BM_LOOP      (9u << 15)                         /* loop start in the file: 9 x 32 KB */
+static const char bm_file[] = "/battle/BATTLE.adp";
+struct { u32 magic; s32 state, t, starts; } BM;        /* 'BTLM' (dump): 0 off, 1 on, 2 fading out */
+static void bm_off(s32 at_once)
+{
+    u8 *au = AUDIO;
+    if (!BM.state || (u32)au < 0x80000000u || (u32)au >= 0x81800000u) { BM.state = 0; return; }
+    if (at_once) { stream_stop(au); BM.state = 0; return; }
+    if (BM.state == 1) {
+        fader_to(au + 0x160, 0, 1500); fader_to(au + 0x170, 0, 1500);
+        music_vol(*(u8 **)(au + 0x4C), 127, 1500);
+        BM.state = 2; BM.t = 0;
+    }
+}
+static void bm_frame(u8 *g, s32 map)
+{
+    u8 *au = AUDIO, *a;
+    BM.magic = 0x42544C4Du;
+    if ((u32)au < 0x80000000u || (u32)au >= 0x81800000u) return;
+    if (map != 1) { if (BM.state) { stream_stop(au); BM.state = 0; } return; }   /* left the valley */
+    a = wild_obj();
+    if (BM.state == 0) {
+        if (Z.target == ZT_WILD && a && en_alive()) {
+            music_vol(*(u8 **)(au + 0x4C), 0, 800);
+            fader_to(au + 0x160, 0, 0); fader_to(au + 0x170, 0, 0);
+            stream_play(au + 0x80, bm_file, 0, 0, bm_file, 0, BM_LOOP);
+            fader_to(au + 0x160, 255, 1000); fader_to(au + 0x170, 255, 1000);
+            BM.state = 1; BM.starts++;
+        }
+        return;
+    }
+    if (BM.state == 1) {
+        float *p = SLOT_POS(g, 0), dx, dz;
+        if (!a || !en_alive()) { bm_off(0); return; }
+        dx = *(float *)(a + 0x4C) - p[0]; dz = *(float *)(a + 0x54) - p[2];
+        if (dx * dx + dz * dz > ZT_LEASH * ZT_LEASH) bm_off(0);           /* ran away */
+        return;
+    }
+    if (++BM.t >= 100) { stream_stop(au); BM.state = 0; }               /* faded out: stop the stream */
+}
 void zt_frame(u8 *g, s32 map, volatile u32 *held, volatile u32 *press)
 {
 #ifdef NO_ZT
     (void)g; (void)map; (void)held; (void)press; return;   /* test build: Z targeting, reticle and combos off */
 #endif
     if (map == 1) en_frame();                                /* the day's wild animal as an enemy (HP / flash / defeat) */
+    bm_frame(g, map);                                        /* battle music */
     u8 *f = FADER;
     u8 *ev = EVMGR;
     s32 zpress;
@@ -505,7 +557,7 @@ static float smooth01(float x) { if (x <= 0.0f) return 0.0f; if (x >= 1.0f) retu
 #define SE_SWING_H 437                                  /* hit 3 */
 #define SE_HIT_L   438
 #define SE_HIT_H   439
-#define SE_DEFEAT  439                                  /* defeat: for now the heavy impact (user to pick a dissolve sound) */
+#define SE_DEFEAT  222                                  /* defeat: an animal cry (user pick) */
 #define SE_VOICE1  440                                  /* Toan's voice (Dark Cloud): hit 1, hit 2, hit 3; 443 hurt / 444 dies for later */
 static const float sw_snap[3] = { 5.0f, 3.0f, 10.0f }, sw_strike[3] = { 8.0f, 6.0f, 13.0f };
 static float weapon_reach(s32 item)

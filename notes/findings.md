@@ -3418,3 +3418,15 @@ so, door fades are timed there, possibly per frame. Not traced yet.
   fewer of each 16 frames); defeated = hidden and moved to (-5000, y, -5000).
 - The invisible Z target in the dump: event slot 5 at (274.9, 126.1) = moi_0.arc = MURREY (grass skirt, bare feet;
   body texture decoded): his actor has the 0x2000 "out on this map" flag but his model is not drawn.
+
+### 7.45 Battle music: the DTK stream player (enemy3, static)
+- Valley music = MusyX songs; the DTK stream is free there. Stream player (audio = *0x803491E4, player at +0x80):
+  func_80129928(player, f1, len1, off1, f2, len2, off2): DVDChangeDir("sound"), DVDOpen both, DVDPrepareStreamAsync
+  (func_801BACD0) for f1 then f2 queued (the drive loops the second). Busy (+0xDC) -> the request waits in
+  lbl_802FBE60 and the update retries. func_8012A880(audio, track): names lbl_802C1000, {len1, off1, len2, off2}
+  << 15 from lbl_802545B8 (all vanilla tracks: whole file, then loop from N x 32 KB). Stop: func_8012A8E4(audio).
+  Faders audio+0x160 / +0x170: func_8018A08C(fader, u8 target, u16 ms) (func_8018A0FC = current value).
+  Music master: func_80189DD8(*(audio+0x4C), 0..127, ms) (sndMasterVolume music group).
+- zt.c bm_frame ('BTLM'): lock on a living enemy -> field music to 0 in 0.8 s, stream /battle/BATTLE.adp (loop at
+  9 << 15), faders 0 -> 255 in 1 s; defeat or > ZT_LEASH from the enemy -> faders to 0 + music back to 127 over
+  1.5 s, stream stopped after 100 frames; leaving the valley stops it at once. Defeat sound SE_DEFEAT = 222.
