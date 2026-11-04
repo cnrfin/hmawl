@@ -3398,3 +3398,16 @@ so, door fades are timed there, possibly per frame. Not traced yet.
 - memfix 20 dump 08c13861 (m20t, buildings + rucksack with Joe): arena / pool A start 0x8037C000 (OK), MGRD n_a 42,255 /
   n_b 15,357, overlaps 0; chapter archive ends 0x808E8D80, B lowest ever 445 KB above it; MEMG gap min 214 KB.
   m20t = the user's base from now on.
+
+### 7.44 Enemy step 2: HP, hit flash and an FF7-style defeat (enemy2, static)
+- Model instance draw func_801A2CFC(inst): +0 gpl, +4 3x4 matrix, +0x3C visible, +0x3D flat colour (lighting off via
+  func_801A7BA4(.., 0), then GXSetChanMatColor(GX_COLOR0A0, *(u32 *)(inst + 0x3E)) at 0x801A2E70), +0x44 texture pair.
+  Normal drawing has GXSetBlendMode(BLEND, SRCALPHA, INVSRCALPHA) on (0x80182868 / 0x80184B24 / 0x80191344).
+- The wild animal's instance (dump 60ea3264, tanuki): animal +0x168 = skeleton instance 0x80A39420 (+0 act,
+  +8 37 nodes, +0x14 mesh instance); +0x14 = 0x80A3A020: +0 its gpl, matrix with the animal's position, +0x3C 1,
+  +0x3D 0. Characters are skinned on the CPU (func_8019C080) and then drawn by the same instance path.
+- zt.c: EN {hp, day, state 0 alive / 1 dying / 2 gone, t, flash, ...} ('ENMY'); en_hit on each impact (weapon
+  damage table, hit 3 x1.5, knockback), en_frame every field frame (flash, shake + tint + alpha fade, then
+  +0x3C = 0); tpos(ZT_WILD) refuses unless alive (no lock on a defeated animal). Reset each new day.
+  Unknowns for the test: whether the channel takes the material colour from the register (tint visible) and
+  whether TEV passes its alpha (fade), and whether the game rewrites +0x3C every frame.

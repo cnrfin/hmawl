@@ -46,6 +46,34 @@ static float aim_h(s32 id)                              /* reticle / visibility 
     switch (*(s32 *)(a + 0x128)) { case 0x2D: return 0.15f; case 0x2E: return 0.35f; case 0x30: return 0.3f; }
     return 0.2f;                                        /* lizard, turtle */
 }
+/* ---- Enemy step 2: HP, damage, hit flash, FF7-style defeat (user design) ----
+   Each enemy has its own HP (the day's wild animal: EN_HP); each weapon its damage per hit; the combo's 3rd hit
+   does x1.5. A hit flashes the model white for a few frames and pushes it back a little; at 0 HP it freezes,
+   shakes side to side, turns red and fades out, then is gone (not drawn, not targetable) for the rest of the day.
+   The colour / fade use the game's own per-instance flat colour: the model draw (func_801A2CFC) reads +0x3C
+   visible, +0x3D "flat colour" (lighting off, GXSetChanMatColor COLOR0A0) and +0x3E RGBA. The animal's draw
+   instance = *(*(animal + 0x168) + 0x14) (its skeleton instance, then the mesh; dump 60ea3264). */
+#define EN_HP       120
+#define EN_FLASH    4                                   /* frames of white per hit */
+#define EN_TINT     15                                  /* defeat: frames white -> red */
+#define EN_FADE     45                                  /* then frames red -> transparent */
+static const u8 en_dmg[4] = { 10, 13, 20, 40 };         /* Stick, Wooden Sword, Farmer's Sword, H.M Murasama */
+struct { u32 magic; s32 hp, day, state, t, flash, last_dmg, hits; float x, y, z, kx, kz; } EN;   /* 'ENMY' (dump) */
+static u8 *wild_inst(u8 *a)
+{
+    u8 *sk = *(u8 **)(a + 0x168), *in;
+    if ((u32)sk < 0x80000000u || (u32)sk >= 0x81800000u) return 0;
+    in = *(u8 **)(sk + 0x14);
+    if ((u32)in < 0x80000000u || (u32)in >= 0x81800000u || in[0x3C] > 1 || in[0x3D] > 1) return 0;
+    return in;
+}
+static void en_colour(u8 *in, s32 on, u32 r, u32 g, u32 b, u32 al)
+{
+    in[0x3D] = (u8)on;
+    in[0x3E] = (u8)r; in[0x3F] = (u8)g; in[0x40] = (u8)b; in[0x41] = (u8)al;
+}
+static s32 en_today(void) { return (s32)((**(u32 **)0x80349218) / 864000u); }
+static s32 en_alive(void) { if (EN.day != en_today()) { EN.day = en_today(); EN.hp = EN_HP; EN.state = 0; EN.t = 0; EN.flash = 0; } return EN.state == 0; }
 #define SE_LOCK    238                                  /* lock on: vanilla sound 238 (user pick; 434 = our OoT-style flutter, still in the bank) */
 #define SE_FREE    239                                  /* lock off: vanilla 239 (435 = ours) */
 
@@ -99,7 +127,7 @@ static s32 tpos(u8 *g, s32 id, s32 map, float *x, float *z)
     }
     if (id == ZT_WILD) {
         u8 *a = wild_obj();
-        if (map != 1 || !a) return 0;
+        if (map != 1 || !a || !en_alive()) return 0;   /* defeated: gone for the day */
         *x = *(float *)(a + 0x4C); *z = *(float *)(a + 0x54); return 1;
     }
     if (!Z.apos[id] || Z.now - Z.seen[id] > ZT_PRESENT || SLOT_MAP(g, id) != map) return 0;   /* out here, lately */
@@ -252,11 +280,13 @@ static void reticle(u8 *g)
 static void swing_frame(s32 bpress, s32 free);
 static s32 sw_item; static u8 *sw_g;
 struct { u32 magic, n, lastm, bpress, tries, fail, starts, bones, slot, arc, anim; float w, frame, len; u32 ring[8][4]; u32 item, kids[4], kbone[4]; } sw_dbg;   /* 'SWDB' (dump) */
+static void en_frame(void);
 void zt_frame(u8 *g, s32 map, volatile u32 *held, volatile u32 *press)
 {
 #ifdef NO_ZT
     (void)g; (void)map; (void)held; (void)press; return;   /* test build: Z targeting, reticle and combos off */
 #endif
+    if (map == 1) en_frame();                                /* the day's wild animal as an enemy (HP / flash / defeat) */
     u8 *f = FADER;
     u8 *ev = EVMGR;
     s32 zpress;
@@ -470,6 +500,7 @@ static float smooth01(float x) { if (x <= 0.0f) return 0.0f; if (x >= 1.0f) retu
 #define SE_SWING_H 437                                  /* hit 3 */
 #define SE_HIT_L   438
 #define SE_HIT_H   439
+#define SE_DEFEAT  439                                  /* defeat: for now the heavy impact (user to pick a dissolve sound) */
 #define SE_VOICE1  440                                  /* Toan's voice (Dark Cloud): hit 1, hit 2, hit 3; 443 hurt / 444 dies for later */
 static const float sw_snap[3] = { 5.0f, 3.0f, 10.0f }, sw_strike[3] = { 8.0f, 6.0f, 13.0f };
 static float weapon_reach(s32 item)
@@ -479,6 +510,52 @@ static float weapon_reach(s32 item)
 }
 /* Impacts only on enemies: the day's wild animal (villagers / Joe can be locked onto but are never hit). */
 static s32 target_is_enemy(s32 t) { return t == ZT_WILD; }
+static void let_go_why(s32 why);
+static void en_hit(s32 h, float dx, float dz)
+{
+    s32 w = sw_item == 0x4E3 ? 0 : sw_item == 0x4E4 ? 1 : sw_item == 0x4EA ? 2 : 3, dmg;
+    float d2 = dx * dx + dz * dz, k;
+    if (!en_alive() || Z.target != ZT_WILD) return;
+    dmg = en_dmg[w]; if (h == 2) dmg = dmg * 3 / 2;
+    EN.magic = 0x454E4D59u; EN.hits++; EN.last_dmg = dmg; EN.hp -= dmg;
+    EN.flash = EN_FLASH;
+    k = d2 > 0.0001f ? 0.35f * rsq(d2) : 0.0f;             /* knock back 0.35 away from the player, over 4 frames */
+    EN.kx = dx * k / 4.0f; EN.kz = dz * k / 4.0f;
+    if (EN.hp <= 0) {
+        u8 *a = wild_obj();
+        EN.hp = 0; EN.state = 1; EN.t = 0;
+        if (a) { EN.x = *(float *)(a + 0x4C); EN.y = *(float *)(a + 0x50); EN.z = *(float *)(a + 0x54); }
+        let_go_why(9);                                       /* the lock lets go: the enemy is dying */
+    }
+}
+/* every frame (zt_frame): flash / knockback while alive, the defeat animation, then hidden for the day */
+static void en_frame(void)
+{
+    u8 *a = wild_obj(), *in;
+    if (!a || !(in = wild_inst(a))) return;
+    if (en_alive()) {
+        if (EN.flash > 0) {
+            en_colour(in, 1, 255, 255, 255, 255);
+            *(float *)(a + 0x4C) += EN.kx; *(float *)(a + 0x54) += EN.kz;
+            if (--EN.flash == 0) en_colour(in, 0, 255, 255, 255, 255);
+        }
+        return;
+    }
+    if (EN.state == 1) {
+        s32 t = ++EN.t;
+        float sh = (t & 2) ? 0.07f : -0.07f;                /* rapid side-to-side shake, in place */
+        *(float *)(a + 0x4C) = EN.x + sh * *(float *)(a + 0x60);
+        *(float *)(a + 0x54) = EN.z - sh * *(float *)(a + 0x58);
+        *(float *)(a + 0x50) = EN.y;
+        if (t <= EN_TINT) { u32 c = 255 - (u32)(t * 225 / EN_TINT); en_colour(in, 1, 255, c, c, 255); }
+        else if (t <= EN_TINT + EN_FADE) en_colour(in, 1, 255, 30, 30, (u32)(255 * (EN_TINT + EN_FADE - t) / EN_FADE));
+        else EN.state = 2;
+        if (t == 1) sfx_play(*(u8 **)0x803491E4, SE_DEFEAT, 0);
+        return;
+    }
+    in[0x3C] = 0;                                            /* defeated: not drawn for the rest of the day */
+    en_colour(in, 1, 255, 30, 30, 0);
+}
 static void swing_sounds(float f0, float f1)
 {
     s32 h = SW.hit;
@@ -490,6 +567,7 @@ static void swing_sounds(float f0, float f1)
         float *p = SLOT_POS(sw_g, 0), dx = Z.tx - p[0], dz = Z.tz - p[2], r = weapon_reach(sw_item) + 0.4f;
         if (dx * dx + dz * dz < r * r && dx * Z.fx + dz * Z.fz > 0.0f) {
             sfx_play(*(u8 **)0x803491E4, h == 2 ? SE_HIT_H : SE_HIT_L, 0); sw_dbg.n++;
+            en_hit(h, dx, dz);
         }
     }
 }
