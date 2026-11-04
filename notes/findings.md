@@ -3619,3 +3619,9 @@ so, door fades are timed there, possibly per frame. Not traced yet.
   +0): pelvis 7 -0.06, thighs 10/15 -0.622, knees 11/16 +1.200, ankles 12/17 -0.578 (two-bone IK, feet 1-6 stay on the
   root), spine 18 +0.15; weight eased 0.15 / frame while locked on, standing (< 0.02 a frame), free, not swinging.
   Checked in a skinned preview of boy_0 (scratchpad anim_prev/stance.py). pm test 1dbce1f1, normal 7a719751.
+- battle18 (user: the tanuki clipped into the mountain by Celia's farm and fell out of the map; the lizard went into the
+  mountainside too). Cause: our AI's moves (ai_move) skip the animal's movement code and its walls, only snapping to
+  func_8001CB54's ground. Now ai_move probes from 3 above and refuses a step climbing > 0.6 x step + 0.08 (~31 deg),
+  dropping > 1.5 x step + 0.4, or without ground (NaN / |y| > 5000) (EN.blocked counts). Circling reverses at a wall,
+  a blocked lunge / retreat ends. The tanuki's poof (ai_jump) needs ground within +0.8 / -1.5 of the player's height
+  behind him, else in front, else it reappears where it was.

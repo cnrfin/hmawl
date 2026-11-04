@@ -58,7 +58,7 @@ static float aim_h(s32 id)                              /* reticle / visibility 
 #define EN_TINT     15                                  /* defeat: frames white -> red */
 #define EN_FADE     45                                  /* then frames red -> transparent */
 static const u8 en_dmg[4] = { 10, 13, 20, 40 };         /* Stick, Wooden Sword, Farmer's Sword, H.M Murasama */
-struct { u32 magic; s32 hp, day, state, t, flash, last_dmg, hits; float x, y, z, kx, kz; s32 lasth, maxhp, armour, clinks, pushes; } EN;   /* 'ENMY' (dump) */
+struct { u32 magic; s32 hp, day, state, t, flash, last_dmg, hits; float x, y, z, kx, kz; s32 lasth, maxhp, armour, clinks, pushes, blocked; } EN;   /* 'ENMY' (dump) */
 static u8 *wild_inst(u8 *a)
 {
     u8 *sk = *(u8 **)(a + 0x168), *in;
@@ -664,10 +664,28 @@ static void en_hit(s32 h, float dx, float dz)
 }
 /* every frame (zt_frame): flash / knockback while alive, the defeat animation, then hidden for the day */
 #define ground_at  F(0x8001CB54, float, (void *, float *))   /* ground height under a point (pm.c ground_y) */
-static void ai_move(u8 *a, float x, float z)                  /* our moves skip its movement code: keep it on the ground */
+/* Our moves skip its movement code (and its walls): keep it on the ground, and (battle18, user: the tanuki clipped into
+   the mountain by Celia's farm and fell out of the map) refuse a step that climbs steeper than ~31 degrees, drops off a
+   ledge, or finds no ground. Probed from 3 above, so a mountain's surface is found, not a floor inside it. 1 = moved. */
+static s32 ai_move(u8 *a, float x, float z)
 {
-    float v[3]; v[0] = x; v[1] = *(float *)(a + 0x50) + 1.0f; v[2] = z;
-    en_setpos(a, x, ground_at(*(void **)0x80349204, v), z);
+    float v[3], cy = *(float *)(a + 0x50), dx = x - *(float *)(a + 0x4C), dz = z - *(float *)(a + 0x54), ny, dy, dist;
+    v[0] = x; v[1] = cy + 3.0f; v[2] = z;
+    ny = ground_at(*(void **)0x80349204, v);
+    dist = dx * dx + dz * dz; dist = dist > 0.000001f ? dist * rsq(dist) : 0.0f;
+    dy = ny - cy;
+    if (ny != ny || ny > 5000.0f || ny < -5000.0f || dy > 0.6f * dist + 0.08f || dy < -(1.5f * dist + 0.4f)) { EN.blocked++; return 0; }
+    en_setpos(a, x, ny, z);
+    return 1;
+}
+static s32 ai_jump(u8 *a, float x, float z, float cy)       /* poof: a far move in one go - ground near the player's height */
+{
+    float v[3], ny;
+    v[0] = x; v[1] = cy + 3.0f; v[2] = z;
+    ny = ground_at(*(void **)0x80349204, v);
+    if (ny != ny || ny - cy > 0.8f || ny - cy < -1.5f) { EN.blocked++; return 0; }
+    en_setpos(a, x, ny, z);
+    return 1;
 }
 static void ai_face(u8 *a, float dx, float dz)
 {
@@ -728,7 +746,7 @@ static void ai_frame(u8 *g, u8 *a)
         float cap = Z.target == ZT_WILD ? 0.12f * fs : AI_CHASE;
         if (rad > cap) rad = cap; if (rad < -cap) rad = -cap;
         if (sp == 1 && --AI.zz <= 0) { AI.dir = -AI.dir; AI.zz = 12 + (s32)ai_rand(18); }   /* chihuahua: zig-zag */
-        ai_move(a, x + ux * rad - uz * tan, z + uz * rad + ux * tan);
+        if (!ai_move(a, x + ux * rad - uz * tan, z + uz * rad + ux * tan)) AI.dir = -AI.dir;   /* a wall: circle the other way */
         ai_face(a, ux * rad - uz * tan, uz * rad + ux * tan);   /* runs the way it goes (user); the head tracks you */
         ai_mot(a, ai_go(a));
         if (sp == 0 && d < 2.2f && ai_rand(100) < 5) {       /* lizard: you came close - tail whip */
@@ -752,7 +770,7 @@ static void ai_frame(u8 *g, u8 *a)
         break;
     case AI_LUNGE: {
         float v = AI.atk == ATK_BITE ? 0.2f : AI.atk == ATK_WHIP ? 0.0f : AI.atk == ATK_FEINT ? -0.22f : AIP[sp].spd * fs;
-        if (v < 0.0f || (v > 0.0f && d > (AI.atk == ATK_BITE ? 1.2f : 0.7f))) ai_move(a, x + AI.lx * v, z + AI.lz * v);
+        if ((v < 0.0f || (v > 0.0f && d > (AI.atk == ATK_BITE ? 1.2f : 0.7f))) && !ai_move(a, x + AI.lx * v, z + AI.lz * v) && AI.t < AI.len) AI.t = AI.len;   /* a wall ends it */
         if (AI.atk != ATK_WHIP) ai_face(a, AI.lx, AI.lz);
         ai_mot(a, sp <= 3 ? MOT_IDLE : ai_dash(a));
         if (AI.t >= AI.len) {
@@ -771,13 +789,15 @@ static void ai_frame(u8 *g, u8 *a)
             float *pd = (float *)(g + 0x29F84), fx = pd[0], fz = pd[2], l = fx * fx + fz * fz, nx, nz;
             if (l < 0.0001f) { fx = -ux; fz = -uz; } else { l = rsq(l); fx *= l; fz *= l; }
             nx = p[0] - fx * 2.2f; nz = p[2] - fz * 2.2f;
-            ai_move(a, nx, nz); ai_face(a, p[0] - nx, p[2] - nz);
+            if (!ai_jump(a, nx, nz, p[1])) { nx = p[0] + fx * 2.2f; nz = p[2] + fz * 2.2f; if (!ai_jump(a, nx, nz, p[1])) { nx = x; nz = z; } }   /* blocked: in front, else here */
+            ai_face(a, p[0] - nx, p[2] - nz);
             poof_fx(nx, *(float *)(a + 0x50), nz); AI.hidden = 0;
         }
         if (AI.t >= AI.len) { AI.st = AI_WINDUP; AI.t = 0; AI.atk = ATK_LUNGE; AI.len = 8; }
         break;
     case AI_RETREAT:                                         /* chihuahua: hit, it skitters away - then darts back in */
-        ai_move(a, x - ux * 0.2f * fs, z - uz * 0.2f * fs); ai_face(a, dx, dz); ai_mot(a, ai_go(a));
+        if (!ai_move(a, x - ux * 0.2f * fs, z - uz * 0.2f * fs)) AI.t = AI.len;   /* back to a wall */
+        ai_face(a, dx, dz); ai_mot(a, ai_go(a));
         if (AI.t >= AI.len) { AI.st = AI_WINDUP; AI.t = 0; AI.atk = ATK_LUNGE; AI.again = 0; AI.len = 6; }
         break;
     case AI_SHELL:                                           /* turtle: hides (armoured); 3 knocks -> the head pops out, bites */
