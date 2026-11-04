@@ -77,6 +77,20 @@ static void en_setpos(u8 *a, float x, float y, float z)     /* both copies: the 
     *(float *)(a + 0x4C) = x; *(float *)(a + 0x50) = y; *(float *)(a + 0x54) = z;
     *(float *)(a + 0xFC) = x; *(float *)(a + 0x100) = y; *(float *)(a + 0x104) = z;
 }
+u8 *en_ctl;                                              /* the animal our battle AI drives (hook.s skips its own AI / movement) */
+/* Battle AI (battle test 1): circle at a distance, wind up, lunge, recover - repeat. The tanuki's motion request
+   obj+0xD8 = its clip n (0-8: 0-3, 7, 8 loop, 4-6 once; findings 7.46); idle 0 / walk 1 / run 2 assumed.
+   Facing: +0xF0 sin / +0xF8 cos (copied to +0x58 / +0x60 every update). No damage to the player yet. */
+enum { AI_CIRCLE, AI_WINDUP, AI_LUNGE, AI_RECOVER };
+#define AI_R       3.0f                                 /* circling distance */
+#define AI_WIND    30
+#define AI_LUNGE_T 14
+#define AI_LSPEED  0.28f                                /* per frame: ~3.9 units */
+#define AI_REC     45
+#define MOT_IDLE   0
+#define MOT_WALK   1
+#define MOT_RUN    2
+struct { u32 magic; s32 st, t, len, dir; float lx, lz; } AI;   /* 'ENAI' (dump) */
 static s32 en_today(void) { return (s32)((**(u32 **)0x80349218) / 864000u); }
 static s32 en_alive(void) { if (EN.day != en_today()) { EN.day = en_today(); EN.hp = EN_HP; EN.state = 0; EN.t = 0; EN.flash = 0; } return EN.state == 0; }
 #define SE_LOCK    238                                  /* lock on: vanilla sound 238 (user pick; 434 = our OoT-style flutter, still in the bank) */
@@ -285,7 +299,7 @@ static void reticle(u8 *g)
 static void swing_frame(s32 bpress, s32 free);
 static s32 sw_item; static u8 *sw_g;
 struct { u32 magic, n, lastm, bpress, tries, fail, starts, bones, slot, arc, anim; float w, frame, len; u32 ring[8][4]; u32 item, kids[4], kbone[4]; } sw_dbg;   /* 'SWDB' (dump) */
-static void en_frame(void);
+static void en_frame(u8 *g);
 /* ---- Battle music (Breeze battle v12, user design): locking onto a living enemy fades the field song out (MusyX
    music master, func_80189DD8) and starts the DTK stream /battle/BATTLE.adp through the game's own stream player
    (func_80129928(audio + 0x80, file, 0, 0, file, 0, loop): play the whole file once, then loop from 9 x 32 KB =
@@ -342,7 +356,7 @@ void zt_frame(u8 *g, s32 map, volatile u32 *held, volatile u32 *press)
 #ifdef NO_ZT
     (void)g; (void)map; (void)held; (void)press; return;   /* test build: Z targeting, reticle and combos off */
 #endif
-    if (map == 1) en_frame();                                /* the day's wild animal as an enemy (HP / flash / defeat) */
+    if (map == 1) en_frame(g); else en_ctl = 0;                                /* the day's wild animal as an enemy (HP / flash / defeat) */
     bm_frame(g, map);                                        /* battle music */
     u8 *f = FADER;
     u8 *ev = EVMGR;
@@ -586,10 +600,50 @@ static void en_hit(s32 h, float dx, float dz)
     }
 }
 /* every frame (zt_frame): flash / knockback while alive, the defeat animation, then hidden for the day */
-static void en_frame(void)
+static void ai_face(u8 *a, float dx, float dz)
+{
+    float r = dx * dx + dz * dz;
+    if (r < 0.0001f) return;
+    r = rsq(r); *(float *)(a + 0xF0) = dx * r; *(float *)(a + 0xF8) = dz * r;
+}
+static void ai_frame(u8 *g, u8 *a)
+{
+    float *p = SLOT_POS(g, 0), x = *(float *)(a + 0x4C), y = *(float *)(a + 0x50), z = *(float *)(a + 0x54);
+    float dx = p[0] - x, dz = p[2] - z, d2 = dx * dx + dz * dz, inv = d2 > 0.0001f ? rsq(d2) : 0.0f, d = d2 * inv;
+    float ux = dx * inv, uz = dz * inv;
+    AI.magic = 0x454E4149u; AI.t++;
+    if (EN.flash > 0 && AI.st != AI_RECOVER) { AI.st = AI_RECOVER; AI.t = 0; AI.len = 30; }   /* hit: stagger */
+    switch (AI.st) {
+    case AI_CIRCLE: {
+        float rad = (d - AI_R) * 0.04f, tan = 0.035f * (float)AI.dir;
+        if (rad > 0.06f) rad = 0.06f; if (rad < -0.06f) rad = -0.06f;
+        en_setpos(a, x + ux * rad - uz * tan, y, z + uz * rad + ux * tan);
+        ai_face(a, dx, dz); *(s32 *)(a + 0xD8) = MOT_WALK;
+        if (AI.t >= AI.len) { AI.st = AI_WINDUP; AI.t = 0; }
+        break; }
+    case AI_WINDUP:
+        ai_face(a, dx, dz); *(s32 *)(a + 0xD8) = MOT_IDLE;
+        if (AI.t >= AI_WIND) { AI.st = AI_LUNGE; AI.t = 0; AI.lx = ux; AI.lz = uz; }
+        break;
+    case AI_LUNGE:
+        if (d > 0.7f) en_setpos(a, x + AI.lx * AI_LSPEED, y, z + AI.lz * AI_LSPEED);   /* stops at the player */
+        ai_face(a, AI.lx, AI.lz); *(s32 *)(a + 0xD8) = MOT_RUN;
+        if (AI.t >= AI_LUNGE_T) { AI.st = AI_RECOVER; AI.t = 0; AI.len = AI_REC; }
+        break;
+    default:
+        *(s32 *)(a + 0xD8) = MOT_IDLE;
+        if (AI.t >= AI.len) { AI.st = AI_CIRCLE; AI.t = 0; AI.len = 75 + (s32)(F(0x8017D3E8, u32, (void))() % 75u); AI.dir = -AI.dir;   /* game rand() */ }
+    }
+}
+static void en_frame(u8 *g)
 {
     u8 *a = wild_obj(), *in;
-    if (!a || !(in = wild_inst(a))) return;
+    if (!a || !(in = wild_inst(a))) { en_ctl = 0; return; }
+    if (en_alive() && Z.target == ZT_WILD) {                 /* in battle: our AI drives it */
+        if (en_ctl != a) { en_ctl = a; AI.st = AI_CIRCLE; AI.t = 0; AI.len = 90; AI.dir = 1; }
+        ai_frame(g, a);
+    } else if (en_alive()) en_ctl = 0;                       /* lock let go: back to its own wandering */
+    else en_ctl = a;                                         /* dying / gone: keep it still */
     if (en_alive()) {
         if (EN.flash > 0) {                                  /* the flat colour multiplies the texture: a light red flash */
             en_colour(in, 1, 255, 120, 120, 255);

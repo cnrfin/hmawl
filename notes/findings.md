@@ -3445,3 +3445,9 @@ so, door fades are timed there, possibly per frame. Not traced yet.
 - Battle plan: patch the two bl's (AI step / movement) to pm.bin stubs that skip them while we drive the animal
   (position via +0x4C/+0xFC, facing, motion via +0xD8); new attack clips appended to tanu.anm.arc (clips 11+) and
   mapped through the species table.
+- battle test 1: HOOK28 0x8015A2B4 (bl func_8015A6D4, AI step) / HOOK29 0x8015A2BC (bl func_8015C398, movement)
+  -> pm_aistep_stub +0x42C / pm_move_stub +0x440: return at once when r3 == en_ctl (zt.c), else the original.
+  zt.c ai_frame ('ENAI'): while locked on and alive: circle at 3.0 (walk, 75-150 frames, direction alternating),
+  wind up 30 frames (idle, facing), lunge 14 frames at 0.28/frame toward where the player was (run), recover 45
+  (idle; a hit = 30-frame stagger). Motion request +0xD8 = clip (idle 0 / walk 1 / run 2 assumed); facing via
+  +0xF0 / +0xF8. Lock let go -> en_ctl 0 (its own AI again); dying / gone -> still held.

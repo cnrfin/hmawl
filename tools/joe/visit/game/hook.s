@@ -411,3 +411,20 @@ pm_pool_stub:
 pool_orig:
     stwu  r1, -0x30(r1)             # the replaced instruction
     b     pool_return               # 0x80178A48
+
+# Wild animal update (func_8015A22C): its AI step (bl func_8015A6D4 at 0x8015A2B4) and movement (bl func_8015C398 at
+# 0x8015A2BC) -> these stubs: skipped while zt.c's battle AI drives this animal (en_ctl == r3), else the originals.
+    .globl pm_aistep_stub
+pm_aistep_stub:
+    lis   r12, en_ctl@ha
+    lwz   r12, en_ctl@l(r12)
+    cmpw  r12, r3
+    beqlr
+    b     ai_step_orig              # 0x8015A6D4
+    .globl pm_move_stub
+pm_move_stub:
+    lis   r12, en_ctl@ha
+    lwz   r12, en_ctl@l(r12)
+    cmpw  r12, r3
+    beqlr
+    b     ai_move_orig              # 0x8015C398

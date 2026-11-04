@@ -23,6 +23,8 @@ arcanim_return = 0x801A0A8C;
 new_return = 0x80178E8C;
 del_return = 0x8017916C;
 pool_return = 0x80178A48;
+ai_step_orig = 0x8015A6D4;
+ai_move_orig = 0x8015C398;
 SECTIONS {
   . = 0x8035EFA0;
   .pm : { *(.text.hook) *(.text*) *(.rodata*) *(.sdata*) *(.data*) *(.sbss*) *(.bss*) }
