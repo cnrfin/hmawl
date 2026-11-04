@@ -92,7 +92,7 @@ enum { ATK_LUNGE, ATK_BITE, ATK_WHIP, ATK_FEINT, ATK_POOF };
 #define AI_REC     30
 #define AI_AGAIN   35                                   /* % chance of a second lunge straight after */
 #define MOT_IDLE   0
-struct { u32 magic; s32 st, t, len, dir; float lx, lz; s32 atk, kb, hseen, again, zz, hidden, press, pdecay, shits; } AI;   /* 'ENAI' (dump) */
+struct { u32 magic; s32 st, t, len, dir; float lx, lz; s32 atk, kb, hseen, again, zz, hidden, press, pdecay, shits, struck; } AI;   /* 'ENAI' (dump) */
 /* Mini bosses (battle13, user design): per species {HP, circle radius, circle speed, circle min / extra frames,
    wind-up, lunge, recover frames, % chain, max chain, lunge speed, push radius}. Below half HP they enrage: 1.3x
    speed, 0.7x wind-up / recover, 0.6x circling time. Chihuahua easy and twitchy; tanuki the all-rounder with feints
@@ -397,6 +397,8 @@ static void bm_frame(u8 *g, s32 map)
     if (++BM.t >= 100) { stream_stop(au); BM.state = 0; }               /* faded out: stop the stream */
 }
 static void stance_frame(u8 *g, s32 map);
+static void hurt_frame(volatile u32 *held, volatile u32 *press);
+extern u8 *pm_player;
 void zt_frame(u8 *g, s32 map, volatile u32 *held, volatile u32 *press)
 {
 #ifdef NO_ZT
@@ -419,6 +421,7 @@ void zt_frame(u8 *g, s32 map, volatile u32 *held, volatile u32 *press)
         if ((u32)tm >= 0x80000000u && (u32)tm < 0x81800000u && *(s32 *)(tm + 0x3F8) == 0x30) *(s32 *)(tm + 0x3F8) = 0x2C + (s32)(F(0x8017D3E8, u32, (void))() % 4u);
     }
     stance_frame(g, map);
+    hurt_frame(held, press);                              /* battle21: enemy hits on the player */
     if (map == 1) en_frame(g); else { en_ctl = 0; AG.who = 0; AG.on = 0; AG.homing = 0; }                                /* the day's wild animal as an enemy (HP / flash / defeat) */
     bm_frame(g, map);                                        /* battle music */
     u8 *f = FADER;
@@ -721,6 +724,59 @@ static void ai_mot(u8 *a, s32 m)                        /* motion request + play
     *(s32 *)(a + 0xD8) = m; *(s32 *)(a + 0xE0) = 0;
 }
 static u32 ai_rand(u32 n) { return F(0x8017D3E8, u32, (void))() % n; }   /* the game's rand() */
+/* Player damage (battle21, user design: stamina is HP). Each attack can land once: lunge contact (body radius + 0.6),
+   the turtle's spin (1.7), the bite's strike frames (2.0), the tail whip's sweep (2.4). Damage in stamina units (max
+   100000; tentative, tuned once the level system exists), x1.25 enraged. A hit: Toan's hurt voice (SE 443), the
+   player slides back 8 frames, 14 frames of hurt (pad locked except Z), 60 frames invulnerable. */
+#define SE_HURT   443
+static const s32 EN_DMG[5] = { 14000, 6000, 9000, 15000, 8000 };   /* lizard, chihuahua, tanuki, turtle (spin), owl */
+#define DMG_BITE  20000
+#define DMG_WHIP  12000
+struct { u32 magic; s32 hits, last, inv, slide, stun, taken, collapses; float kx, kz; } PD;   /* 'PDMG' (dump) */
+static void collapse_start(u8 *g);
+static void player_hurt(u8 *g, s32 dmg, float ux, float uz)
+{
+    s32 *st = (s32 *)(g + 0x11B84);
+    if (PD.inv > 0 || dmg <= 0) return;
+    if (en_rage()) dmg = dmg * 5 / 4;
+    PD.magic = 0x50444D47u; PD.hits++; PD.last = dmg; PD.taken += dmg;
+    *st -= dmg;
+    PD.inv = 60; PD.slide = 8; PD.stun = 14; PD.kx = ux * 0.16f; PD.kz = uz * 0.16f;
+    sfx_play(*(u8 **)0x803491E4, SE_HURT, 0);
+    if (*st <= *(s32 *)(g + 0x11B8C)) { *st = *(s32 *)(g + 0x11B8C); collapse_start(g); }
+}
+static void ai_strike(u8 *g, s32 sp, float d, float ux, float uz)
+{
+    float u = AI.len > 0 ? (float)AI.t / (float)AI.len : 1.0f;
+    s32 dmg = 0;
+    if (AI.st != AI_LUNGE || AI.struck || AI.hidden) return;
+    if (AI.atk == ATK_BITE) { if (u > 0.35f && u < 0.75f && d < 2.0f) dmg = DMG_BITE; }
+    else if (AI.atk == ATK_WHIP) { if (u > 0.2f && u < 0.8f && d < 2.4f) dmg = DMG_WHIP; }
+    else if (AI.atk == ATK_FEINT) return;
+    else if (sp == 3) { if (d < 1.7f) dmg = EN_DMG[3]; }
+    else if (d < AIP[sp].push + 0.6f) dmg = EN_DMG[sp];
+    if (dmg) { AI.struck = 1; player_hurt(g, dmg, ux, uz); }
+}
+static void hurt_frame(volatile u32 *held, volatile u32 *press)
+{
+    u8 *pl = pm_player;
+    if (PD.inv > 0) PD.inv--;
+    if (PD.stun > 0) { PD.stun--; *press &= 0x10u; *held &= 0x10u; }   /* hurt: only Z (keep the lock) */
+    if (PD.slide > 0 && (u32)pl >= 0x80000000u && (u32)pl < 0x81800000u) {
+        float *pp = (float *)(pl + 0x4C), *pq = (float *)(pl + 0xFC), v[3], ny;
+        PD.slide--;
+        v[0] = pp[0] + PD.kx; v[1] = pp[1] + 3.0f; v[2] = pp[2] + PD.kz;
+        ny = ground_at(*(void **)0x80349204, v);
+        if (ny == ny && ny - pp[1] < 0.15f && ny - pp[1] > -0.6f) {   /* no shoving into a slope or off a ledge */
+            if (pq[0] - pp[0] < 0.001f && pp[0] - pq[0] < 0.001f && pq[2] - pp[2] < 0.001f && pp[2] - pq[2] < 0.001f) { pq[0] = v[0]; pq[2] = v[2]; }
+            pp[0] = v[0]; pp[2] = v[2];
+        } else PD.slide = 0;
+    }
+}
+static void collapse_start(u8 *g)                         /* stamina gone: filled from the collapse research */
+{
+    (void)g; PD.collapses++;
+}
 static s32 en_rage(void) { return EN.maxhp > 0 && EN.hp * 2 < EN.maxhp; }   /* below half HP: enraged */
 static s32 ai_k(s32 n, float k) { s32 v = (s32)((float)n * k); return v < 1 ? 1 : v; }
 static void poof_fx(float x, float y, float z);
@@ -749,6 +805,7 @@ static void ai_frame(u8 *g, u8 *a)
             AI.st = AI_HIT; AI.t = 0; AI.len = AI.kb ? AI_HIT_KB : AI_HIT_FL;
         }
     }
+    ai_strike(g, sp, d, ux, uz);                            /* battle21: its attacks can hurt the player */
     switch (AI.st) {
     case AI_CIRCLE: {
         float rad = (d - AIP[sp].r) * 0.08f, tan = AIP[sp].tan * fs * (float)AI.dir;
@@ -773,7 +830,7 @@ static void ai_frame(u8 *g, u8 *a)
         if (AI.t < 8 && sp != 3 && AI.atk != ATK_WHIP) ai_move(a, x - ux * 0.05f, z - uz * 0.05f);   /* a little hop back: the tell */
         ai_face(a, dx, dz); ai_mot(a, MOT_IDLE);
         if (AI.t >= AI.len) {
-            AI.st = AI_LUNGE; AI.t = 0; AI.lx = ux; AI.lz = uz;
+            AI.st = AI_LUNGE; AI.t = 0; AI.lx = ux; AI.lz = uz; AI.struck = 0;
             AI.len = AI.atk == ATK_BITE ? 12 : AI.atk == ATK_WHIP || AI.atk == ATK_FEINT ? 14 : AIP[sp].lunge;
         }
         break;
