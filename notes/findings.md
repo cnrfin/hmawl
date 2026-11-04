@@ -3605,3 +3605,17 @@ so, door fades are timed there, possibly per frame. Not traced yet.
 - battle16: owl removed for now (user; later a 1-5 am alien enemy). The species counts lbl_803469D0 / lbl_803469D8 (read
   only by the two rolls, 0x800132B0 / 0x80013B6C) are set to 3 every frame (zt_frame) -> 0x2C..0x2F; a day already
   rolled 0x30 is re-rolled (applies at the next valley load).
+- battle17 (user: bar above the reticle, always red; enemies cheesable by chasing + spamming in their circle phase; a
+  turtle that hides and bites back; a bent-knee Z stance).
+  HP bar: two quads borrowed from the skill pop-up's last two (AGC_POP_Q quads 9 / 10 = reticle indices -2 / -1: the pop
+  block ends exactly at AGC_RET_Q); skill.c leaves them alone while no pop-up shows (skill_pop_on), the bar hides during a
+  pop-up. RET_GAP 6 above the box, RET_BAR 7, dark back + red fill. All 8 bracket arms back.
+  Anti-cheese: pressure AI.press (+1 per hit, -1 per 45 frames); at AIP_PRESS {lizard 3, chihuahua 2, tanuki 3, turtle
+  2} the next hit is shrugged off and countered (lizard whip, chihuahua skitter + dart, tanuki poof, turtle shell); after
+  any flinch the circle is 12-25 frames; chihuahua retreats then darts back.
+  Turtle AI_SHELL: tucked in (pose kr), armoured (clink, 1/4 damage), counts knocks; after 3 (player within 3.5) the head
+  pops out and bites (wind-up 3); left alone 150 frames it comes out. Entered at pressure or 50 % after a flinch.
+  Player stance: pl_bone (same model-space layer, pl_m for the player's 55 bones; skeleton = *(sw_slot+0x14), act at
+  +0): pelvis 7 -0.06, thighs 10/15 -0.622, knees 11/16 +1.200, ankles 12/17 -0.578 (two-bone IK, feet 1-6 stay on the
+  root), spine 18 +0.15; weight eased 0.15 / frame while locked on, standing (< 0.02 a frame), free, not swinging.
+  Checked in a skinned preview of boy_0 (scratchpad anim_prev/stance.py). pm test 1dbce1f1, normal 7a719751.

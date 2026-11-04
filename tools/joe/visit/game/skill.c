@@ -92,6 +92,7 @@ static void pop_layout(u8 *a, s32 alpha, s32 rise)
     }
 }
 
+s32 skill_pop_on;                                        /* zt.c: the pop-up owns all its quads now */
 void skill_frame(u8 *g, u32 pad_held, u32 pad_press)
 {
     u8 *a = AGC;
@@ -145,7 +146,8 @@ void skill_frame(u8 *g, u32 pad_held, u32 pad_press)
         if (K.pop < POP_OUT) al = 0xF0 * K.pop / POP_OUT;
         pop_layout(a, al, t / 4);
         K.pop--;
-    } else {
-        for (k = 0; k < POP_QUADS; k++) set_alpha(QUAD(a, AGC_POP_Q, k), 0xFFFFFF00u);
+    } else {   /* battle17: the last two pop-up quads are the enemy HP bar's while no pop-up shows (zt.c reticle) */
+        for (k = 0; k < POP_QUADS - 2; k++) set_alpha(QUAD(a, AGC_POP_Q, k), 0xFFFFFF00u);
     }
+    skill_pop_on = K.pop > 0;
 }

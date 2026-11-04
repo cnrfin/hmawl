@@ -82,7 +82,7 @@ u8 *en_ctl;                                              /* the animal our battl
    obj+0xD8 = its clip n (motion table per species family = species - 0x2C; findings 7.46), with the play state
    obj+0xE0 = 0 (loop; 1 = once, 3 = stopped); idle 0; the moving clips per species: ai_go / ai_dash.
    Facing: +0xF0 sin / +0xF8 cos (copied to +0x58 / +0x60 every update). No damage to the player yet. */
-enum { AI_CIRCLE, AI_WINDUP, AI_LUNGE, AI_RECOVER, AI_HIT, AI_RETREAT, AI_POOF, AI_HOME = 100 };
+enum { AI_CIRCLE, AI_WINDUP, AI_LUNGE, AI_RECOVER, AI_HIT, AI_RETREAT, AI_POOF, AI_SHELL, AI_HOME = 100 };
 enum { ATK_LUNGE, ATK_BITE, ATK_WHIP, ATK_FEINT, ATK_POOF };
 #define AI_R       3.5f                                 /* circling distance */
 #define AI_TAN     0.09f                                /* circling speed (per frame) */
@@ -92,7 +92,7 @@ enum { ATK_LUNGE, ATK_BITE, ATK_WHIP, ATK_FEINT, ATK_POOF };
 #define AI_REC     30
 #define AI_AGAIN   35                                   /* % chance of a second lunge straight after */
 #define MOT_IDLE   0
-struct { u32 magic; s32 st, t, len, dir; float lx, lz; s32 atk, kb, hseen, again, zz, hidden; } AI;   /* 'ENAI' (dump) */
+struct { u32 magic; s32 st, t, len, dir; float lx, lz; s32 atk, kb, hseen, again, zz, hidden, press, pdecay, shits; } AI;   /* 'ENAI' (dump) */
 /* Mini bosses (battle13, user design): per species {HP, circle radius, circle speed, circle min / extra frames,
    wind-up, lunge, recover frames, % chain, max chain, lunge speed, push radius}. Below half HP they enrage: 1.3x
    speed, 0.7x wind-up / recover, 0.6x circling time. Chihuahua easy and twitchy; tanuki the all-rounder with feints
@@ -104,6 +104,7 @@ static const struct { s16 hp; u8 cmin, cvar, wind, lunge, rec, again, chain; flo
     {  500, 40, 40, 26, 20, 26, 25, 1, 3.2f, 0.08f, 0.36f, 0.65f },   /* tanuki */
     { 3000, 50, 40, 24, 36, 40, 60, 3, 3.5f, 0.05f, 0.30f, 1.30f },   /* turtle */
     {  500, 40, 50, 18, 16, 30, 35, 2, 3.5f, 0.09f, 0.42f, 0.60f } }; /* owl */
+static const u8 AIP_PRESS[5] = { 3, 2, 3, 2, 3 };      /* hits within the pressure window before a counter (battle17) */
 #define AI_HIT_KB  18                                    /* hit 3: knocked back, quick recovery (user) */
 #define AI_HIT_FL  10                                    /* hits 1-2: a flinch */
 struct { u32 magic; s32 sp, st, t, len, atk, kb; u32 clk; } PZ;   /* 'POSE': what the bone layer draws (dump) */
@@ -263,7 +264,8 @@ static s32 en_rage(void);
 #define RET_DEPTH  12.0f                                /* ... and it scales with 1 / depth (clamped) */
 #define RET_ARM    12                                   /* bracket arm length */
 #define RET_W      4                                    /* bracket thickness */
-#define RET_BAR    7                                    /* enemy HP bar height (the box's bottom edge) */
+#define RET_BAR    7                                    /* enemy HP bar height */
+#define RET_GAP    6                                    /* ... and its gap above the box */
 #define RET_SNAP   9.0f                                 /* frames to snap in (ease-out-back, overshoot 2) */
 static void quad(u8 *a, s32 k, s32 x0, s32 y0, s32 x1, s32 y1, const float *uv, u32 rgba)
 {
@@ -275,10 +277,18 @@ static void quad(u8 *a, s32 k, s32 x0, s32 y0, s32 x1, s32 y1, const float *uv, 
     *(s16 *)(q + 4) = x0; *(s16 *)(q + 6) = y0; *(s16 *)(q + 8) = x1; *(s16 *)(q + 10) = y1;
     for (i = 0; i < 4; i++) { *(u32 *)(q + 0xC + 4 * i) = rgba; *(float *)(q + 0x1C + 4 * i) = uv[i]; }
 }
+/* Enemy HP bar (battle17): two quads borrowed from the skill pop-up's last two (skill.c leaves them alone while no
+   pop-up shows; during a pop-up the bar is hidden for its 2 s). Above the reticle, always red (user). */
+extern s32 skill_pop_on;
+static void bar_quad(u8 *a, s32 k, s32 x0, s32 y0, s32 x1, s32 y1, u32 rgba)
+{
+    if (!skill_pop_on) quad(a, (AGC_POP_Q + 0x2C * (POP_QUADS - 2 + k) - AGC_RET_Q) / 0x2C, x0, y0, x1, y1, UV_WHITE, rgba);
+}
 static void ret_hide(u8 *a)
 {
     s32 k;
     for (k = 0; k < 8; k++) quad(a, k, 0, 0, 0, 0, UV_WHITE, 0xFFFFFF00u);
+    bar_quad(a, 0, 0, 0, 0, 0, 0xFFFFFF00u); bar_quad(a, 1, 0, 0, 0, 0, 0xFFFFFF00u);
 }
 /* reticle B (chosen from four mock-ups, tools/ztarget/reticle): four flat yellow corner brackets round the
    target's body; they snap in from twice the size with a little overshoot, then pulse gently */
@@ -320,15 +330,15 @@ static void reticle(u8 *g)
     for (sxn = -1; sxn <= 1; sxn += 2)
         for (syn = -1; syn <= 1; syn += 2) {
             s32 x0 = cx + sxn * hx, y0 = cy + syn * hy;
-            if (!(bar && syn > 0)) quad(a, n++, x0, y0, x0 - sxn * RET_ARM, y0 - syn * RET_W, UV_WHITE, col);   /* horizontal arm */
+            quad(a, n++, x0, y0, x0 - sxn * RET_ARM, y0 - syn * RET_W, UV_WHITE, col);   /* horizontal arm */
             quad(a, n++, x0, y0, x0 - sxn * RET_W, y0 - syn * RET_ARM, UV_WHITE, col);   /* vertical arm */
         }
-    if (bar) {   /* enemy HP (battle13): the box's bottom edge is the bar - dark back, yellow fill (red when enraged) */
-        s32 y0 = cy + hy, w = 2 * hx - 2, f = (s32)((float)w * (float)EN.hp / (float)EN.maxhp);
+    if (bar) {   /* enemy HP: a little above the box, dark back, red fill */
+        s32 y1 = cy - hy - RET_GAP, w = 2 * hx - 2, f = (s32)((float)w * (float)EN.hp / (float)EN.maxhp);
         if (f < 0) f = 0;
-        quad(a, n++, cx - hx, y0 - RET_BAR, cx + hx, y0, UV_WHITE, 0x28282800u | (u32)(Z.alpha * 3 / 4));
-        quad(a, n++, cx - hx + 1, y0 - RET_BAR + 1, cx - hx + 1 + f, y0 - 1, UV_WHITE, (en_rage() ? 0xFF4A2A00u : RET_COL) | (u32)Z.alpha);
-    }
+        bar_quad(a, 0, cx - hx, y1 - RET_BAR, cx + hx, y1, 0x28282800u | (u32)(Z.alpha * 3 / 4));
+        bar_quad(a, 1, cx - hx + 1, y1 - RET_BAR + 1, cx - hx + 1 + f, y1 - 1, 0xE0262600u | (u32)Z.alpha);
+    } else { bar_quad(a, 0, 0, 0, 0, 0, 0xFFFFFF00u); bar_quad(a, 1, 0, 0, 0, 0, 0xFFFFFF00u); }
 }
 
 static void swing_frame(s32 bpress, s32 free);
@@ -386,6 +396,7 @@ static void bm_frame(u8 *g, s32 map)
     }
     if (++BM.t >= 100) { stream_stop(au); BM.state = 0; }               /* faded out: stop the stream */
 }
+static void stance_frame(u8 *g, s32 map);
 void zt_frame(u8 *g, s32 map, volatile u32 *held, volatile u32 *press)
 {
 #ifdef NO_ZT
@@ -398,6 +409,7 @@ void zt_frame(u8 *g, s32 map, volatile u32 *held, volatile u32 *press)
         *(s32 *)0x803469D0 = 3; *(s32 *)0x803469D8 = 3;
         if ((u32)tm >= 0x80000000u && (u32)tm < 0x81800000u && *(s32 *)(tm + 0x3F8) == 0x30) *(s32 *)(tm + 0x3F8) = 0x2C + (s32)(F(0x8017D3E8, u32, (void))() % 4u);
     }
+    stance_frame(g, map);
     if (map == 1) en_frame(g); else { en_ctl = 0; AG.who = 0; AG.on = 0; AG.homing = 0; }                                /* the day's wild animal as an enemy (HP / flash / defeat) */
     bm_frame(g, map);                                        /* battle music */
     u8 *f = FADER;
@@ -634,7 +646,7 @@ static void en_hit(s32 h, float dx, float dz)
     dmg = en_dmg[w]; if (h == 2) dmg = dmg * 3 / 2;
     {   u8 *a = wild_obj();                                  /* the turtle tucked in its shell: 1/4 damage, a clink */
         EN.armour = a && en_ctl == a && *(s32 *)(a + 0x128) == 0x2F && AI.atk == ATK_LUNGE &&
-                    ((AI.st == AI_WINDUP && AI.t > 5) || AI.st == AI_LUNGE || (AI.st == AI_RECOVER && AI.t < 6));
+                    (AI.st == AI_SHELL || (AI.st == AI_WINDUP && AI.t > 5) || AI.st == AI_LUNGE || (AI.st == AI_RECOVER && AI.t < 6));
         if (EN.armour) { dmg = dmg / 4; if (dmg < 1) dmg = 1; EN.clinks++; if (SE_CLINK >= 0) sfx_play(*(u8 **)0x803491E4, SE_CLINK, 0); }
     }
     EN.magic = 0x454E4D59u; EN.hits++; EN.last_dmg = dmg; EN.hp -= dmg;
@@ -694,9 +706,18 @@ static void ai_frame(u8 *g, u8 *a)
     float fs = rage ? 1.3f : 1.0f, ft = rage ? 0.7f : 1.0f;
     if (sp < 0 || sp > 4) sp = 4;
     AI.magic = 0x454E4149u; AI.t++;
-    if (EN.hits != AI.hseen) {                               /* a new hit: flinch, or knocked back on hit 3 */
-        AI.hseen = EN.hits;
-        if (!EN.armour && AI.st != AI_POOF) {                /* the turtle's shell shrugs it off */
+    if (AI.press > 0 && ++AI.pdecay >= 45) { AI.press--; AI.pdecay = 0; }   /* pressure fades, 1 per 0.75 s */
+    if (EN.hits != AI.hseen) {                               /* a new hit */
+        AI.hseen = EN.hits; AI.press++; AI.pdecay = 0;
+        if (AI.st == AI_SHELL) AI.shits++;                    /* the turtle counts the knocks on its shell */
+        else if (AI.press >= AIP_PRESS[sp] && AI.st != AI_POOF) {   /* battle17: pressed too hard - counter (no stun lock) */
+            AI.press = 0; AI.again = 0;
+            if (sp == 0) { AI.st = AI_WINDUP; AI.t = 0; AI.atk = ATK_WHIP; AI.len = 4; }
+            else if (sp == 1) { AI.st = AI_RETREAT; AI.t = 0; AI.len = 10; AI.atk = ATK_LUNGE; }
+            else if (sp == 2) { AI.st = AI_POOF; AI.t = 0; AI.len = 16; AI.atk = ATK_POOF; }
+            else if (sp == 3) { AI.st = AI_SHELL; AI.t = 0; AI.len = 150; AI.shits = 0; AI.atk = ATK_LUNGE; }
+            else { AI.st = AI_WINDUP; AI.t = 0; AI.atk = ATK_LUNGE; AI.len = 6; }
+        } else if (!EN.armour && AI.st != AI_POOF) {         /* flinch, or knocked back on hit 3 (the shell shrugs it off) */
             AI.kb = EN.lasth == 2;
             AI.st = AI_HIT; AI.t = 0; AI.len = AI.kb ? AI_HIT_KB : AI_HIT_FL;
         }
@@ -755,16 +776,24 @@ static void ai_frame(u8 *g, u8 *a)
         }
         if (AI.t >= AI.len) { AI.st = AI_WINDUP; AI.t = 0; AI.atk = ATK_LUNGE; AI.len = 8; }
         break;
-    case AI_RETREAT:                                         /* chihuahua: hit, it skitters away */
+    case AI_RETREAT:                                         /* chihuahua: hit, it skitters away - then darts back in */
         ai_move(a, x - ux * 0.2f * fs, z - uz * 0.2f * fs); ai_face(a, dx, dz); ai_mot(a, ai_go(a));
-        if (AI.t >= AI.len) { AI.st = AI_CIRCLE; AI.t = 0; AI.len = ai_k(AIP[sp].cmin + (s32)ai_rand(AIP[sp].cvar), rage ? 0.6f : 1.0f); }
+        if (AI.t >= AI.len) { AI.st = AI_WINDUP; AI.t = 0; AI.atk = ATK_LUNGE; AI.again = 0; AI.len = 6; }
+        break;
+    case AI_SHELL:                                           /* turtle: hides (armoured); 3 knocks -> the head pops out, bites */
+        ai_face(a, dx, dz); ai_mot(a, MOT_IDLE);
+        if (AI.shits >= 3 && d < 3.5f) { AI.st = AI_WINDUP; AI.t = 0; AI.atk = ATK_BITE; AI.len = 3; AI.again = 0; AI.shits = 0; break; }
+        if (AI.t >= AI.len) { AI.st = AI_RECOVER; AI.t = 6; AI.atk = ATK_LUNGE; AI.len = 18; }   /* left alone: comes out */
         break;
     default:                                                 /* recover / hit */
         ai_mot(a, MOT_IDLE);
         if (AI.t >= AI.len) {
-            if (AI.st == AI_HIT && sp == 1 && ai_rand(100) < 70) { AI.st = AI_RETREAT; AI.t = 0; AI.len = 14; break; }
+            s32 wasHit = AI.st == AI_HIT;
+            if (wasHit && sp == 1 && ai_rand(100) < 70) { AI.st = AI_RETREAT; AI.t = 0; AI.len = 14; break; }
+            if (wasHit && sp == 3 && ai_rand(100) < 50) { AI.st = AI_SHELL; AI.t = 0; AI.len = 150; AI.shits = 0; break; }
             AI.st = AI_CIRCLE; AI.t = 0; AI.atk = ATK_LUNGE;
             AI.len = ai_k(AIP[sp].cmin + (s32)ai_rand(AIP[sp].cvar), rage ? 0.6f : 1.0f);
+            if (wasHit) AI.len = 12 + (s32)ai_rand(14);       /* battle17: after a hit it attacks soon (no free circling) */
             if (ai_rand(2)) AI.dir = -AI.dir;
         }
     }
@@ -1121,6 +1150,7 @@ static void pose_apply(s32 n, PCX *c)
         if (!PZ.atk) {
             if (st == AI_WINDUP) kr = smooth01((float)t / 10.0f);
             else if (st == AI_LUNGE) kr = 1.0f;
+            else if (st == AI_SHELL) kr = smooth01((float)t / 5.0f);   /* hiding */
             else if (st == AI_RECOVER) kr = 1.0f - smooth01((float)t / 12.0f);
         }
         if (kr > 0.0f) {
@@ -1182,10 +1212,67 @@ static s32 ht_bone(s32 n, u8 *trs, s32 r)                /* r: anim_eval's resul
     else for (i = 0; i < 9; i++) m[i] = L[i];
     return r;
 }
+/* Player attack stance (battle17, user): while Z-targeting, standing and not swinging, the knees bend a little.
+   boy_0 (rest, model +Z forward): pelvis 7 (y 0.535), thighs 10 / 15 (hip 0.495), knees 11 / 16 (0.33), ankles 12 / 17
+   (0.154); the feet 1-3 / 4-6 hang from the root, so they stay planted. Two-bone IK for a 0.06 pelvis drop (thigh
+   0.167, shin 0.178): thigh -0.622 (knee forward), knee +1.200, ankle -0.578 (level); spine 18 leans 0.15 forward
+   (0.03 was invisible under the trousers in the skinned preview).
+   Same model-space layer as the animals (pl_m = the player's model rotations). */
+#define ST_DROP 0.06f
+static float pl_m[64][9];
+static float ST_w;                                       /* stance weight 0..1, eased in zt_frame */
+static s32 pl_bone(u8 *inst, s32 n, u8 *trs, s32 r)
+{
+    u8 *act = *(u8 **)inst, *node, *par;
+    float *pm = 0, *q = (float *)(trs + 0x10), *t = (float *)(trs + 0x20), *rm, L[9], *m;
+    s32 i;
+    PCX c;
+    if ((u32)act < 0x80000000u || (u32)act >= 0x81800000u || n < 0 || n >= 64 || n >= *(s32 *)(act + 4)) return r;
+    node = *(u8 **)(act + 0xC) + n * 0x1C; par = *(u8 **)(node + 0xC); rm = *(float **)node; m = pl_m[n];
+    if ((u32)rm < 0x80000000u || (u32)rm >= 0x81800000u) return r;
+    if (par) { i = (s32)(par - *(u8 **)(act + 0xC)) / 0x1C; if (i >= 0 && i < n) pm = pl_m[i]; }
+    if (ST_w > 0.01f && (n == 7 || n == 10 || n == 15 || n == 11 || n == 16 || n == 12 || n == 17 || n == 18)) {
+        if (!r) {                                       /* untracked: its rest pose as a record (rotation, translation) */
+            float tr = rm[0] + rm[5] + rm[10], k;
+            if (tr > -0.99f) { k = 0.5f * rsq(1.0f + tr); q[3] = 0.25f / k; q[0] = (rm[9] - rm[6]) * k; q[1] = (rm[2] - rm[8]) * k; q[2] = (rm[4] - rm[1]) * k; }
+            else { q[0] = 0.0f; q[1] = 1.0f; q[2] = 0.0f; q[3] = 0.0f; }
+            t[0] = rm[3]; t[1] = rm[7]; t[2] = rm[11]; trs[0] = 4 | 8; r = 1;
+        }
+        if (!(trs[0] & 4)) { q[0] = q[1] = q[2] = 0.0f; q[3] = 1.0f; trs[0] |= 4; }
+        c.trs = trs; c.pm = pm;
+        if (n == 7) p_mov(&c, 0.0f, -ST_DROP * ST_w, 0.0f);
+        else if (n == 10 || n == 15) p_rot(&c, 0, -0.622f * ST_w);
+        else if (n == 11 || n == 16) p_rot(&c, 0, 1.200f * ST_w);
+        else if (n == 12 || n == 17) p_rot(&c, 0, -0.578f * ST_w);
+        else p_rot(&c, 0, 0.15f * ST_w);
+    }
+    if (r && (trs[0] & 4)) {
+        float x = q[0], y = q[1], z = q[2], w = q[3];
+        L[0] = 1 - 2 * (y * y + z * z); L[1] = 2 * (x * y - z * w); L[2] = 2 * (x * z + y * w);
+        L[3] = 2 * (x * y + z * w); L[4] = 1 - 2 * (x * x + z * z); L[5] = 2 * (y * z - x * w);
+        L[6] = 2 * (x * z - y * w); L[7] = 2 * (y * z + x * w); L[8] = 1 - 2 * (x * x + y * y);
+    } else if (r) { for (i = 0; i < 9; i++) L[i] = (i % 4) ? 0.0f : 1.0f; }
+    else { for (i = 0; i < 3; i++) { L[i * 3] = rm[i * 4]; L[i * 3 + 1] = rm[i * 4 + 1]; L[i * 3 + 2] = rm[i * 4 + 2]; } }
+    if (pm) { for (i = 0; i < 9; i++) { s32 rr = i / 3, cc = i % 3; m[i] = pm[rr * 3] * L[cc] + pm[rr * 3 + 1] * L[3 + cc] + pm[rr * 3 + 2] * L[6 + cc]; } }
+    else for (i = 0; i < 9; i++) m[i] = L[i];
+    return r;
+}
+static void stance_frame(u8 *g, s32 map)
+{
+    static float lx, lz;
+    float *p = SLOT_POS(g, 0), dx = p[0] - lx, dz = p[2] - lz, want;
+    u8 *pl = pm_player;
+    s32 still = dx * dx + dz * dz < 0.0004f;               /* under 0.02 a frame: standing */
+    lx = p[0]; lz = p[2];
+    want = map == 1 && Z.target && still && SW.w <= 0.0f && (u32)pl >= 0x80000000u && (u32)pl < 0x81800000u &&
+           *(s32 *)(pl + PL_STATE) == 1 ? 1.0f : 0.0f;
+    ST_w += (want - ST_w) * 0.15f;
+}
 s32 zt_bone(u8 *ctl, s32 n, u8 *trs, u8 *inst)
 {
     s32 r = anim_eval(ctl, n, trs);
     if (inst && en_skel && (inst == en_skel || inst == *(u8 **)(en_skel + 0x14))) r = ht_bone(n, trs, r);
+    else if (inst && sw_slot && inst == *(u8 **)(sw_slot + 0x14)) r = pl_bone(inst, n, trs, r);   /* player: stance */
     if (r && SW.w > 0.0f && n >= 18 && sw_slot && inst == *(u8 **)(sw_slot + 0x14)) {
         anim_blend((u8 *)&SWC[SW.cur], n, trs, SW.w); sw_dbg.bones++;   /* the clips own the whole spine: full weight */
     }
