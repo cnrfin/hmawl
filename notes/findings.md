@@ -3652,3 +3652,12 @@ so, door fades are timed there, possibly per frame. Not traced yet.
   house spot, func_8017775C(g_system, 6, 3, 0); fade-in fallback once map 3 is up with the fader idle on black.
   Recovery bands (food_frame): small per-frame stamina rises x1 / 0.8 / 0.6 / 0.45 / 0.3 / 0 for fullness >= 90 / 80 /
   70 / 60 / > 50 / <= 50 %, not in state 0x25. pm test d160eb72, normal 5c3706d1.
+- battle21 (user, dump 6bd2a3a2): unplayable - the 'tired' flinch through state 0x1B played in full, stun-locked the
+  player, dropped the Z lock and moved the camera; and at low stamina the game's own exhausted kneel (stars, state 0x25)
+  refilled to ~40 % instead of a collapse. Dump: PD 5 hits, player state 0x1B; player draw instance = *(*(sw_slot+0x14)+0x14)
+  (+0x3C visible, +0x3D flat colour, +0x3E RGBA, as the animals).
+- battle22: no motion on a hit - 12 frames of red flicker (flat colour) + 8-frame slide + 8 frames input lock; 10 % stamina
+  = 0 HP (collapse there, before state 0x25 can start); while fighting (aggro / invulnerable / collapsing) the ctrl edge flags
+  +0x158 / +0x159 / +0x15B are held at 1 (no 20 % / 40 % tired or hungry motions); the HUD stays up: our main.dol cave HUD code
+  (hud_slide, v03) 'moved -> still count 0' at 0x80003618 (li r12,0 = 0x39800000) is swapped for li r12,255 while fighting
+  (dcbst / icbi), restored after. pm test 95bad8a0, normal 5ffea81e.

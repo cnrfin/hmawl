@@ -736,7 +736,7 @@ static u32 ai_rand(u32 n) { return F(0x8017D3E8, u32, (void))() % n; }   /* the 
 static const s32 EN_DMG[5] = { 14000, 6000, 9000, 15000, 8000 };   /* lizard, chihuahua, tanuki, turtle (spin), owl */
 #define DMG_BITE  20000
 #define DMG_WHIP  12000
-struct { u32 magic; s32 hits, last, inv, slide, stun, taken, collapses; float kx, kz; } PD;   /* 'PDMG' (dump) */
+struct { u32 magic; s32 hits, last, inv, slide, stun, taken, collapses; float kx, kz; s32 flash; } PD;   /* 'PDMG' (dump) */
 static void collapse_start(u8 *g);
 static void pl_motion(u8 *pl, s32 m, s32 face);
 static void player_hurt(u8 *g, s32 dmg, float ux, float uz)
@@ -746,11 +746,12 @@ static void player_hurt(u8 *g, s32 dmg, float ux, float uz)
     if (en_rage()) dmg = dmg * 5 / 4;
     PD.magic = 0x50444D47u; PD.hits++; PD.last = dmg; PD.taken += dmg;
     *st -= dmg;
-    PD.inv = 60; PD.slide = 8; PD.stun = 14; PD.kx = ux * 0.16f; PD.kz = uz * 0.16f;
+    PD.inv = 60; PD.slide = 8; PD.stun = 8; PD.kx = ux * 0.16f; PD.kz = uz * 0.16f;
     sfx_play(*(u8 **)0x803491E4, SE_HURT, 0);
-    if (*st <= *(s32 *)(g + 0x11B8C)) { *st = *(s32 *)(g + 0x11B8C); collapse_start(g); return; }
-    if ((u32)pm_player >= 0x80000000u && (u32)pm_player < 0x81800000u && *(s32 *)(pm_player + PL_STATE) == 1)
-        pl_motion(pm_player, 0x16, 0x26);                  /* a hurt reaction: the 'tired' flinch (no hurt motion exists) */
+    PD.flash = 12;                                       /* battle22: a red flicker, no motion (the motion state took the lock,
+                                                            the camera and the controls, user) */
+    if (*st <= *(s32 *)(g + 0x11B88) / 10) { *st = *(s32 *)(g + 0x11B88) / 10; collapse_start(g); }   /* 10 % = 0 HP: the game's own
+                                                            exhausted kneel (state 0x25, refills to 30 %) starts at 10 % */
 }
 static void ai_strike(u8 *g, s32 sp, float d, float ux, float uz)
 {
@@ -764,10 +765,32 @@ static void ai_strike(u8 *g, s32 sp, float d, float ux, float uz)
     else if (d < AIP[sp].push + 0.6f) dmg = EN_DMG[sp];
     if (dmg) { AI.struck = 1; player_hurt(g, dmg, ux, uz); }
 }
+struct { u32 magic; s32 st, t; } CL;                      /* 'CLPS': 0 idle, 1 collapsing, 2 fading, 3 warped */
+static void code_poke(u32 *a, u32 want, u32 other)        /* swap one instruction of our own HUD code (checked), cache-safe */
+{
+    if (*a != other) return;
+    *a = want;
+    __asm__ volatile("dcbst 0,%0\n\tsync\n\ticbi 0,%0\n\tisync" :: "r"(a) : "memory");
+}
 static void hurt_frame(volatile u32 *held, volatile u32 *press)
 {
-    u8 *pl = pm_player;
+    u8 *pl = pm_player, *g = *(u8 **)0x803491CC;
+    s32 fight = AG.on || PD.inv > 0 || CL.st;
     if (PD.inv > 0) PD.inv--;
+    if ((u32)g >= 0x80000000u && (u32)g < 0x81800000u && fight) {
+        g[0x11B80 + 0x158] = 1; g[0x11B80 + 0x159] = 1; g[0x11B80 + 0x15B] = 1;   /* no 20 % / 40 % tired or hungry motions mid-fight */
+    }
+    /* HUD in a fight (user): our HUD code (main.dol cave, hud_slide) shows after 20 still frames; 'moved -> 0' at 0x80003618
+       becomes 'moved -> 255' while fighting */
+    if (fight) code_poke((u32 *)0x80003618, 0x398000FFu, 0x39800000u);
+    else code_poke((u32 *)0x80003618, 0x39800000u, 0x398000FFu);
+    if (PD.flash > 0 && sw_slot) {                        /* hit: the player flickers red, as the animals do */
+        u8 *sk = *(u8 **)(sw_slot + 0x14), *in = (u32)sk >= 0x80000000u && (u32)sk < 0x81800000u ? *(u8 **)(sk + 0x14) : 0;
+        PD.flash--;
+        if ((u32)in >= 0x80000000u && (u32)in < 0x81800000u && in[0x3D] <= 1) {
+            if (PD.flash > 0 && (PD.flash & 2)) en_colour(in, 1, 255, 90, 90, 255); else en_colour(in, 0, 255, 255, 255, 255);
+        }
+    }
     if (PD.stun > 0) { PD.stun--; *press &= 0x10u; *held &= 0x10u; }   /* hurt: only Z (keep the lock) */
     if (PD.slide > 0 && (u32)pl >= 0x80000000u && (u32)pl < 0x81800000u) {
         float *pp = (float *)(pl + 0x4C), *pq = (float *)(pl + 0xFC), v[3], ny;
@@ -789,7 +812,6 @@ static void hurt_frame(volatile u32 *held, volatile u32 *press)
 #define scene_map  F(0x8017775C, void, (u8 *, s32, s32, s32))
 #define fade_to    F(0x80189128, void, (u8 *, u32 *, u32 *, s32, s32, float))
 #define FADER_     (*(u8 **)0x803491B8)
-struct { u32 magic; s32 st, t; } CL;                      /* 'CLPS': 0 idle, 1 collapsing, 2 fading, 3 warped */
 static void pl_motion(u8 *pl, s32 m, s32 face)           /* a one-shot motion, then back to free (state 0x1B) */
 {
     *(s32 *)(pl + 0x1498) = m; *(s32 *)(pl + 0x149C) = 0; *(s32 *)(pl + 0x14A0) = face;
