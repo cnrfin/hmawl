@@ -28,7 +28,7 @@ enum { C_MAGIC = 54, C_EXP, C_LV, C_HP, C_PWR, C_END, C_LCK, C_ANS, C_PTS };
 void skill_levelup(void);
 #define SH_DATA
 #include "stat_hud.h"
-struct { u32 magic; s32 ignore, acc, last, lastfull, menu, cool, gained, refund, wait, fish_set, r_exp, r_gold, r_wait, r_open; } ST;   /* 'STAT' (dump) */
+struct { u32 magic; s32 ignore, acc, last, lastfull, menu, cool, gained, refund, wait, fish_set, r_exp, r_gold, r_wait, r_open, tl_seen, tl[2], tacc[2]; } ST;   /* 'STAT' (dump) */
 
 static s32 need(s32 lv) { return 500 + 1250 * (lv - 1); }   /* stats3: 500, 1750, 3000 ... (farming EXP x3); stats2: 500, 1250, 2000 ... (was 1500 + 500 lv: Lv 2 took 2000) */
 static s32 ready(u8 *g) { return OK(g) && CNT(g, C_MAGIC) == (s32)ST_MAGIC; }
@@ -164,6 +164,28 @@ static void stats_luck(s32 lck)
     FISH_BIG = 10000 / (100 + 5 * lck);
 }
 
+/* step 4: Attack on the farm - the tool skill pools (ctrl = game+0x11B80: +0x2C animal tools, +0x30 field tools; u16,
+   level = pool / 500 + 1, max 5; the level cuts the tools' stamina cost and widens the charge) grow 5 % faster per
+   Attack point (x2 at 20): each rise the game makes gets that much on top. */
+static void stats_tools(u8 *g, s32 atk)
+{
+    s32 k;
+    for (k = 0; k < 2; k++) {
+        unsigned short *p = (unsigned short *)(g + 0x11B80 + (k ? 0x30 : 0x2C));
+        s32 cur = *p, d = cur - ST.tl[k];
+        if (ST.tl_seen && d > 0 && d < 5000 && atk > 0) {
+            ST.tacc[k] += d * 5 * atk;
+            if (ST.tacc[k] >= 100) {
+                cur += ST.tacc[k] / 100; ST.tacc[k] %= 100;
+                if (cur > 60000) cur = 60000;
+                *p = (unsigned short)cur;
+            }
+        }
+        ST.tl[k] = cur;
+    }
+    ST.tl_seen = 1;
+}
+
 void stats_frame(u8 *g, s32 map, volatile u32 *held, volatile u32 *press, s32 busy)
 {
     s32 cur, d, *pts;
@@ -177,6 +199,7 @@ void stats_frame(u8 *g, s32 map, volatile u32 *held, volatile u32 *press, s32 bu
     /* HP: max stamina */
     *(s32 *)(g + 0x11B88) = 100000 + 10000 * CNT(g, C_HP);
     stats_hud(g);
+    if (map >= 0) stats_tools(g, CNT(g, C_PWR)); else ST.tl_seen = 0;   /* not across loads / scene changes */
 #ifdef LUCK_TEST
     stats_luck(STAT_MAX);                                   /* test build: Luck 20 effects */
 #else

@@ -3763,3 +3763,9 @@ so, door fades are timed there, possibly per frame. Not traced yet.
   debug.mes 30 was "You found <n0> G!" with no 30, so the box closed as soon as the text was out (the stats view text
   ends in 30 and stays). gold4: debug.mes 30 + 30 (8cf553f9); pm.bin stays gold3 (b4391e56), whose waits are kept.
 - gold4 tested (user): works - gold box stays until A, then Level up!, then the stat menu.
+
+### 7.55 Attack on the farm (step 4; atk1)
+- stats.c stats_tools: each frame in the field, a rise d (0 < d < 5000) of the u16 pools ctrl+0x2C (animal tools) /
+  +0x30 (field tools) gets d x 5 % x Attack on top (remainder carried; capped 60000). Off the field the last values are
+  forgotten, so a load or scene change never counts as a rise. The game's level bytes (+0x2E / +0x32) follow on the next
+  tool use. pm test 7c3dfa06, normal 77a9e1ea.
