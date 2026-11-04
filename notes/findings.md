@@ -3482,3 +3482,8 @@ so, door fades are timed there, possibly per frame. Not traced yet.
   dynasty" 0x087), "strange mushroom. Eat it?" (event 0x009), Muffy followed by "someone strange" (muumuu 0x07C).
   Son's rumours (son_npccom): 0x01D "<20:23> (Mukumuku) was once a human!", 0x017 "<20:06> can talk to the spirits of
   the wind", 0x00A "<20:11> (Galen) is not scared of graveyards"; tai/tay 0x125 crops disappearing from the common garden.
+- b3t (user): animals "incredibly rare" for days. The animal object is created at every valley setup (func_80013F60,
+  0x8001434C, unconditional); our defeat code hides its draw instance (+0x3C = 0, flat colour on) and never undid
+  it - if that instance outlives the day's object, every later animal of that species stays invisible. battle3c:
+  en_hid remembers the hidden / tinted instance; a living animal on it gets +0x3C = 1 and normal colour back.
+  (Unconfirmed: needs a dump on a day with no visible animal.)
