@@ -3599,3 +3599,6 @@ so, door fades are timed there, possibly per frame. Not traced yet.
   wrong. Dump 6c868b39 (player running): ~90 live particle records (stride 0x110) hold the player's +0x4C / +0x58
   pointers and effect table entry 0x80251278 (= id 4): the running puffs are id 4. battle14: poof = 11 id-4 puffs
   (ring of 8 + column of 3), no id 15. pm test 6327291b, normal c429c6b8.
+- battle15: lock-off ended fights again (user). Cause: battle7's own extra rule (de-aggro when unlocked and > 25 from the
+  animal's home); battle13's travelling fights (chains, spins, poof) put it past 25 at once. Removed: only the player
+  distance (ZT_LEASH) ends a fight. pm test / normal: see the commit's pm.bin.

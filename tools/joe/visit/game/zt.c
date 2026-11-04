@@ -108,7 +108,7 @@ static const struct { s16 hp; u8 cmin, cvar, wind, lunge, rec, again, chain; flo
 #define AI_HIT_FL  10                                    /* hits 1-2: a flinch */
 struct { u32 magic; s32 sp, st, t, len, atk, kb; u32 clk; } PZ;   /* 'POSE': what the bone layer draws (dump) */
 /* Aggro (battle7, user design): locking on starts the fight; letting go of the lock does not end it. It ends when
-   the player gets more than ZT_LEASH away (or it is led AG_HOME_MAX from home while not locked on); then it walks
+   the player gets more than ZT_LEASH away (battle15: the home leash is gone); then it walks
    back to where it was first seen today, and only a new lock-on starts it again. The battle music follows AG.on. */
 #define AG_HOME_MAX 25.0f
 #define AG_HOME_V   0.07f                                /* walking home, units per frame */
@@ -792,7 +792,8 @@ static void ag_frame(u8 *g, u8 *a)
     if (AG.who != a) { AG.who = a; AG.hx = x; AG.hz = z; AG.on = 0; AG.homing = 0; hx = hz = 0; }   /* today's animal: home */
     if (!en_alive()) { AG.on = 0; AG.homing = 0; return; }
     if (Z.target == ZT_WILD) { if (!AG.on) { AG.on = 2; AG.starts++; } AG.homing = 0; return; }   /* 2: just started */
-    if (AG.on && (dx * dx + dz * dz > ZT_LEASH * ZT_LEASH || hx * hx + hz * hz > AG_HOME_MAX * AG_HOME_MAX)) {
+    (void)hx; (void)hz;                                   /* battle15: no home leash - fights travel far now and it ended them on lock-off (user) */
+    if (AG.on && dx * dx + dz * dz > ZT_LEASH * ZT_LEASH) {
         AG.on = 0; AG.homing = 1;
     }
 }
