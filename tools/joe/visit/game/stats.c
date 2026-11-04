@@ -65,7 +65,9 @@ void stats_reward(s32 exp, s32 gold)
 static s32 event_free(void)
 {
     u8 *ev = EVMGR;
-    return OK(ev) && *(s32 *)(ev + 0x680) == -1 && !*(s32 *)(ev + 0x58C) && CONTROL == 1;
+    u8 *mm = MSGMGR;
+    return OK(ev) && *(s32 *)(ev + 0x680) == -1 && !*(s32 *)(ev + 0x58C) && CONTROL == 1 &&
+           !(OK(mm) && *(s32 *)(mm + 0x48));                 /* gold3: and no message box up */
 }
 
 /* step 3: the stat HUD (tools/hud/build_stat_hud.py: quads appended to opguide.agc element 7, rewritten here) */
@@ -210,8 +212,14 @@ void stats_frame(u8 *g, s32 map, volatile u32 *held, volatile u32 *press, s32 bu
     /* a defeat's reward: gold box, then its EXP (levels and menus wait) */
     if (ST.r_open) {
         u8 *mm = MSGMGR, *pl = pm_player;
-        if ((OK(mm) && *(s32 *)(mm + 0x48)) || (OK(pl) && *(s32 *)(pl + 0x1364) == ST_MSG)) return;   /* until A closes it */
-        ST.r_open = 0; ST.cool = 20;
+        s32 up = (OK(mm) && *(s32 *)(mm + 0x48)) || (OK(pl) && *(s32 *)(pl + 0x1364) == ST_MSG);
+        if (ST.r_open == 1) {                                /* gold3: the box opens a frame or more after the state change; */
+            if (up && OK(mm) && *(s32 *)(mm + 0x48)) ST.r_open = 2;   /* gold2 took that gap for 'closed' (dump 0c6bb71d) */
+            else if (++ST.r_wait > 90) ST.r_open = 3;        /* never showed: go on */
+            return;
+        }
+        if (up) return;                                      /* until A closes it */
+        ST.r_open = 0; ST.r_wait = 0; ST.cool = 20;
     }
     if (ST.r_gold || ST.r_exp) {
         u8 *mm = MSGMGR;
@@ -225,7 +233,7 @@ void stats_frame(u8 *g, s32 map, volatile u32 *held, volatile u32 *press, s32 bu
             msg_num(mm, 0, ST.r_gold);
             *(s32 *)(pl + 0x14C0) = MES_DEBUG; *(s32 *)(pl + 0x14C4) = M_GOLD;
             pl_state(pl, ST_MSG);
-            ST.r_gold = 0; ST.r_open = 1;
+            ST.r_gold = 0; ST.r_open = 1; ST.r_wait = 0;
             return;
         }
         CNT(g, C_EXP) += ST.r_exp; ST.gained += ST.r_exp; ST.r_exp = 0;

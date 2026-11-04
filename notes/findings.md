@@ -3753,3 +3753,9 @@ so, door fades are timed there, possibly per frame. Not traced yet.
   CONTROL 0, no player state). gold2: the box comes from player state 0x2A (player+0x14C0 file 0x32, +0x14C4 msg 30,
   pl_state func_80031D7C; as the tested R item description), started only when the player is free (state 1); done when
   the box is closed and the player has left 0x2A. pm test 96da791e, normal e14914b7 (debug.mes as gold1).
+- gold2 (user dump 0c6bb71d): the box still skipped. Dump: ST r_open 0, menu 1 (level-up event requested), message
+  mgr+0x48 = 3 (a box showing), CONTROL 0: the gold box was up while the menu was already queued. Player state 0x2A
+  opens its box a frame or more after pl_state, and the first check saw no box yet and called it closed; the menu's
+  event then took over. gold3: wait until the box is really seen open (mgr+0x48 != 0; 90-frame give-up), then until it
+  is closed and the player left 0x2A; event_free() (level-up menu, stats view) also needs no box open.
+  pm test b4391e56, normal 75728db0.
