@@ -92,6 +92,13 @@ enum { AI_CIRCLE, AI_WINDUP, AI_LUNGE, AI_RECOVER };
 #define AI_AGAIN   35                                   /* % chance of a second lunge straight after */
 #define MOT_IDLE   0
 struct { u32 magic; s32 st, t, len, dir; float lx, lz; } AI;   /* 'ENAI' (dump) */
+/* Aggro (battle7, user design): locking on starts the fight; letting go of the lock does not end it. It ends when
+   the player gets more than ZT_LEASH away (or it is led AG_HOME_MAX from home while not locked on); then it walks
+   back to where it was first seen today, and only a new lock-on starts it again. The battle music follows AG.on. */
+#define AG_HOME_MAX 25.0f
+#define AG_HOME_V   0.07f                                /* walking home, units per frame */
+#define AI_CHASE    0.07f                                /* closing in while not locked on: slower, so you can run */
+struct { u32 magic; s32 on, homing, starts; float hx, hz; u8 *who; } AG;   /* 'AGRO' (dump) */
 static u8 *en_hid;                                       /* the draw instance we hid / tinted (it can outlive the day's
                                                              animal: memfix-era b3t, animals "gone" for days after a defeat) */
 static s32 en_today(void) { return (s32)((**(u32 **)0x80349218) / 864000u); }
@@ -336,7 +343,7 @@ static void bm_frame(u8 *g, s32 map)
     if (map != 1) { if (BM.state) { stream_stop(au); BM.state = 0; } return; }   /* left the valley */
     a = wild_obj();
     if (BM.state == 0) {
-        if (Z.target == ZT_WILD && a && en_alive()) {
+        if (AG.on && a && en_alive()) {                        /* battle7: follows the aggro, not the lock */
             music_vol(*(u8 **)(au + 0x4C), 0, 800);
             fader_to(au + 0x160, 0, 0); fader_to(au + 0x170, 0, 0);
             stream_play(au + 0x80, bm_file, 0, 0, bm_file, 0, BM_LOOP);
@@ -349,7 +356,7 @@ static void bm_frame(u8 *g, s32 map)
         float *p = SLOT_POS(g, 0), dx, dz;
         if (!a || !en_alive()) { bm_off(0); return; }
         dx = *(float *)(a + 0x4C) - p[0]; dz = *(float *)(a + 0x54) - p[2];
-        if (dx * dx + dz * dz > ZT_LEASH * ZT_LEASH) bm_off(0);           /* ran away */
+        if (!AG.on || dx * dx + dz * dz > ZT_LEASH * ZT_LEASH) bm_off(0);   /* de-aggro / ran away */
         return;
     }
     if (++BM.t >= 100) { stream_stop(au); BM.state = 0; }               /* faded out: stop the stream */
@@ -359,7 +366,7 @@ void zt_frame(u8 *g, s32 map, volatile u32 *held, volatile u32 *press)
 #ifdef NO_ZT
     (void)g; (void)map; (void)held; (void)press; return;   /* test build: Z targeting, reticle and combos off */
 #endif
-    if (map == 1) en_frame(g); else en_ctl = 0;                                /* the day's wild animal as an enemy (HP / flash / defeat) */
+    if (map == 1) en_frame(g); else { en_ctl = 0; AG.who = 0; AG.on = 0; AG.homing = 0; }                                /* the day's wild animal as an enemy (HP / flash / defeat) */
     bm_frame(g, map);                                        /* battle music */
     u8 *f = FADER;
     u8 *ev = EVMGR;
@@ -644,7 +651,8 @@ static void ai_frame(u8 *g, u8 *a)
     switch (AI.st) {
     case AI_CIRCLE: {
         float rad = (d - AI_R) * 0.08f, tan = AI_TAN * (float)AI.dir;
-        if (rad > 0.12f) rad = 0.12f; if (rad < -0.12f) rad = -0.12f;
+        float cap = Z.target == ZT_WILD ? 0.12f : AI_CHASE;
+        if (rad > cap) rad = cap; if (rad < -cap) rad = -cap;
         ai_move(a, x + ux * rad - uz * tan, z + uz * rad + ux * tan);
         ai_face(a, ux * rad - uz * tan, uz * rad + ux * tan);   /* runs the way it goes (user); the head will track you */
         ai_mot(a, ai_go(a));
@@ -680,15 +688,35 @@ static const u8 en_head[5] = { 19, 4, 5, 4, 0xFF };     /* head bone: lizard, ch
 #define HT_EASE  0.18f
 #define HT_SIGN  1.0f                                   /* flip if the head turns away */
 #define HT_BONES 40
-struct { u32 magic; float phi, want; u32 turns; float ax, ay, az; } HT;   /* 'HTRK' (dump) */
+struct { u32 magic; float phi, want; u32 turns, scaled; } HT;   /* 'HTRK' (dump) */
 static float ht_m[HT_BONES][9];
 static u8 *en_skel;                                      /* the day's animal's skeleton instance (for zt_bone) */
 static void en_scale(u8 *a)
 {
     u8 *sk = *(u8 **)(a + 0x168);
     if ((u32)sk < 0x80000000u || (u32)sk >= 0x81800000u) { en_skel = 0; return; }
-    en_skel = sk;
-    *(float *)(sk + 0x1C) = EN_SCALE; *(float *)(sk + 0x20) = EN_SCALE; *(float *)(sk + 0x24) = EN_SCALE;
+    en_skel = sk;                                       /* battle7: the size is the root bone's scale (ht_bone); the skeleton
+                                                           instance scale (+0x1C..) only took on the chihuahua */
+}
+static void ag_frame(u8 *g, u8 *a)
+{
+    float *p = SLOT_POS(g, 0), x = *(float *)(a + 0x4C), z = *(float *)(a + 0x54), dx = p[0] - x, dz = p[2] - z;
+    float hx = AG.hx - x, hz = AG.hz - z;
+    AG.magic = 0x4147524Fu;
+    if (AG.who != a) { AG.who = a; AG.hx = x; AG.hz = z; AG.on = 0; AG.homing = 0; hx = hz = 0; }   /* today's animal: home */
+    if (!en_alive()) { AG.on = 0; AG.homing = 0; return; }
+    if (Z.target == ZT_WILD) { if (!AG.on) { AG.on = 2; AG.starts++; } AG.homing = 0; return; }   /* 2: just started */
+    if (AG.on && (dx * dx + dz * dz > ZT_LEASH * ZT_LEASH || hx * hx + hz * hz > AG_HOME_MAX * AG_HOME_MAX)) {
+        AG.on = 0; AG.homing = 1;
+    }
+}
+static void ai_home(u8 *a)
+{
+    float x = *(float *)(a + 0x4C), z = *(float *)(a + 0x54), dx = AG.hx - x, dz = AG.hz - z, d2 = dx * dx + dz * dz, inv;
+    if (d2 < 1.0f) { AG.homing = 0; en_ctl = 0; ai_mot(a, MOT_IDLE); return; }   /* home: its own AI again */
+    inv = rsq(d2);
+    ai_move(a, x + dx * inv * AG_HOME_V, z + dz * inv * AG_HOME_V);
+    ai_face(a, dx, dz); ai_mot(a, ai_go(a));
 }
 static void ht_want(u8 *g, u8 *a)                        /* the head's target: the player, relative to the facing */
 {
@@ -704,11 +732,13 @@ static void en_frame(u8 *g)
     if (!a || !(in = wild_inst(a))) { en_ctl = 0; en_skel = 0; return; }
     en_scale(a);
     HT.magic = 0x4854524Bu; HT.phi += (HT.want - HT.phi) * HT_EASE; HT.want = 0.0f;   /* back to straight unless in battle */
-    if (en_alive() && Z.target == ZT_WILD) {                 /* in battle: our AI drives it */
-        if (en_ctl != a) { en_ctl = a; AI.st = AI_CIRCLE; AI.t = 0; AI.len = 90; AI.dir = 1; }
+    ag_frame(g, a);
+    if (en_alive() && AG.on) {                                /* in battle: our AI drives it */
+        if (en_ctl != a || AG.on == 2) { en_ctl = a; AG.on = 1; AI.st = AI_CIRCLE; AI.t = 0; AI.len = 90; AI.dir = 1; }
         ai_frame(g, a);
         ht_want(g, a);
-    } else if (en_alive()) en_ctl = 0;                       /* lock let go: back to its own wandering */
+    } else if (en_alive() && AG.homing) { en_ctl = a; ai_home(a); }   /* de-aggro: walk back home */
+    else if (en_alive()) en_ctl = 0;                         /* its own wandering */
     else en_ctl = a;                                         /* dying / gone: keep it still */
     if (en_alive()) {
         if (en_hid == in && EN.flash == 0) { in[0x3C] = 1; en_colour(in, 0, 255, 255, 255, 255); en_hid = 0; }   /* a live animal:
@@ -791,33 +821,50 @@ static void swing_frame(s32 bpress, s32 free)
     swing_sounds(c->frame, c->frame + 1.0f);
     c->frame += 1.0f;
 }
-static void ht_bone(s32 n, u8 *trs)
+static s32 ht_bone(s32 n, u8 *trs, s32 r)                /* r: anim_eval's result (0: the pose build uses the rest matrix) */
 {
     u8 *act = *(u8 **)en_skel, *node, *par, *a = wild_obj();
-    float *m = ht_m[n], *pm = 0, L[9], *q = (float *)(trs + 0x10);
+    float *m = ht_m[n], *pm = 0, L[9], *q = (float *)(trs + 0x10), *t = (float *)(trs + 0x20), *rm;
     s32 i, cnt, sp = a ? *(s32 *)(a + 0x128) - 0x2C : -1;
-    if ((u32)act < 0x80000000u || (u32)act >= 0x81800000u || n < 0 || n >= HT_BONES) return;
-    cnt = *(s32 *)(act + 4); if (n >= cnt) return;
-    node = *(u8 **)(act + 0xC) + n * 0x1C; par = *(u8 **)(node + 0xC);
+    if ((u32)act < 0x80000000u || (u32)act >= 0x81800000u || n < 0 || n >= HT_BONES) return r;
+    cnt = *(s32 *)(act + 4); if (n >= cnt) return r;
+    node = *(u8 **)(act + 0xC) + n * 0x1C; par = *(u8 **)(node + 0xC); rm = *(float **)node;
+    if ((u32)rm < 0x80000000u || (u32)rm >= 0x81800000u) return r;
     if (par) { i = (s32)(par - *(u8 **)(act + 0xC)) / 0x1C; if (i >= 0 && i < n) pm = ht_m[i]; }
-    if (trs[0] & 4) {                                   /* pose rotation -> matrix (column vectors) */
+    if (n == 0 && !r) {                                 /* root without a track: its rest pose as a record, so it can scale */
+        float tr = rm[0] + rm[5] + rm[10], k;           /* rotation matrix -> quaternion */
+        if (tr > -0.99f) { k = 0.5f * rsq(1.0f + tr); q[3] = 0.25f / k; q[0] = (rm[9] - rm[6]) * k; q[1] = (rm[2] - rm[8]) * k; q[2] = (rm[4] - rm[1]) * k; }
+        else if (rm[0] >= rm[5] && rm[0] >= rm[10]) { k = 0.5f * rsq(1.0f + rm[0] - rm[5] - rm[10]); q[0] = 0.25f / k; q[1] = (rm[1] + rm[4]) * k; q[2] = (rm[2] + rm[8]) * k; q[3] = (rm[9] - rm[6]) * k; }
+        else if (rm[5] >= rm[10]) { k = 0.5f * rsq(1.0f + rm[5] - rm[0] - rm[10]); q[1] = 0.25f / k; q[0] = (rm[1] + rm[4]) * k; q[2] = (rm[6] + rm[9]) * k; q[3] = (rm[2] - rm[8]) * k; }
+        else { k = 0.5f * rsq(1.0f + rm[10] - rm[0] - rm[5]); q[2] = 0.25f / k; q[0] = (rm[2] + rm[8]) * k; q[1] = (rm[6] + rm[9]) * k; q[3] = (rm[4] - rm[1]) * k; }
+        t[0] = rm[3]; t[1] = rm[7]; t[2] = rm[11]; trs[0] = 4 | 8; r = 1;
+    }
+    if (r && (trs[0] & 4)) {                            /* pose rotation -> matrix (column vectors) */
         float x = q[0], y = q[1], z = q[2], w = q[3];
         L[0] = 1 - 2 * (y * y + z * z); L[1] = 2 * (x * y - z * w); L[2] = 2 * (x * z + y * w);
         L[3] = 2 * (x * y + z * w); L[4] = 1 - 2 * (x * x + z * z); L[5] = 2 * (y * z - x * w);
         L[6] = 2 * (x * z - y * w); L[7] = 2 * (y * z + x * w); L[8] = 1 - 2 * (x * x + y * y);
-    } else {                                            /* rest: the 3x4's rotation part */
-        float *r = *(float **)node;
-        if ((u32)r < 0x80000000u || (u32)r >= 0x81800000u) return;
-        for (i = 0; i < 3; i++) { L[i * 3] = r[i * 4]; L[i * 3 + 1] = r[i * 4 + 1]; L[i * 3 + 2] = r[i * 4 + 2]; }
+    } else if (r) {                                     /* a record without rotation: identity (func_801A20B4) */
+        for (i = 0; i < 9; i++) L[i] = (i % 4) ? 0.0f : 1.0f;
+    } else {                                            /* no record: the rest matrix's rotation part */
+        for (i = 0; i < 3; i++) { L[i * 3] = rm[i * 4]; L[i * 3 + 1] = rm[i * 4 + 1]; L[i * 3 + 2] = rm[i * 4 + 2]; }
     }
-    if (pm) { for (i = 0; i < 9; i++) { s32 r = i / 3, c = i % 3; m[i] = pm[r * 3] * L[c] + pm[r * 3 + 1] * L[3 + c] + pm[r * 3 + 2] * L[6 + c]; } }
+    if (pm) { for (i = 0; i < 9; i++) { s32 rr = i / 3, c = i % 3; m[i] = pm[rr * 3] * L[c] + pm[rr * 3 + 1] * L[3 + c] + pm[rr * 3 + 2] * L[6 + c]; } }
     else for (i = 0; i < 9; i++) m[i] = L[i];
-    if (sp < 0 || sp >= 5 || n != en_head[sp] || !pm || !(trs[0] & 4)) return;
-    if (HT.phi > -0.01f && HT.phi < 0.01f) return;
+    if (n == 0 && r) {                                  /* user: every animal 2x. Scale (flag 1, +4) the root; its translation
+                                                           doubles too, so the model grows about the object's origin (feet) */
+        float *sc = (float *)(trs + 4);
+        if (trs[0] & 1) { sc[0] *= EN_SCALE; sc[1] *= EN_SCALE; sc[2] *= EN_SCALE; }
+        else { sc[0] = EN_SCALE; sc[1] = EN_SCALE; sc[2] = EN_SCALE; trs[0] |= 1; }
+        if (trs[0] & 8) { t[0] *= EN_SCALE; t[1] *= EN_SCALE; t[2] *= EN_SCALE; }
+        HT.scaled++;
+    }
+    if (sp < 0 || sp >= 5 || n != en_head[sp] || !pm || !r || !(trs[0] & 4)) return r;
+    if (HT.phi > -0.01f && HT.phi < 0.01f) return r;
     {   /* model up (0,1,0) in the parent's frame = row 1 of its model rotation */
         float ax = pm[3], ay = pm[4], az = pm[5], l = ax * ax + ay * ay + az * az, h, sh, ch;
         float bx = q[0], by = q[1], bz = q[2], bw = q[3];
-        if (l < 0.0001f) return;
+        if (l < 0.0001f) return r;
         l = rsq(l); ax *= l; ay *= l; az *= l;
         h = 0.5f * HT_SIGN * HT.phi; sh = zsin(h); ch = zsin(h + 1.57079637f);
         ax *= sh; ay *= sh; az *= sh;                   /* q' = axis(phi) * q */
@@ -825,13 +872,14 @@ static void ht_bone(s32 n, u8 *trs)
         q[1] = ch * by - ax * bz + ay * bw + az * bx;
         q[2] = ch * bz + ax * by - ay * bx + az * bw;
         q[3] = ch * bw - ax * bx - ay * by - az * bz;
-        HT.ax = pm[3] * l; HT.ay = pm[4] * l; HT.az = pm[5] * l; HT.turns++;
+        HT.turns++;
     }
+    return r;
 }
 s32 zt_bone(u8 *ctl, s32 n, u8 *trs, u8 *inst)
 {
     s32 r = anim_eval(ctl, n, trs);
-    if (inst && en_skel && (inst == en_skel || inst == *(u8 **)(en_skel + 0x14))) ht_bone(n, trs);
+    if (inst && en_skel && (inst == en_skel || inst == *(u8 **)(en_skel + 0x14))) r = ht_bone(n, trs, r);
     if (r && SW.w > 0.0f && n >= 18 && sw_slot && inst == *(u8 **)(sw_slot + 0x14)) {
         anim_blend((u8 *)&SWC[SW.cur], n, trs, SW.w); sw_dbg.bones++;   /* the clips own the whole spine: full weight */
     }

@@ -3512,3 +3512,22 @@ so, door fades are timed there, possibly per frame. Not traced yet.
   pre-multiplies the head's q by a rotation about the model's up axis in the parent frame (row 1 of the
   parent's model rotation) by HT.phi = angle from facing to player, clamped 1.2 rad, eased 0.18/frame;
   'HTRK' debug block. HT_SIGN flips the direction if wrong. pm test faa85e15, normal c65e4e48.
+- battle6 results (user): heads track correctly on all animals; only the chihuahua was 2x (skeleton instance
+  scale +0x1C.. is not used for the others). func_801A20B4 (pose record -> matrix): flag 0x10 = full 3x4 at +4
+  (returns early), 4 = quaternion (PSMTXQuat), 2 = euler, then 1 = scale +4/+8/+0xC multiplies the columns,
+  8 = translation +0x20 (no flag 8: translation 0, not the rest one). anim_eval returning 0 -> the pose build
+  copies the rest matrix (func_801B7D38). battle7: the root bone gets scale 2 (and its translation x2, so the
+  model grows about the object origin); a root without a record is rebuilt from its rest matrix (matrix ->
+  quaternion, checked offline). ht_m now uses identity for a record without rotation (rest only without a record).
+- battle7 aggro: AG ('AGRO') {on, homing, starts, home x/z, animal}: lock-on sets it; lock-off keeps it; more
+  than ZT_LEASH from the player, or AG_HOME_MAX 25 from home while unlocked, ends it -> walks home at 0.07/frame
+  (home = where today's animal was first seen on the valley map), then its own AI. While unlocked it closes in at
+  0.07 instead of 0.12 so the player can outrun it. Battle music starts / stops with AG.on.
+- Crash report (dump 2edfd79b, leaving the house after sleeping; invalid read 0x14 at 0x801A40B4): GEOCreateHandle
+  (func_801A3C24 -> 801A3CF0 -> 801A4078) on a .gpl whose +0x10 is still the file offset 0x14, i.e. a model not yet
+  relocated (the only such in pool B: commonall's jimen-reservoir-1.gpl; koro1-3 in the chapter archive). Pool
+  guard: overlaps 2, last = image.mapobj_s*b*.tpl (1,247,200 B, the valley's map-object textures, loaded into pool A
+  above the chapter archive when going outside) over 4 Text.cpp blocks (608/32/448/32 B at 0x8095BEA0..0x8097DA20)
+  that only pool B's own records reference (leaked, so harmless). Not traced to our code; watch for repeats.
+  Invariant correction: outdoors, pool A also holds this 1.2 MB tpl above the chapter archive.
+  pm battle7: test da5f3974, normal c88dc283.
