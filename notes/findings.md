@@ -3459,3 +3459,6 @@ so, door fades are timed there, possibly per frame. Not traced yet.
   3 stopped: the update only advances the clip while < 3); its own AI sets it with each motion. Motion family
   (obj+0xD4) = species - 0x2C; lizard table lbl_8029C844: motion n = clip n (0-5, 9-11 loop, 6-8 once); tanuki
   lbl_8029CA54: 0-3, 7, 8 loop, 4-6 once. battle3: ai_mot sets +0xD8 and +0xE0 = 0.
+- battle3 (user, turtle): no walk cycle. Turtle family 3 (func_8002B358, lbl_8029D324): motions 0-3 = clips 0-3, motion 4
+  = clip 4/5/6/7 by +0x124 / +0x125, 8-10 once; its clip 2 is not a gait. battle3b: moving clip per species
+  (ai_go): walk (1) for turtle / owl, run (2) for lizard / mouse / tanuki.

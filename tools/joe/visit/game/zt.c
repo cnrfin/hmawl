@@ -615,6 +615,12 @@ static void ai_face(u8 *a, float dx, float dz)
     if (r < 0.0001f) return;
     r = rsq(r); *(float *)(a + 0xF0) = dx * r; *(float *)(a + 0xF8) = dz * r;
 }
+static s32 ai_go(u8 *a)                                  /* the moving clip: run, but the turtle / owl walk (turtle clip 2
+                                                             is not a gait: user saw no walk cycle) */
+{
+    s32 sp = *(s32 *)(a + 0x128);
+    return sp == 0x2F || sp == 0x30 ? MOT_WALK : MOT_RUN;
+}
 static void ai_mot(u8 *a, s32 m)                        /* motion request + play state 0 (looping): its own AI sets that */
 {                                                         /* with each motion; left at 3 (stopped) the clip froze: sliding */
     *(s32 *)(a + 0xD8) = m; *(s32 *)(a + 0xE0) = 0;
@@ -632,7 +638,7 @@ static void ai_frame(u8 *g, u8 *a)
         float rad = (d - AI_R) * 0.08f, tan = AI_TAN * (float)AI.dir;
         if (rad > 0.12f) rad = 0.12f; if (rad < -0.12f) rad = -0.12f;
         ai_move(a, x + ux * rad - uz * tan, z + uz * rad + ux * tan);
-        ai_face(a, dx, dz); ai_mot(a, MOT_RUN);
+        ai_face(a, dx, dz); ai_mot(a, ai_go(a));
         if (AI.t >= AI.len) { AI.st = AI_WINDUP; AI.t = 0; }
         break; }
     case AI_WINDUP:
@@ -642,7 +648,7 @@ static void ai_frame(u8 *g, u8 *a)
         break;
     case AI_LUNGE:
         if (d > 0.7f) ai_move(a, x + AI.lx * AI_LSPEED, z + AI.lz * AI_LSPEED);   /* stops at the player */
-        ai_face(a, AI.lx, AI.lz); ai_mot(a, MOT_RUN);
+        ai_face(a, AI.lx, AI.lz); ai_mot(a, ai_go(a));
         if (AI.t >= AI_LUNGE_T) {
             if (ai_rand(100) < AI_AGAIN && AI.len != -1) { AI.st = AI_WINDUP; AI.t = AI_WIND - 6; AI.len = -1; }   /* again! */
             else { AI.st = AI_RECOVER; AI.t = 0; AI.len = AI_REC; }
