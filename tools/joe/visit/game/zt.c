@@ -407,6 +407,8 @@ void zt_frame(u8 *g, s32 map, volatile u32 *held, volatile u32 *press)
            3 drops the owl (0x30). A day already rolled owl is re-rolled (takes effect when the valley next loads). */
         u8 *tm = *(u8 **)0x80349194;
         *(s32 *)0x803469D0 = 3; *(s32 *)0x803469D8 = 3;
+        *(u8 *)0x8024F6AC = 0;   /* battle19 (user): no '?' on the A button - action 0x18 (item description, moved to R) had label
+                                    0x01 in func_80083378's action->label table lbl_8024F638+0x5C (only 0x18 maps to 0x01) */
         if ((u32)tm >= 0x80000000u && (u32)tm < 0x81800000u && *(s32 *)(tm + 0x3F8) == 0x30) *(s32 *)(tm + 0x3F8) = 0x2C + (s32)(F(0x8017D3E8, u32, (void))() % 4u);
     }
     stance_frame(g, map);

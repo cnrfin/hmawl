@@ -3625,3 +3625,6 @@ so, door fades are timed there, possibly per frame. Not traced yet.
   dropping > 1.5 x step + 0.4, or without ground (NaN / |y| > 5000) (EN.blocked counts). Circling reverses at a wall,
   a blocked lunge / retreat ends. The tanuki's poof (ai_jump) needs ground within +0.8 / -1.5 of the player's height
   behind him, else in front, else it reappears where it was.
+- battle19: the '?' on the A button removed (user; the item description is on R). func_80083378 (every HUD button label
+  caller) maps action -> label through lbl_8024F638+0x5C; action 0x18 (description) is the only one -> label 0x01; that
+  byte (0x8024F6AC) is zeroed each frame (zt_frame). A's case 24 already did nothing (R patch).
