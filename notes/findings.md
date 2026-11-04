@@ -3573,3 +3573,25 @@ so, door fades are timed there, possibly per frame. Not traced yet.
   (gpl: header pointers file-relative, model block pointers relative to +0x1C; skn / tpl pointers file-relative;
   turtle display lists use 7-byte vertices: pos, normal, colour u8, uv), bind positions from the skin sources, the
   pose code ported 1:1. Not in the repo (disc data). pm battle12: test 4048d90e, normal 063b3e56.
+
+### 7.49 Mini bosses (battle13, user design)
+- HP per species (AIP): lizard 1000, chihuahua 300, tanuki 500, turtle 3000, owl 500; set on the first frame the day's
+  animal is seen (EN.maxhp). Enrage below half HP: speed x1.3, wind-up / recover x0.7, circling x0.6, bar turns red.
+- Patterns: chihuahua zig-zags (direction flips every 12-30 frames), chains up to 3 darts (70 %), skitters away after
+  70 % of hits (AI_RETREAT); tanuki 25 % poof (AI_POOF: puff, hidden 8 frames, reappears 2.2 behind the player's
+  facing with a puff, short wind-up, lunge), 25 % feint (the jump goes backwards); lizard circles closer (2.8), chains
+  2 leaps (50 %), tail whip (one fast turn) when the player is within 2.2; turtle chains up to 3 spins (60 %), shell
+  armour while tucked in (wind-up past 5 frames, spin, first 6 recovery frames): 1/4 damage, no flinch / knockback,
+  SE 246; dizzy recovery 40 frames at full damage; bites (40 %) from within 4 units. Spin 1.1 rad / frame (2x).
+- Enemy HP bar: the reticle's two bottom horizontal arms become one bar along the box's bottom edge (RET_BAR 7 px,
+  dark back + yellow fill, red when enraged), only while locked onto the day's animal. No opguide.agc change (element
+  7 stays 37 quads: growing it was a suspect in the e996fcfb crash).
+- Collision at 2x: the animal's own collider is unchanged; en_push moves the player (pm_player +0x4C, and +0xFC if it
+  holds the same position) out to the species radius (lizard 1.0, chihuahua 0.55, tanuki 0.65, turtle 1.3).
+- Particles (helper research on main.dol): func_800DD3BC(effect mgr *0x80349234, id, pos*, dir*, pos copy*, dir copy*,
+  f1) - the copy pair is taken at once; ids 0..0x1D = common.ptl entries (table 0x80251270). Walking dust = 4 (footstep
+  handler func_8014BEDC, 0x8014BF3C; only on map 1, ground attribute & 0x2B, not in rain / snow); 15 = the vanish
+  puff objects spawn on message 0x1C (0x800987C0); 0 hoe, 1/2/27 watering, 3 seeds, 14/29 hungry / yawn, 16 discover,
+  28 washing, 0x18 lure splash. Footstep SE 291-297 by ground. No vanilla stone "clink": 246 kama_ng used for the shell,
+  247 kiyurasi for the poof (unverified names). Event cmd_75(char, fx, f) spawns an effect on a character.
+- Arena start 0x8037C000 -> 0x80384000 (+32 KB code room; pools -32 KB). pm battle13: test 584a7aa4, normal 20fdda56.
