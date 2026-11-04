@@ -391,6 +391,13 @@ void zt_frame(u8 *g, s32 map, volatile u32 *held, volatile u32 *press)
 #ifdef NO_ZT
     (void)g; (void)map; (void)held; (void)press; return;   /* test build: Z targeting, reticle and combos off */
 #endif
+    {   /* battle16: no owl for now (user; it comes back later as the 1-5 am alien). The day's species is rolled as
+           0x2C + rand() % (count + 1) with counts lbl_803469D0 / lbl_803469D8 (= 4: lizard, mouse, tanuki, turtle, owl);
+           3 drops the owl (0x30). A day already rolled owl is re-rolled (takes effect when the valley next loads). */
+        u8 *tm = *(u8 **)0x80349194;
+        *(s32 *)0x803469D0 = 3; *(s32 *)0x803469D8 = 3;
+        if ((u32)tm >= 0x80000000u && (u32)tm < 0x81800000u && *(s32 *)(tm + 0x3F8) == 0x30) *(s32 *)(tm + 0x3F8) = 0x2C + (s32)(F(0x8017D3E8, u32, (void))() % 4u);
+    }
     if (map == 1) en_frame(g); else { en_ctl = 0; AG.who = 0; AG.on = 0; AG.homing = 0; }                                /* the day's wild animal as an enemy (HP / flash / defeat) */
     bm_frame(g, map);                                        /* battle music */
     u8 *f = FADER;

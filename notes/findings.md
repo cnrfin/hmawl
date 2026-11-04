@@ -3602,3 +3602,6 @@ so, door fades are timed there, possibly per frame. Not traced yet.
 - battle15: lock-off ended fights again (user). Cause: battle7's own extra rule (de-aggro when unlocked and > 25 from the
   animal's home); battle13's travelling fights (chains, spins, poof) put it past 25 at once. Removed: only the player
   distance (ZT_LEASH) ends a fight. pm test / normal: see the commit's pm.bin.
+- battle16: owl removed for now (user; later a 1-5 am alien enemy). The species counts lbl_803469D0 / lbl_803469D8 (read
+  only by the two rolls, 0x800132B0 / 0x80013B6C) are set to 3 every frame (zt_frame) -> 0x2C..0x2F; a day already
+  rolled 0x30 is re-rolled (applies at the next valley load).
