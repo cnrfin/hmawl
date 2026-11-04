@@ -3631,3 +3631,24 @@ so, door fades are timed there, possibly per frame. Not traced yet.
 - battle20: battle19's byte made action 0x18 show label 0 = the pulsing yellow "nothing here" marker (user screenshot).
   None of the 38 label pictures (opguide.agc group 1, one quad each, texture 0) is blank, so the table is left alone and
   label 1's quad (agc +0x728: box -12..12, colours +0x734..+0x743) gets alpha 0 each frame (checked geometry first).
+
+### 7.50 Player damage, collapse, recovery (battle21; helper research on main.dol + dumps)
+- Vanilla: stamina floor (ctrl+0xC) = 1, fullness floor (+0x1C) = 100 (func_8004B26C); no collapse at 0. func_800326B4
+  (from the free / walk updates) checks: awake limit (+0x12C) -> state 0x21 pass-out (motion 0x12, then 0x22 fades and
+  requests scene 0x1D, returns to the previous scene; wake event via func_8010A9C0(EVMGR, 6, 1, 0)); sleepy -> 0x1B
+  yawn; stamina <= 10 % -> 0x25 "exhausted" kneel (motion 0x14, loop SE 0xFD, refill func_8004BD54, leaves at >= 30 %);
+  <= 20 % / <= 40 % tired motions 0x15 / 0x16; fullness <= 10 % starving (motion 0x17, condition +0x20 -9999 / 60 s),
+  <= 20 % hungry 0x18. One-shot motion state 0x1B: player +0x1498 {motion, loop, face} then func_80031D7C(player, 0x1B)
+  (back to 0 by itself). No hurt / knockdown state exists.
+- Idle refill func_8004C7E8 (from func_80032074, motion id < 0x40): += [+0x150 motion rate] * 200 * (condition term +
+  fullness term 20..100 (func_8004CC84)) / (awake divisor * 20000). Fullness drain func_8004C87C (0x800313B8): -=
+  (500 - 400 * stamina / 100000) / 5 per frame (faster when tired); eating func_8004BF3C (state 0x26).
+- Farmhouse = map 3 (scene 6); usual spot (-1.0, 0, -5.2) facing +Z (dumps a0b0b492 / 102e6cca).
+- battle21: enemy attacks land once each (lunge contact = body radius + 0.6, turtle spin 1.7, bite strike frames 2.0, whip
+  2.4); damage (tentative) lizard 14000, chihuahua 6000, tanuki 9000, turtle spin 15000, bite 20000, whip 12000, x1.25
+  enraged; SE 443 (hurt voice), the 'tired' motion 0x16 as a flinch, 8-frame terrain-checked slide, 14 frames input locked
+  (Z kept), 60 frames invulnerable ('PDMG'). At the floor: collapse ('CLPS'): lock / aggro / music off, motion 0x12 (fall
+  asleep) via 0x1B, input locked, fade out 0.8 s at 75 frames, 55 frames later HP = max / 2, position entry 0 = the
+  house spot, func_8017775C(g_system, 6, 3, 0); fade-in fallback once map 3 is up with the fader idle on black.
+  Recovery bands (food_frame): small per-frame stamina rises x1 / 0.8 / 0.6 / 0.45 / 0.3 / 0 for fullness >= 90 / 80 /
+  70 / 60 / > 50 / <= 50 %, not in state 0x25. pm test d160eb72, normal 5c3706d1.

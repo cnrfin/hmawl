@@ -398,6 +398,8 @@ static void bm_frame(u8 *g, s32 map)
 }
 static void stance_frame(u8 *g, s32 map);
 static void hurt_frame(volatile u32 *held, volatile u32 *press);
+static void collapse_frame(u8 *g, s32 map, volatile u32 *held, volatile u32 *press);
+static void food_frame(u8 *g);
 extern u8 *pm_player;
 void zt_frame(u8 *g, s32 map, volatile u32 *held, volatile u32 *press)
 {
@@ -422,6 +424,8 @@ void zt_frame(u8 *g, s32 map, volatile u32 *held, volatile u32 *press)
     }
     stance_frame(g, map);
     hurt_frame(held, press);                              /* battle21: enemy hits on the player */
+    collapse_frame(g, map, held, press);
+    food_frame(g);
     if (map == 1) en_frame(g); else { en_ctl = 0; AG.who = 0; AG.on = 0; AG.homing = 0; }                                /* the day's wild animal as an enemy (HP / flash / defeat) */
     bm_frame(g, map);                                        /* battle music */
     u8 *f = FADER;
@@ -734,6 +738,7 @@ static const s32 EN_DMG[5] = { 14000, 6000, 9000, 15000, 8000 };   /* lizard, ch
 #define DMG_WHIP  12000
 struct { u32 magic; s32 hits, last, inv, slide, stun, taken, collapses; float kx, kz; } PD;   /* 'PDMG' (dump) */
 static void collapse_start(u8 *g);
+static void pl_motion(u8 *pl, s32 m, s32 face);
 static void player_hurt(u8 *g, s32 dmg, float ux, float uz)
 {
     s32 *st = (s32 *)(g + 0x11B84);
@@ -743,7 +748,9 @@ static void player_hurt(u8 *g, s32 dmg, float ux, float uz)
     *st -= dmg;
     PD.inv = 60; PD.slide = 8; PD.stun = 14; PD.kx = ux * 0.16f; PD.kz = uz * 0.16f;
     sfx_play(*(u8 **)0x803491E4, SE_HURT, 0);
-    if (*st <= *(s32 *)(g + 0x11B8C)) { *st = *(s32 *)(g + 0x11B8C); collapse_start(g); }
+    if (*st <= *(s32 *)(g + 0x11B8C)) { *st = *(s32 *)(g + 0x11B8C); collapse_start(g); return; }
+    if ((u32)pm_player >= 0x80000000u && (u32)pm_player < 0x81800000u && *(s32 *)(pm_player + PL_STATE) == 1)
+        pl_motion(pm_player, 0x16, 0x26);                  /* a hurt reaction: the 'tired' flinch (no hurt motion exists) */
 }
 static void ai_strike(u8 *g, s32 sp, float d, float ux, float uz)
 {
@@ -773,9 +780,66 @@ static void hurt_frame(volatile u32 *held, volatile u32 *press)
         } else PD.slide = 0;
     }
 }
-static void collapse_start(u8 *g)                         /* stamina gone: filled from the collapse research */
+/* Collapse (battle21, user design; vanilla has none: stamina floors at 1 and only staying up too late passes out, research
+   notes 7.50). Ours: the fight ends (lock, aggro, music), the fall-asleep motion through the one-shot motion state 0x1B
+   (player +0x1498 {motion 0x12, loop 0, face 0x26}, func_80031D7C), input locked; fade out; HP to half; into the farmhouse
+   (map 3, func_8017775C(g_system, 6, 3, 0); position entry 0 = its usual spot (-1.0, 0, -5.2) facing +Z, from the user's
+   dumps); fade in if the house scene did not. */
+#define set_state  F(0x80031D7C, void, (u8 *, s32))
+#define scene_map  F(0x8017775C, void, (u8 *, s32, s32, s32))
+#define fade_to    F(0x80189128, void, (u8 *, u32 *, u32 *, s32, s32, float))
+#define FADER_     (*(u8 **)0x803491B8)
+struct { u32 magic; s32 st, t; } CL;                      /* 'CLPS': 0 idle, 1 collapsing, 2 fading, 3 warped */
+static void pl_motion(u8 *pl, s32 m, s32 face)           /* a one-shot motion, then back to free (state 0x1B) */
 {
-    (void)g; PD.collapses++;
+    *(s32 *)(pl + 0x1498) = m; *(s32 *)(pl + 0x149C) = 0; *(s32 *)(pl + 0x14A0) = face;
+    set_state(pl, 0x1B);
+}
+static void collapse_start(u8 *g)
+{
+    u8 *pl = pm_player;
+    (void)g;
+    if (CL.st) return;
+    CL.magic = 0x434C5053u; CL.st = 1; CL.t = 0; PD.collapses++;
+    let_go_why(10); AG.on = 0; AG.homing = 1; bm_off(0);
+    if ((u32)pl >= 0x80000000u && (u32)pl < 0x81800000u) pl_motion(pl, 0x12, 0x26);
+}
+static void collapse_frame(u8 *g, s32 map, volatile u32 *held, volatile u32 *press)
+{
+    u8 *fd = FADER_, *gs = *(u8 **)0x80349208;
+    if (!CL.st) return;
+    CL.t++;
+    if (CL.st < 3) { *press = 0; *held = 0; }
+    if (CL.st == 1 && CL.t >= 75) {                       /* lying down: fade to black */
+        u32 from = 0x00000000, to = 0x000000FF;
+        if ((u32)fd >= 0x80000000u && (u32)fd < 0x81800000u) fade_to(fd, &from, &to, 0, 0, 0.8f);
+        CL.st = 2; CL.t = 0;
+    } else if (CL.st == 2 && CL.t >= 55) {                /* black: half HP, into the house */
+        float *p = SLOT_POS(g, 0), *dr = (float *)(g + 0x29F84);
+        *(s32 *)(g + 0x11B84) = *(s32 *)(g + 0x11B88) / 2;
+        p[0] = -1.0f; p[1] = 0.0f; p[2] = -5.2f; dr[0] = 0.0f; dr[1] = 0.0f; dr[2] = 1.0f;
+        if ((u32)gs >= 0x80000000u && (u32)gs < 0x81800000u) scene_map(gs, 6, 3, 0);
+        CL.st = 3; CL.t = 0;
+    } else if (CL.st == 3 && CL.t > 60) {                 /* in the house: make sure the screen comes back */
+        if (map == 3 && (u32)fd >= 0x80000000u && (u32)fd < 0x81800000u && *(u8 *)(fd + 0x60) != 1) {
+            if (*(u8 *)(fd + 0x53) == 0xFF) { u32 from = 0x000000FF, to = 0x00000000; fade_to(fd, &from, &to, 0, 0, 0.6f); }
+            CL.st = 0;
+        } else if (CL.t > 900) CL.st = 0;                 /* give up after 15 s */
+    }
+}
+/* Recovery by fullness (user): idle refill (func_8004C7E8, already scaled by fullness 20-100 %) is stepped down further:
+   90-100 % full x1, 80-90 x0.8, 70-80 x0.6, 60-70 x0.45, 50-60 x0.3, 50 % or under none. Applied to small per-frame rises
+   only (bed, bench, eating are bigger), never in the exhausted kneel (state 0x25 must refill to 30 % to end). */
+static void food_frame(u8 *g)
+{
+    static s32 last = -1;
+    s32 cur = *(s32 *)(g + 0x11B84), full = *(s32 *)(g + 0x11B94) / 13500, d = cur - last;
+    u8 *pl = pm_player;
+    s32 k = full >= 90 ? 100 : full >= 80 ? 80 : full >= 70 ? 60 : full >= 60 ? 45 : full > 50 ? 30 : 0;
+    if (last >= 0 && d > 0 && d < 3000 && k < 100 && !((u32)pl >= 0x80000000u && (u32)pl < 0x81800000u && *(s32 *)(pl + PL_STATE) == 0x25)) {
+        cur = last + d * k / 100; *(s32 *)(g + 0x11B84) = cur;
+    }
+    last = cur;
 }
 static s32 en_rage(void) { return EN.maxhp > 0 && EN.hp * 2 < EN.maxhp; }   /* below half HP: enraged */
 static s32 ai_k(s32 n, float k) { s32 v = (s32)((float)n * k); return v < 1 ? 1 : v; }
