@@ -670,7 +670,18 @@ static void ai_frame(u8 *g, u8 *a)
 }
 #define EN_SCALE 2.0f                                   /* user: all wild animals 2x (skeleton instance scale +0x1C..+0x24) */
 static const u8 en_head[5] = { 19, 4, 5, 4, 0xFF };     /* head bone: lizard, chihuahua, tanuki, turtle, owl (none) */
-struct { u32 magic, n, bone, inst; u8 trs[96]; u8 trs0[96]; } HEADDBG;   /* 'HEAD': the head bone's pose data (layout probe) */
+/* Head tracking (battle6). The pose record func_801A01F8 fills is the .act transform layout (0x34): u8 flags at
+   +0 (1 scale +4, 4 rotation quaternion xyzw +0x10, 8 translation +0x20); the rotation replaces the rest one
+   (user dump 041fd6dd: chihuahua head = rest + its own motion). zt_bone builds each bone's model-space rotation
+   (pose quaternion, else the rest matrix from the relocated .act: skeleton +0 -> +4 count, +0xC nodes 0x1C
+   [xform 3x4, prev, next, parent, ...]) and turns the head about the model's up axis, written in its parent's
+   frame, by HT.phi: the angle from the body's facing to the player, clamped and eased. */
+#define HT_MAX   1.2f                                   /* about 70 degrees either way */
+#define HT_EASE  0.18f
+#define HT_SIGN  1.0f                                   /* flip if the head turns away */
+#define HT_BONES 40
+struct { u32 magic; float phi, want; u32 turns; float ax, ay, az; } HT;   /* 'HTRK' (dump) */
+static float ht_m[HT_BONES][9];
 static u8 *en_skel;                                      /* the day's animal's skeleton instance (for zt_bone) */
 static void en_scale(u8 *a)
 {
@@ -679,14 +690,24 @@ static void en_scale(u8 *a)
     en_skel = sk;
     *(float *)(sk + 0x1C) = EN_SCALE; *(float *)(sk + 0x20) = EN_SCALE; *(float *)(sk + 0x24) = EN_SCALE;
 }
+static void ht_want(u8 *g, u8 *a)                        /* the head's target: the player, relative to the facing */
+{
+    float *p = SLOT_POS(g, 0), dx = p[0] - *(float *)(a + 0x4C), dz = p[2] - *(float *)(a + 0x54);
+    float fx = *(float *)(a + 0xF0), fz = *(float *)(a + 0xF8);
+    float w = zatan2(fz * dx - fx * dz, fx * dx + fz * dz);
+    if (w > HT_MAX) w = HT_MAX; if (w < -HT_MAX) w = -HT_MAX;
+    HT.want = w;
+}
 static void en_frame(u8 *g)
 {
     u8 *a = wild_obj(), *in;
     if (!a || !(in = wild_inst(a))) { en_ctl = 0; en_skel = 0; return; }
     en_scale(a);
+    HT.magic = 0x4854524Bu; HT.phi += (HT.want - HT.phi) * HT_EASE; HT.want = 0.0f;   /* back to straight unless in battle */
     if (en_alive() && Z.target == ZT_WILD) {                 /* in battle: our AI drives it */
         if (en_ctl != a) { en_ctl = a; AI.st = AI_CIRCLE; AI.t = 0; AI.len = 90; AI.dir = 1; }
         ai_frame(g, a);
+        ht_want(g, a);
     } else if (en_alive()) en_ctl = 0;                       /* lock let go: back to its own wandering */
     else en_ctl = a;                                         /* dying / gone: keep it still */
     if (en_alive()) {
@@ -770,17 +791,47 @@ static void swing_frame(s32 bpress, s32 free)
     swing_sounds(c->frame, c->frame + 1.0f);
     c->frame += 1.0f;
 }
+static void ht_bone(s32 n, u8 *trs)
+{
+    u8 *act = *(u8 **)en_skel, *node, *par, *a = wild_obj();
+    float *m = ht_m[n], *pm = 0, L[9], *q = (float *)(trs + 0x10);
+    s32 i, cnt, sp = a ? *(s32 *)(a + 0x128) - 0x2C : -1;
+    if ((u32)act < 0x80000000u || (u32)act >= 0x81800000u || n < 0 || n >= HT_BONES) return;
+    cnt = *(s32 *)(act + 4); if (n >= cnt) return;
+    node = *(u8 **)(act + 0xC) + n * 0x1C; par = *(u8 **)(node + 0xC);
+    if (par) { i = (s32)(par - *(u8 **)(act + 0xC)) / 0x1C; if (i >= 0 && i < n) pm = ht_m[i]; }
+    if (trs[0] & 4) {                                   /* pose rotation -> matrix (column vectors) */
+        float x = q[0], y = q[1], z = q[2], w = q[3];
+        L[0] = 1 - 2 * (y * y + z * z); L[1] = 2 * (x * y - z * w); L[2] = 2 * (x * z + y * w);
+        L[3] = 2 * (x * y + z * w); L[4] = 1 - 2 * (x * x + z * z); L[5] = 2 * (y * z - x * w);
+        L[6] = 2 * (x * z - y * w); L[7] = 2 * (y * z + x * w); L[8] = 1 - 2 * (x * x + y * y);
+    } else {                                            /* rest: the 3x4's rotation part */
+        float *r = *(float **)node;
+        if ((u32)r < 0x80000000u || (u32)r >= 0x81800000u) return;
+        for (i = 0; i < 3; i++) { L[i * 3] = r[i * 4]; L[i * 3 + 1] = r[i * 4 + 1]; L[i * 3 + 2] = r[i * 4 + 2]; }
+    }
+    if (pm) { for (i = 0; i < 9; i++) { s32 r = i / 3, c = i % 3; m[i] = pm[r * 3] * L[c] + pm[r * 3 + 1] * L[3 + c] + pm[r * 3 + 2] * L[6 + c]; } }
+    else for (i = 0; i < 9; i++) m[i] = L[i];
+    if (sp < 0 || sp >= 5 || n != en_head[sp] || !pm || !(trs[0] & 4)) return;
+    if (HT.phi > -0.01f && HT.phi < 0.01f) return;
+    {   /* model up (0,1,0) in the parent's frame = row 1 of its model rotation */
+        float ax = pm[3], ay = pm[4], az = pm[5], l = ax * ax + ay * ay + az * az, h, sh, ch;
+        float bx = q[0], by = q[1], bz = q[2], bw = q[3];
+        if (l < 0.0001f) return;
+        l = rsq(l); ax *= l; ay *= l; az *= l;
+        h = 0.5f * HT_SIGN * HT.phi; sh = zsin(h); ch = zsin(h + 1.57079637f);
+        ax *= sh; ay *= sh; az *= sh;                   /* q' = axis(phi) * q */
+        q[0] = ch * bx + ax * bw + ay * bz - az * by;
+        q[1] = ch * by - ax * bz + ay * bw + az * bx;
+        q[2] = ch * bz + ax * by - ay * bx + az * bw;
+        q[3] = ch * bw - ax * bx - ay * by - az * bz;
+        HT.ax = pm[3] * l; HT.ay = pm[4] * l; HT.az = pm[5] * l; HT.turns++;
+    }
+}
 s32 zt_bone(u8 *ctl, s32 n, u8 *trs, u8 *inst)
 {
     s32 r = anim_eval(ctl, n, trs);
-    if (inst && en_skel && (inst == en_skel || inst == *(u8 **)(en_skel + 0x14))) {                        /* layout probe: the animal's head bone (and bone 0) */
-        u8 *a = wild_obj(); s32 sp = a ? *(s32 *)(a + 0x128) - 0x2C : -1, k;
-        if (sp >= 0 && sp < 5 && (n == en_head[sp] || n == 0)) {
-            u8 *dst = n == 0 ? HEADDBG.trs0 : HEADDBG.trs;
-            for (k = 0; k < 96; k++) dst[k] = trs[k];
-            HEADDBG.magic = 0x48454144u; HEADDBG.n++; HEADDBG.bone = (u32)n; HEADDBG.inst = (u32)inst;
-        }
-    }
+    if (inst && en_skel && (inst == en_skel || inst == *(u8 **)(en_skel + 0x14))) ht_bone(n, trs);
     if (r && SW.w > 0.0f && n >= 18 && sw_slot && inst == *(u8 **)(sw_slot + 0x14)) {
         anim_blend((u8 *)&SWC[SW.cur], n, trs, SW.w); sw_dbg.bones++;   /* the clips own the whole spine: full weight */
     }

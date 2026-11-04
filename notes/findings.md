@@ -3501,3 +3501,14 @@ so, door fades are timed there, possibly per frame. Not traced yet.
   radius is not scaled; aim_h doubled. Probe: zt_bone copies 96 B of the evaluated TRS for the head bone and bone 0
   into HEADDBG ('HEAD') when inst is the animal's skeleton (or its +0x14 draw instance), to learn the layout
   before rotating the head toward the player. pm test f9e6a42e, normal 4ec96111.
+- battle6, head tracking (dump 041fd6dd, chihuahua circling; circling-direction facing confirmed by the user).
+  Pose record from func_801A01F8 = the .act transform layout, 0x34 bytes (func_8019FF8C's stack records are
+  0x34 apart; func_801A23A0 blends by flag): u8 flags +0 (1 scale +4, 4 quaternion xyzw +0x10 via func_801A24CC,
+  8 translation +0x20 via func_801A264C). Head (bone 4) flags 0x0C, q (0.10, -0.068, 0.007, 0.993), t (0, 0,
+  -0.030) = its rest translation; the quaternion replaces the rest rotation (rest-derived q ~ (0.099, -0.137,
+  0.014, 0.985)). In RAM the .act is relocated (magic -> FFFFFFFF, skeleton instance +0 -> act; +4 count, +0xC
+  node table; node +0 -> rest 3x4 row-major matrix, translation in column 4, +0xC parent node). Skeleton +0x18
+  = per-bone inverse-bind matrices (static). zt_bone builds each bone's model rotation (pose q, else rest) and
+  pre-multiplies the head's q by a rotation about the model's up axis in the parent frame (row 1 of the
+  parent's model rotation) by HT.phi = angle from facing to player, clamped 1.2 rad, eased 0.18/frame;
+  'HTRK' debug block. HT_SIGN flips the direction if wrong. pm test faa85e15, normal c65e4e48.
