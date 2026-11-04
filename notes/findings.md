@@ -3759,3 +3759,6 @@ so, door fades are timed there, possibly per frame. Not traced yet.
   event then took over. gold3: wait until the box is really seen open (mgr+0x48 != 0; 90-frame give-up), then until it
   is closed and the player left 0x2A; event_free() (level-up menu, stats view) also needs no box open.
   pm test b4391e56, normal 75728db0.
+- gold3 (user dump 402eb2e8): still skipped. The real cause: the text. Every message ends with code 30 (wait for A);
+  debug.mes 30 was "You found <n0> G!" with no 30, so the box closed as soon as the text was out (the stats view text
+  ends in 30 and stays). gold4: debug.mes 30 + 30 (8cf553f9); pm.bin stays gold3 (b4391e56), whose waits are kept.

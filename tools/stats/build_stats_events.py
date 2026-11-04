@@ -43,7 +43,7 @@ STATS = pad(body('Lvl ') + num(0) + body('    EXP ') + num(1) + body(' / ') + nu
             body('HP ') + num(3) + body('    Attack ') + num(4) + b'\x01' +
             body('Endurance ') + num(5) + body('    Luck ') + num(6) + b'\x30')
 
-GOLD = pad(body('You found ') + num(0) + body(' G!'))   # step 4: a defeated animal's gold (pm.bin opens it in the info box)
+GOLD = pad(body('You found ') + num(0) + body(' G!') + b'\x30')   # 30 = wait for A (gold1-3 lacked it: the box closed by itself); step 4: a defeated animal's gold (pm.bin opens it in the info box)
 ev = open(mes_in, 'rb').read(); ents = mes_entries(ev)
 assert mes_build(ents) == ev
 free = [i for i, e in enumerate(ents) if e == b'\0\0\0\0' and i < len(ents) - 1]
