@@ -397,6 +397,11 @@ static void bm_frame(u8 *g, s32 map)
     if (++BM.t >= 100) { stream_stop(au); BM.state = 0; }               /* faded out: stop the stream */
 }
 static void stance_frame(u8 *g, s32 map);
+void stats_frame(u8 *g, s32 map, volatile u32 *held, volatile u32 *press, s32 busy);
+static s32 zt_busy(void);
+void stats_ignore(s32 dmg);
+void stats_exp(s32 n);
+s32 stats_pwr(void);
 static void hurt_frame(volatile u32 *held, volatile u32 *press);
 static void collapse_frame(u8 *g, s32 map, volatile u32 *held, volatile u32 *press);
 static void food_frame(u8 *g);
@@ -426,6 +431,7 @@ void zt_frame(u8 *g, s32 map, volatile u32 *held, volatile u32 *press)
     hurt_frame(held, press);                              /* battle21: enemy hits on the player */
     collapse_frame(g, map, held, press);
     food_frame(g);
+    stats_frame(g, map, held, press, zt_busy());   /* step 2: EXP, levels, stats */
     if (map == 1) en_frame(g); else { en_ctl = 0; AG.who = 0; AG.on = 0; AG.homing = 0; }                                /* the day's wild animal as an enemy (HP / flash / defeat) */
     bm_frame(g, map);                                        /* battle music */
     u8 *f = FADER;
@@ -660,6 +666,7 @@ static void en_hit(s32 h, float dx, float dz)
     float d2 = dx * dx + dz * dz, k;
     if (!en_alive() || Z.target != ZT_WILD || AI.hidden) return;   /* nothing to hit while the tanuki is a puff of smoke */
     dmg = en_dmg[w]; if (h == 2) dmg = dmg * 3 / 2;
+    dmg = dmg * (100 + 5 * stats_pwr()) / 100;               /* step 2: Pwr +5 % per point */
     {   u8 *a = wild_obj();                                  /* the turtle tucked in its shell: 1/4 damage, a clink */
         EN.armour = a && en_ctl == a && *(s32 *)(a + 0x128) == 0x2F && AI.atk == ATK_LUNGE &&
                     (AI.st == AI_SHELL || (AI.st == AI_WINDUP && AI.t > 5) || AI.st == AI_LUNGE || (AI.st == AI_RECOVER && AI.t < 6));
@@ -674,6 +681,8 @@ static void en_hit(s32 h, float dx, float dz)
     if (EN.hp <= 0) {
         u8 *a = wild_obj();
         EN.hp = 0; EN.state = 1; EN.t = 0;
+        { u8 *aa = wild_obj(); s32 sp = aa ? *(s32 *)(aa + 0x128) - 0x2C : 4; static const s32 XP[5] = { 3000, 800, 1500, 6000, 1500 };
+          stats_exp(XP[sp >= 0 && sp < 5 ? sp : 4]); }   /* step 2: a defeated animal's EXP (lizard, chihuahua, tanuki, turtle, owl) */
         if (a) { EN.x = *(float *)(a + 0x4C); EN.y = *(float *)(a + 0x50); EN.z = *(float *)(a + 0x54); }
         let_go_why(9);                                       /* the lock lets go: the enemy is dying */
     }
@@ -744,7 +753,7 @@ static void player_hurt(u8 *g, s32 dmg, float ux, float uz)
     if (PD.inv > 0 || dmg <= 0) return;
     if (en_rage()) dmg = dmg * 5 / 4;
     PD.magic = 0x50444D47u; PD.hits++; PD.last = dmg; PD.taken += dmg;
-    *st -= dmg;
+    *st -= dmg; stats_ignore(dmg);                        /* not tool work: no EXP, no End refund */
     PD.inv = 60; PD.slide = 8; PD.stun = 8; PD.kx = ux * 0.16f; PD.kz = uz * 0.16f;
     sfx_play(*(u8 **)0x803491E4, SE_HURT, 0);
     PD.flash = 12;                                       /* battle22: a red flicker, no motion (the motion state took the lock,
@@ -822,6 +831,7 @@ static void collapse_start(u8 *g)
 }
 #define se_find  F(0x8018CD6C, void *, (u8 *, s32, s32))
 #define se_stop  F(0x8018B25C, void, (void *))
+static s32 zt_busy(void) { return CL.st ? 2 : (AG.on || PD.inv > 0) ? 1 : 0; }   /* 2 collapsing, 1 fighting */
 static void collapse_frame(u8 *g, s32 map, volatile u32 *held, volatile u32 *press)
 {
     u8 *fd = FADER_, *gs = *(u8 **)0x80349208;

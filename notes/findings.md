@@ -3677,3 +3677,19 @@ so, door fades are timed there, possibly per frame. Not traced yet.
   fallback in the house kept).
 - battle24 (user): right animation (kneel + stars, weapon in hand), one fade home. Dump f64dabdb mid-collapse: player state
   0x25, stamina 10337, CL st 1 t 58, HUD poke active, pool guard 0 overlaps. battle25: kneel 150 -> 95 frames (user: long).
+
+### 7.51 Levels, EXP, stats (step 2 of notes/stats_design.md; stats1)
+- Messages: option lists `01 41 <count> 00` + options split by 01 (takakura.mes 113); number insert `2A 00 nn` = number slot
+  nn, set by func_80102300(msg mgr *0x803491C4, nn, value) (mgr+0x88 + 4n, 8 slots; name slots at +0xA8).
+- tools/stats/build_stats_events.py (Common.arc f8cdeca9 + debug.mes 52b153f1 -> Common.arc 5f1848b3, debug.mes fb86ea8a):
+  event 410 = "Level up! You are now Lv <n0>. Which will you raise?" + HP / Pwr / End / Lck -> counter 61 = 1..4 (x128);
+  event 411 = "Lv <n0> EXP <n1> / <n2>, HP / Pwr / End / Lck <n3..n6>" (debug.mes 28 / 29).
+- stats.c: counters 54 'ST01', 55 EXP into the level, 56 level, 57-60 HP / Pwr / End / Lck, 61 answer, 62 unspent points
+  (saved with the game). EXP = tool work: stamina drops that are not enemy hits (zt.c stats_ignore), divided back by the
+  game's tool-level factor ((3450 - 650 L) / 400, category ctrl+0x160 -> level +0x2E / +0x32), / 100; defeats: lizard 3000,
+  chihuahua 800, tanuki 1500, turtle 6000. Next level 1500 + 500 x level. Level-up: skill.c "Level up" (font glyphs from
+  glyph_meta.json, tools/hud/gen_level_word.py -> level_word.h) + SE 216; the tool pools' own pop-ups are off. Menu event 410
+  once free (no event, CONTROL 1), not fighting / collapsing, 150 frames after the pop-up. Stats view: Z + D-pad Up (411).
+  HP: max stamina 100000 + 10000 / point (our HUD bar clamps at 100000 until the new HUD). End: 2 % of tool stamina cost
+  refunded and 2.5 % of each fullness drop per point. Pwr: weapon damage +5 % / point (zt.c en_hit). Stats max 20.
+- pm.bin now links stats.o (link line: ... tile.o toolfix.o clips.o stats.o). pm test ef490425, normal a8f8fefe.

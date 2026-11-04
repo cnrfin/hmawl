@@ -14,6 +14,7 @@ typedef unsigned short u16;
 typedef unsigned char u8;
 
 #include "skill_hud.h"
+#include "level_word.h"
 
 #define F(addr, ret, args) ((ret (*) args)(addr))
 #define sfx_play      F(0x8012A52C, s32, (u8 *, s32, s32))
@@ -72,8 +73,8 @@ static void set_alpha(u8 *q, u32 rgba)
 
 static void pop_layout(u8 *a, s32 alpha, s32 rise)
 {
-    const struct glyph *w = K.pop_pool ? WORD1 : WORD0;
-    s32 n = K.pop_pool ? WORD1_N : WORD0_N, i, x, total = 0, e7y = *(s16 *)(a + AGC_E7_Y);
+    const struct glyph *w = K.pop_pool == 2 ? WORD2 : K.pop_pool ? WORD1 : WORD0;
+    s32 n = K.pop_pool == 2 ? WORD2_N : K.pop_pool ? WORD1_N : WORD0_N, i, x, total = 0, e7y = *(s16 *)(a + AGC_E7_Y);
     s32 h = (s32)(21 * POP_SCALE), y;
     u32 col = YELLOW | (u32)alpha;
     for (i = 0; i < n; i++) total += w[i].w ? (s32)(w[i].w * POP_SCALE) + 1 : 8;
@@ -93,6 +94,13 @@ static void pop_layout(u8 *a, s32 alpha, s32 rise)
 }
 
 s32 skill_pop_on;                                        /* zt.c: the pop-up owns all its quads now */
+/* step 2 (notes/stats_design.md): the farmer's level-up - "Level up!" pops up with sound 216 (user) */
+#define SFX_LVUP 216
+void skill_levelup(void)
+{
+    K.pop = POP_FRAMES; K.pop_pool = 2;
+    sfx_play(*(u8 **)0x803491E4, SFX_LVUP, 0);
+}
 void skill_frame(u8 *g, u32 pad_held, u32 pad_press)
 {
     u8 *a = AGC;
@@ -102,7 +110,7 @@ void skill_frame(u8 *g, u32 pad_held, u32 pad_press)
 
     for (k = 0; k < 2; k++) {                                /* level-ups (no pop-up for the first look) */
         lv = level_of(g, k);
-        if (K.lv[k] && lv > K.lv[k]) {
+        if (0 && K.lv[k] && lv > K.lv[k]) {                  /* step 2: the tool pools level up silently; one "Level up" */
             K.pop = POP_FRAMES; K.pop_pool = k;
             sfx_play(*(u8 **)0x803491E4, SFX_LEVEL_UP, 0);
             {
