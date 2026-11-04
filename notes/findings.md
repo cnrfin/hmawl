@@ -3430,3 +3430,18 @@ so, door fades are timed there, possibly per frame. Not traced yet.
 - zt.c bm_frame ('BTLM'): lock on a living enemy -> field music to 0 in 0.8 s, stream /battle/BATTLE.adp (loop at
   9 << 15), faders 0 -> 255 in 1 s; defeat or > ZT_LEASH from the enemy -> faders to 0 + music back to 127 over
   1.5 s, stream stopped after 100 frames; leaving the valley stops it at once. Defeat sound SE_DEFEAT = 222.
+
+### 7.46 Wild animal update / motion (research for battle AI, static + dump 60ea3264)
+- Update = func_8015A22C(obj) (vtable thunk 0x8015C830): timers +0xE4 / +0xE8; **AI step bl func_8015A6D4 at
+  0x8015A2B4**, **movement bl func_8015C398 at 0x8015A2BC**, then func_800107A4(obj+0x30, obj+0xFC) (the +0xFC
+  position copy -> +0x4C), facing +0xF0.. -> +0x58... Animation player at obj+0x1A8 (func_8017D7FC advance,
+  func_8017D7EC done?); a motion request obj+0xD8 != current +0xDC starts a clip: kind obj+0xD4 (0..4) picks
+  func_8002B4B8 (+0x278) / 8002B114 (+0x279) / 8002B62C (+0x27A) / 8002B358 (+0x27B) / 8002B258 (+0x27C) for the clip,
+  then func_8017D610(obj+0x1A8, skel obj+0x168, set, clip, 0) and +0xDC = +0xD8. Tanuki: kind 2, motion 8.
+- Motion table per species (func_8002F8CC, 0x8029FBF0 + 4*id): lizard {0,2,4,6,8,10,0,0,0,0,0,2}, mouse {0,2,0,6,0,0,
+  0,0,0,0,21,2}, tanu {21,2,0,6,8,0,0,0,0,0,21,2}, kame {21,2,22,6,8,10,0,14,0,0,21,0}, owl {21,0,0,0,8,0,0,0,0,0,21,0}
+  (>= 0x14: sub-animation archive clip - 0x14). The motion state +0x280 ({slot, table, sub-player +8}).
+- Tanuki animations = animation set 10 (obj+0x1E8 = 10): 11 clips, 1.4-5.9 KB each. AI uses rand() (func_8017D3E8).
+- Battle plan: patch the two bl's (AI step / movement) to pm.bin stubs that skip them while we drive the animal
+  (position via +0x4C/+0xFC, facing, motion via +0xD8); new attack clips appended to tanu.anm.arc (clips 11+) and
+  mapped through the species table.
