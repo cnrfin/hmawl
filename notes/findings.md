@@ -3462,3 +3462,16 @@ so, door fades are timed there, possibly per frame. Not traced yet.
 - battle3 (user, turtle): no walk cycle. Turtle family 3 (func_8002B358, lbl_8029D324): motions 0-3 = clips 0-3, motion 4
   = clip 4/5/6/7 by +0x124 / +0x125, 8-10 once; its clip 2 is not a gait. battle3b: moving clip per species
   (ai_go): walk (1) for turtle / owl, run (2) for lizard / mouse / tanuki.
+
+### 7.47 Lore sweep (all 71 US .mes files, 17,469 messages; dump only in the user's zip)
+- Decoder: scratchpad mesread.py (notes 7.6 table), tolerant of the character files' extra control codes.
+- Dr. Hardy = badog.mes. 0x0CE (graveyard line, after 0x0CD "Visiting a graveyard..."): "I was walking around here a
+  few nights ago, and heard a girl screaming...". No "red light(s)" line in the US text (only the milk tank, system
+  0x0BD); the JP files use the game's own glyph numbering (not SJIS), not decoded yet.
+- "Red stars": kate 0x096 (beach at night), gustafa 0x09A (southern ocean). Code: ObjectStar.cpp (main.dol, data
+  0x802C3BF0): the night sky, star1-4.oqt / star0-1..4.oqt picked by season (func_80010004), star.tpl (commonall).
+- Grave keeper: path_GraveKeeper.pth (main.dol 0x802C3764) and hakamori.arc (wlp0 / wlp2 room lists, between the
+  inn rooms and yashiki): one of the regular interiors, named "grave keeper" internally; HAKA.adp stream track.
+- Others: white-haired being in the north forest (daryl 0x002/0x050/0x0E8, hugh 0x0E7/0x0ED; = Mukumuku), King's
+  Hall / Tomb of the King curse (carter 0x019-0x022, flora 0x02A-0x039; Carter "the descendant of the ancient
+  dynasty" 0x087), "strange mushroom. Eat it?" (event 0x009), Muffy followed by "someone strange" (muumuu 0x07C).
