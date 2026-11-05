@@ -198,7 +198,7 @@ def hunch(k):
 
 SKIN = np.array([214, 210, 212]) / 255; HUM = np.array([150, 158, 170]) / 255; BG = np.array([30, 30, 36]) / 255
 
-def render(V, ang, col, W=280, H=470, sc=240, oy=None, F=F):
+def render(V, ang, col, W=280, H=470, sc=240, oy=None, F=F, fcol=None):
     c, s = np.cos(ang), np.sin(ang)
     X = V @ np.array([[c, 0, -s], [0, 1, 0], [s, 0, c]]).T
     sx = W / 2 + X[:, 0] * sc; sy = (H - 14 if oy is None else oy) - X[:, 1] * sc; z = X[:, 2]
@@ -207,7 +207,8 @@ def render(V, ang, col, W=280, H=470, sc=240, oy=None, F=F):
     Lt = np.array([0.35, 0.55, 0.75]); Lt /= np.linalg.norm(Lt)
     shade = 0.28 + 0.72 * np.clip(N @ Lt, 0, 1) + 0.18 * (1 - np.abs(N[:, 2])) ** 3
     for i, (a, b, cc) in enumerate(F):
-        if N[i, 2] <= 0: continue
+        inside = N[i, 2] <= 0
+        if inside and not render.insides: continue
         xs = np.array([sx[a], sx[b], sx[cc]]); ys = np.array([sy[a], sy[b], sy[cc]])
         x0, x1 = int(max(0, xs.min())), int(min(W - 1, xs.max() + 1)); y0, y1 = int(max(0, ys.min())), int(min(H - 1, ys.max() + 1))
         if x0 > x1 or y0 > y1: continue
@@ -219,9 +220,11 @@ def render(V, ang, col, W=280, H=470, sc=240, oy=None, F=F):
         m = (l0 >= -1e-6) & (l1 >= -1e-6) & (l2 >= -1e-6)
         zz = l0 * z[a] + l1 * z[b] + l2 * z[cc]
         sub = zb[y0:y1 + 1, x0:x1 + 1]; m &= zz > sub
-        sub[m] = zz[m]; img[y0:y1 + 1, x0:x1 + 1][m] = col * shade[i]
+        c_ = np.array([0.16, 0.05, 0.06]) if inside or (fcol is not None and i < len(fcol) and fcol[i]) else col * shade[i]
+        sub[m] = zz[m]; img[y0:y1 + 1, x0:x1 + 1][m] = c_
     return Image.fromarray((np.clip(img, 0, 1) * 255).astype(np.uint8))
 
+render.insides = False
 def tube(a, b, ra, rb, k=8):
     """a closed cylinder a -> b (radii ra, rb): vertices, faces"""
     a, b = np.asarray(a, float), np.asarray(b, float); d = b - a; L = np.linalg.norm(d) + 1e-9; d /= L
@@ -233,6 +236,19 @@ def tube(a, b, ra, rb, k=8):
         j = (i + 1) % k
         Ft += [(i, j, k + j), (i, k + j, k + i), (2 * k, j, i), (2 * k + 1, k + i, k + j)]
     return Vt, np.array(Ft)
+
+HINGE = np.array([0, 0.95, -0.02])
+def jaw(V, width=1.35, open_deg=0.0, mouth=0.905):
+    """a wide jaw (user): the lower front of the head below the mouth line, flaring out wider than the face toward
+       the chin (jowls), hinged under the ears; open_deg drops it for the scream. Rest space (head rigid on node 7)."""
+    V = V.copy(); hd = LAB == 'head'
+    w = ((V[:, 1] < mouth) & (V[:, 2] > -0.01) & hd).astype(float)     # a clean cut at the mouth line
+    flare = np.clip((mouth - V[:, 1]) / 0.06, 0, 1)                # wider toward the bottom of the jaw
+    V[:, 0] *= 1 + (width - 1) * w * flare
+    if open_deg:
+        q = V - HINGE; Rj = rot((1, 0, 0), open_deg)
+        V = V * (1 - w[:, None]) + (q @ Rj.T + HINGE) * w[:, None]
+    return V
 
 FORE_NODES = [15, 16, 17, 19, 20, 26, 27, 28, 30, 31]
 def forelimbs(V):
@@ -265,6 +281,28 @@ if SET == 'mantis':
     LIST = (('M1', 'Mantis, hunched: forearms up at chest height', fore((0, 1, 0), -105, ((0, 1, 0), -85), fwd=18, out=10, extra=hunch(1.0))),
             ('M2', 'Mantis, hunched: forearms lower, reaching forward', fore((0, 1, 0), -80, ((0, 1, 0), -80), fwd=10, out=8, extra=hunch(1.0))),
             ('M3', 'Mantis, very hunched: forearms low, hands dangling', fore((0, 1, 0), -70, ((0, 1, 0), -90), fwd=5, out=6, extra=hunch(1.5))))
+if SET == 'jaw':
+    T2 = fore((0, 1, 0), -150, ((0, 1, 0), 145), fwd=0, out=4, extra=hunch(1.5))
+    render.insides = True
+    rows = []
+    for tag, nm, wd, op in (('J1', 'T2, wide jaw closed', 1.35, 0), ('J2', 'T2, the scream: jaw dropped', 1.35, 45), ('J3', 'T2, the scream, wider jaw', 1.6, 65)):
+        Vc = pose(T2, jaw(VA, wd, 0)); Vj = pose(T2, jaw(VA, wd, op))
+        ar = lambda X: np.linalg.norm(np.cross(X[F[:, 1]] - X[F[:, 0]], X[F[:, 2]] - X[F[:, 0]]), axis=1)
+        mouthF = ar(Vj) > 2.5 * ar(Vc) + 1e-7                        # skin stretched across the opening: the mouth
+        Vj, FF = forelimbs(Vj); keep = ~np.isin(NODE, FORE_NODES); mouthF = mouthF[keep[F].all(1)]
+        hc = Vj[LAB == 'head'].mean(0) if False else None
+        cells = [render(Vj, a, SKIN, F=FF, fcol=mouthF) for a, _ in views[:3]]
+        # close-ups of the head: front and 3/4, zoomed on the face
+        Hc = Vj[LAB == 'head'].mean(0) if len(Vj) == len(LAB) else Vj[:len(LAB)][LAB == 'head'].mean(0)
+        for a in (0, np.radians(40)):
+            cells.append(render(Vj - Hc, a, SKIN, F=FF, sc=380, oy=250, fcol=mouthF))
+        sheet = Image.new('RGB', (280 * len(cells), 470 + 34), (30, 30, 36)); dr = ImageDraw.Draw(sheet)
+        for k, cimg in enumerate(cells):
+            sheet.paste(cimg, (280 * k, 34)); dr.text((280 * k + 6, 38), (['front', '3/4', 'side'] + ['face front', 'face 3/4'])[k], fill=(160, 160, 170), font=small)
+        dr.text((8, 6), '%s  %s' % (tag, nm), fill=(235, 225, 220), font=font); rows.append(sheet); print(tag)
+    out = Image.new('RGB', (rows[0].width, sum(r.height for r in rows))); y = 0
+    for r in rows: out.paste(r, (0, y)); y += r.height
+    out.save(OUT + '/alien_jaw.png'); sys.exit(0)
 if SET == 'trex':   # M3's hunch, forearms up from the elbow, wrists bent so the hands hang down (user: like a T-rex)
     LIST = (('T1', 'T-rex arms: forearms up and forward, hands hanging down', fore((0, 1, 0), -130, ((0, 1, 0), 128), fwd=-5, out=4, extra=hunch(1.5))),
             ('T2', 'T-rex arms: forearms steeper, hands hanging down', fore((0, 1, 0), -150, ((0, 1, 0), 145), fwd=0, out=4, extra=hunch(1.5))),

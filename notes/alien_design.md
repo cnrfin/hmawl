@@ -47,6 +47,10 @@ Optional night enemy, unlocked by two events; replaces the owl's slot in the wil
   swing them back), forearms point up from the elbow, wrists bent so the hands hang down. SET=trex: T1 forearms up and
   forward, T2 steeper, T3 elbows tucked back. In the blockout the base's mitten forearm / hand is replaced by a round
   forearm, a palm and three long fingers (the final mesh needs a real forearm and hand).
+  Picked: T2 (user). Head: a wide hinged jaw for the scream (user) - the lower front of the head below the mouth line,
+  flaring wider toward the chin, hinged under the ears; at the reveal it drops 45-65 degrees and the whole lower head
+  gapes. Rig: Celia's braid nodes 8 / 9 (children of the head, unused - no hair) give a jaw bone for the pose layer
+  (as the lizard gape). SET=jaw: J1 closed, J2 open 45, J3 wider jaw open 65.
 
 ## After the first defeat: the well
 - A red glow appears in the town well and beckons the player down. Below: a small new map (our own).
