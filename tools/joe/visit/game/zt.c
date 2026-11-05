@@ -1086,6 +1086,7 @@ static void ht_want(u8 *g, u8 *a)                        /* the head's target: t
 }
 /* Alien stage 2 (notes/alien_design.md): the owl slot's model is the alien. It stands still opposite Celia's farm
    (user's spot), on the ground, facing the player; its own AI is off (en_ctl), no fight yet. */
+#define AL_SCALE 1.6f
 #define ALIEN_X 125.8f                                  /* alien3: the user's spot (dump 31139935; the map tool's X / Z
                                                            are the world's Z / X) */
 #define ALIEN_Z 211.7f
@@ -1406,6 +1407,12 @@ static s32 ht_bone(s32 n, u8 *trs, s32 r)                /* r: anim_eval's resul
     if (sp == 4) {                                      /* alien stage 2: held in its standing pose (absolute local rotations
                                                            over whatever clip plays); its own size, no 2x */
         if (n < AL_NODES) { q[0] = AL_Q[n][0]; q[1] = AL_Q[n][1]; q[2] = AL_Q[n][2]; q[3] = AL_Q[n][3]; trs[0] |= 4; }
+        if (n == 0) {                                   /* alien3 (user: not intimidating): 1.6x, as the animals' 2x */
+            float *sc = (float *)(trs + 4);
+            if (trs[0] & 1) { sc[0] *= AL_SCALE; sc[1] *= AL_SCALE; sc[2] *= AL_SCALE; }
+            else { sc[0] = AL_SCALE; sc[1] = AL_SCALE; sc[2] = AL_SCALE; trs[0] |= 1; }
+            if (trs[0] & 8) { t[0] *= AL_SCALE; t[1] *= AL_SCALE; t[2] *= AL_SCALE; }
+        }
         goto matrix;
     }
     if (n == 0) {                                       /* user: every animal 2x. Scale (flag 1, +4) the root; its translation

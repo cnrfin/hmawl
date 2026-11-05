@@ -44,11 +44,11 @@ def parts(VV):
         ps.append((P, Q, F, T[tid], np.repeat(n, 3, 0)))
     return ps
 
-def draw(ps, angs, zm, yc, W=250, H=360, lab=''):
+def draw(ps, angs, zm, yc, W=250, H=360, lab='', tilt=0.0):
     ims = []
     for ang in angs:
         img = np.zeros((H, W, 3)) + [40, 42, 50]; zb = np.full((H, W), -1e9); sc = H / 1.6 * zm; oy = H / 2 + yc * sc
-        Rv = raster.rotY(ang)
+        Rv = raster.rotX(tilt) @ raster.rotY(ang)
         for P, Q, F, t, Nn in ps: view.smooth_tex(img, zb, P, F, Q, t, Rv, sc, W / 2, oy, normals=Nn, weld_key=False)
         ims.append(Image.fromarray(img.clip(0, 255).astype(np.uint8)))
     o = Image.new('RGB', (W * len(ims), H + 20), (30, 30, 36))
@@ -59,7 +59,8 @@ T2 = fore((0, 1, 0), -150, ((0, 1, 0), 145), fwd=0, out=4, extra=hunch(1.5))['ro
 angs = (0, 0.6, 1.57, 3.14)
 rows = [draw(parts(V), angs, 0.85, 0.75, lab='read back from the files: bind pose (T-pose on the lengthened skeleton)'),
         draw(parts(posed(T2)), angs, 1.0, 0.62, lab='posed as zt.c will: T2 arms, hunch, head forward'),
-        draw(parts(posed(T2, 70, 1.6)), angs, 1.0, 0.62, lab='the scream: jaw node 8 turned 70 degrees and 1.6x wide')]
+        draw(parts(posed(T2, 70, 1.6)), angs, 1.0, 0.62, lab='the scream: jaw node 8 turned 70 degrees and 1.6x wide'),
+        draw(parts(posed(T2)), (3.14, 2.4, 3.9, 0.0), 1.0, 0.55, lab='posed, from above like the game camera (back, back-left, back-right, front)', tilt=0.45)]
 out = Image.new('RGB', (rows[0].width, sum(r.height for r in rows))); y = 0
 for r in rows: out.paste(r, (0, y)); y += r.height
 out.save(OUTP); print('saved', OUTP, 'vertices', len(V), 'nodes', sorted(set(bone.tolist())))

@@ -126,16 +126,17 @@ def body_col(r):
     return SKIN_RGB
 DARK = np.array([30, 10, 12.0])
 
-UVL = []; TUV = []; GROUP = []; UVIX = {}
+UVL = []; TUV = []; GROUP = []; UVIX = {}; UV_GROUP = []
 for t in TRI:
     k = KIND[t]; kind = 'c' if 'c' in k else ('h' if all(np.isin(k, ['h', 'j'])) else 'b')
     uv = uv_head(PV[t]) if kind == 'h' else uv_body(PV[t])
     if kind == 'c': uv = np.array([[0.97, 0.97]] * 3)              # the dark patch of the body texture
-    if uv[:, 0].max() - uv[:, 0].min() > 0.5: uv[uv[:, 0] < 0.5, 0] += 1.0   # across the back seam: wrap (repeat)
+    if uv[:, 0].max() - uv[:, 0].min() > 0.5: uv[uv[:, 0] < 0.5, 0] = 0.999   # across the back seam (plain skin): no wrap in the atlas
     ids = []
     for x in uv:
         key = (round(float(x[0]), 5), round(float(x[1]), 5))   # shared texture coordinates
-        if key not in UVIX: UVIX[key] = len(UVL); UVL.append(key)
+        key = key + (1 if kind == 'h' else 0,)
+        if key not in UVIX: UVIX[key] = len(UVL); UVL.append(key[:2]); UV_GROUP.append(key[2])
         ids.append(UVIX[key])
     TUV.append(tuple(ids)); GROUP.append(1 if kind == 'h' else 0)
 
@@ -144,7 +145,7 @@ def bake(size, group, colfn, extra=None):
     W, H = size; img = np.tile(SKIN_RGB, (H, W, 1)); filled = np.zeros((H, W), bool)
     for t, tu, g in zip(TRI, TUV, GROUP):
         if g != group or 'c' in KIND[t]: continue
-        uv = np.array([UVL[i] for i in tu]) % 1.0 * [W, H]
+        uv = np.array([UVL[i] for i in tu]) * [W, H]
         if np.ptp(uv[:, 0]) > W / 2: continue                       # wrapped seam triangles: plain skin there anyway
         x0, x1 = int(uv[:, 0].min()), int(np.ceil(uv[:, 0].max())); y0, y1 = int(uv[:, 1].min()), int(np.ceil(uv[:, 1].max()))
         gx, gy = np.meshgrid(np.arange(x0, x1 + 1) + 0.5, np.arange(y0, y1 + 1) + 0.5)
@@ -163,6 +164,11 @@ def dark_patch(img):
     H, W = img.shape[:2]; img[int(H * 0.94):, int(W * 0.94):] = DARK
 head_tex = bake((128, 128), 1, face_col)
 body_tex = bake((64, 128), 0, body_col, dark_patch)
+# alien3 (user: no eyes in game - the animal slot seems to draw everything with b0 image 0): one atlas, body at
+# u 0..0.25, head at u 0.5..1.0, stored as both b0 images; the UVs are remapped into it
+atlas = Image.new('RGB', (256, 128), tuple(int(c) for c in SKIN_RGB))
+atlas.paste(body_tex, (0, 0)); atlas.paste(head_tex, (128, 0))
+UVL = [((u * 0.25 if g == 0 else 0.5 + u * 0.5), v) for (u, v), g in zip(UVL, UV_GROUP)]
 
 # ------------------------------------------------------------------ the game files (as tools/goddess build_blank.py)
 P = PV; B = NODEV
@@ -219,7 +225,7 @@ if __name__ == '__main__':
     f0e = blank_frames(pm['files'][pn['pm_0_f0_e.tpl']]); f0m = blank_frames(pm['files'][pn['pm_0_f0_m.tpl']])
     check_strips(tris[0]); check_strips(tris[1])
     gpl, skn, actb = build_gpl(), build_skn(), build_act()
-    b0 = tpl([body_tex, head_tex])
+    b0 = tpl([atlas, atlas])
     files = [(NAME + '.act', actb), (NAME + '.gpl', gpl), (NAME + '.skn', skn), (NAME + '_b0.tpl', b0),
              (NAME + '_f0_e.tpl', f0e), (NAME + '_f0_m.tpl', f0m)]
     if NAME == 'owl':                                       # the owl's archive also has owl_f0.tpl (one face texture)
@@ -235,7 +241,7 @@ if __name__ == '__main__':
     for nm_, d_ in ((NAME + '.act', actb), (NAME + '.gpl', gpl), (NAME + '.skn', skn), (NAME + '_b0.tpl', b0),
                     (NAME + '_f0_e.tpl', f0e), (NAME + '_f0_m.tpl', f0m)):
         open(os.path.join(OUT, nm_), 'wb').write(d_)
-    body_tex.save(os.path.join(OUT, 'b0_body.png')); head_tex.save(os.path.join(OUT, 'b0_head.png'))
+    body_tex.save(os.path.join(OUT, 'b0_body.png')); head_tex.save(os.path.join(OUT, 'b0_head.png')); atlas.save(os.path.join(OUT, 'b0_atlas.png'))
     print('vertices', len(P), 'buffer', len(P2), 'uvs', len(uvs), 'tris body/head', len(tris[0]), len(tris[1]),
           'skin groups', len(groups), 'nodes', sorted(set(int(b) for b in B)))
     print(NAME + '.arc', len(arc), NAME + '.anm.arc', len(anm))

@@ -159,3 +159,10 @@ Optional night enemy, unlocked by two events; replaces the owl's slot in the wil
 - Also alien3 (user: EXP rose just walking): stats.c counted every non-hit stamina drop; the game drains a little
   stamina from moving. Now only drops while a tool is held and the player is not free (state 1) count.
   alien3: pm alien test 72e18eb3, test 756d6d21, normal 906b2b48.
+- alien3 test (user + dump 81edf65b): it shows, in place, facing the player (object facing = direction to player).
+  No eyes; a dark band from behind; not intimidating; milker gave no EXP. The readback (also from above / behind) is
+  clean, so the game draws it differently: most likely the animal slot draws every material with b0 image 0 (the head
+  then samples the body texture: the back of the head lands on its dark corner patch). alien4: one 256x128 atlas (body
+  u 0-0.25, head u 0.5-1, no seam wrap) stored as BOTH b0 images (owl.arc 99,776 B); 1.6x root scale (AL_SCALE) in
+  ht_bone; tool EXP = stamina drops within 40 frames of a tool-skill pool rise (pools tracked everywhere now, reset on a
+  map change), so milking in the barn counts and walking does not.
