@@ -33,7 +33,9 @@ def head_mesh(k, seg=48, M=40):
     for kk in range(seg):
         ph = 2 * np.pi * kk / seg; w = max(np.cos(ph), 0) ** fw
         C = Bc + (Fc - Bc) * w
-        for r, y in C: V.append((r * np.sin(ph), y, r * zr * np.cos(ph)))
+        for r, y in C:                                     # flat front to back (user): depth zr on the cap, the neck
+            z_ = zr if y > ey else 0.9 + (zr - 0.9) * min(r / (0.6 * R), 1.0)   # and chin stay round
+            V.append((r * np.sin(ph), y, r * z_ * np.cos(ph)))
     for kk in range(seg):
         k2 = (kk + 1) % seg
         for i in range(M - 1):
@@ -98,12 +100,12 @@ def place(Hv):
     return (R_[7] @ (Hv + CHIN - P[7]).T).T + t_[7]
 
 CANDS = [
-    ('C1 wide cap, eyes on its front', dict(R=0.30, top=0.38, rim=0.21, fw=1.6, eyey=0.175, mouth=0.07, chin=-0.02, nape=0.12),
-     (0.06, 0.042, 0.088, 0.172, 0.2), 0),
-    ('C2 wider, flatter', dict(R=0.36, top=0.34, rim=0.2, fw=2.0, eyey=0.165, mouth=0.07, chin=-0.02, nape=0.125, zr=0.8),
-     (0.065, 0.04, 0.095, 0.162, 0.25), 0),
-    ('C3 with a jaw (closed / open)', dict(R=0.31, top=0.41, rim=0.24, fw=1.1, eyey=0.205, mouth=0.1, chin=-0.1, nape=0.13, lobe=1.45),
-     (0.056, 0.044, 0.088, 0.2, 0.2), 65),
+    ('F1 flat plate head (thin front to back)', dict(R=0.30, top=0.46, rim=0.2, fw=1.6, eyey=0.17, mouth=0.07, chin=-0.02, nape=0.12, zr=0.38),
+     (0.06, 0.045, 0.09, 0.17, 0.2), 0),
+    ('F2 flatter still, wider', dict(R=0.34, top=0.44, rim=0.19, fw=2.0, eyey=0.165, mouth=0.07, chin=-0.02, nape=0.125, zr=0.26),
+     (0.065, 0.045, 0.1, 0.165, 0.25), 0),
+    ('F3 flat, with a jaw (closed / open)', dict(R=0.31, top=0.48, rim=0.23, fw=1.1, eyey=0.205, mouth=0.1, chin=-0.1, nape=0.13, lobe=1.45, zr=0.36),
+     (0.056, 0.046, 0.088, 0.2, 0.2), 65),
 ]
 try: font = ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf', 20); small = ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf', 14)
 except Exception: font = small = ImageFont.load_default()
@@ -127,7 +129,7 @@ for nm, pr, eye, jdeg in CANDS:
         ext = len(Vall) - len(UVb)
         L2 = (np.vstack([UVb, np.zeros((ext, 2))]), np.concatenate([ONb, np.zeros(ext, bool)]), ribs)
         L1 = (np.vstack([np.zeros((o, 2)), UVh]), np.concatenate([np.zeros(o, bool), ONh]), tex)
-        cells = [render_layers(Vall, [L1, L2], a, Fall, sc=200, oy=440, fcol=fc) for a in (0, np.radians(35), np.radians(90))]
+        cells = [render_layers(Vall, [L1, L2], a, Fall, sc=190, oy=445, fcol=fc) for a in (0, np.radians(35), np.radians(90))]
         Hc = Hp.mean(0) + np.array([0, -0.02, 0])
         for ang in (np.radians(0), np.radians(-30)):
             cells.append(render_layers(Vall - Hc, [L1, L2], ang, Fall, sc=380, oy=235, fcol=fc))
