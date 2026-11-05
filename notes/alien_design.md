@@ -35,6 +35,10 @@ Optional night enemy, unlocked by two events; replaces the owl's slot in the wil
   v2 (user: too feminine, too like the villagers), shared by all four: straight torso with no waist or hips, flat
   chest, gaunt arms and legs (0.72x thick), no ears, the skull swelling up and back into a dome above a normal-sized
   face, hands 1.5x long, pale cool grey skin.
+  Chosen: B (user), with hypermobile forelimbs - elbows bent, forearms pointing up (forearms 3x long) - and a thinner
+  neck (0.6x). Forelimb options (SET=fore): B1 mantis (folded up in front, hands limp), B2 reversed (elbows bent
+  backwards, forearms up behind), B3 sideways (elbows bend outward, forearms up beside the head), B4 raised (upper
+  arms level, forearms straight up, wrists bent over).
 
 ## After the first defeat: the well
 - A red glow appears in the town well and beckons the player down. Below: a small new map (our own).
