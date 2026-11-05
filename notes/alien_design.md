@@ -75,6 +75,14 @@ Optional night enemy, unlocked by two events; replaces the owl's slot in the wil
   painted mouth line (jaw_bell top 0.909, hinge 0.93) so the scream opens below the nose and the eyes stay.
   Then (user): no features at all, just big black empty eyes - the fear is the mouth; aliens have bigger eyes.
   face.py (FACE=eyes): E1 round, E2 big tilted ovals, E3 huge and far apart; black, red with a glow at the scream.
+  Picked: E3 (huge black eyes, far apart).
+
+## Behaviour notes (user's reference: a scream-and-freeze enemy from another game - mechanics only; our own model,
+## look and sounds, nothing taken from that game's files)
+- The freeze also triggers by distance: walk up close without locking on and it turns and screams anyway.
+- While the farmer is frozen it closes in and grabs; mashing buttons breaks free sooner (shorter freeze with Endurance?).
+- A grab drains (HP or fullness) until the player breaks free; then it reels back, open to hits.
+- Roaming: it hardly moves while watched, shuffles closer when the player looks away.
 
 ## After the first defeat: the well
 - A red glow appears in the town well and beckons the player down. Below: a small new map (our own).
