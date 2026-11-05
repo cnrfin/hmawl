@@ -242,12 +242,24 @@ def jaw(V, width=1.35, open_deg=0.0, mouth=0.905):
     """a wide jaw (user): the lower front of the head below the mouth line, flaring out wider than the face toward
        the chin (jowls), hinged under the ears; open_deg drops it for the scream. Rest space (head rigid on node 7)."""
     V = V.copy(); hd = LAB == 'head'
+    # the bell (user, from the first jaw render): the whole lower head flares out, widest at the bottom
+    b = np.clip((0.965 - V[:, 1]) / 0.03, 0, 1) * (V[:, 2] > -0.09) * hd; b = b * b * (3 - 2 * b)
+    V[:, 0] *= 1 + (width - 1) * b * np.clip((0.975 - V[:, 1]) / 0.05, 0, 1)
     w = ((V[:, 1] < mouth) & (V[:, 2] > -0.01) & hd).astype(float)     # a clean cut at the mouth line
-    flare = np.clip((mouth - V[:, 1]) / 0.06, 0, 1)                # wider toward the bottom of the jaw
-    V[:, 0] *= 1 + (width - 1) * w * flare
     if open_deg:
         q = V - HINGE; Rj = rot((1, 0, 0), open_deg)
         V = V * (1 - w[:, None]) + (q @ Rj.T + HINGE) * w[:, None]
+    return V
+
+def jaw_bell(V, width=1.6, open_deg=0.0):
+    """the first jaw render (user's pick, J3): the whole lower head flares smoothly into a bell, widest at the bottom,
+       and opening swings that whole lower head down from a hinge under the ears (the skin stretches, no cut)."""
+    V = V.copy(); hd = LAB == 'head'
+    w = np.clip((0.965 - V[:, 1]) / 0.03, 0, 1) * (V[:, 2] > -0.09) * hd; w = w * w * (3 - 2 * w)
+    V[:, 0] *= 1 + (width - 1) * w * np.clip((0.975 - V[:, 1]) / 0.05, 0, 1)
+    if open_deg:
+        hg = np.array([0, 0.975, -0.03]); q = V - hg; Rj = rot((1, 0, 0), open_deg)
+        V = V * (1 - w[:, None]) + (q @ Rj.T + hg) * w[:, None]
     return V
 
 FORE_NODES = [15, 16, 17, 19, 20, 26, 27, 28, 30, 31]
@@ -285,10 +297,11 @@ if SET == 'jaw':
     T2 = fore((0, 1, 0), -150, ((0, 1, 0), 145), fwd=0, out=4, extra=hunch(1.5))
     render.insides = True
     rows = []
-    for tag, nm, wd, op in (('J1', 'T2, wide jaw closed', 1.35, 0), ('J2', 'T2, the scream: jaw dropped', 1.35, 45), ('J3', 'T2, the scream, wider jaw', 1.6, 65)):
-        Vc = pose(T2, jaw(VA, wd, 0)); Vj = pose(T2, jaw(VA, wd, op))
+    for tag, nm, wd, op, dark in (('J3', 'bell jaw closed', 1.6, 0, 0), ('J3', 'the scream (as you picked)', 1.6, 70, 0),
+                                  ('J3', 'the scream, with a dark mouth where the skin stretches', 1.6, 70, 1)):
+        Vc = pose(T2, jaw_bell(VA, wd, 0)); Vj = pose(T2, jaw_bell(VA, wd, op))
         ar = lambda X: np.linalg.norm(np.cross(X[F[:, 1]] - X[F[:, 0]], X[F[:, 2]] - X[F[:, 0]]), axis=1)
-        mouthF = ar(Vj) > 2.5 * ar(Vc) + 1e-7                        # skin stretched across the opening: the mouth
+        mouthF = (ar(Vj) > 1.8 * ar(Vc) + 1e-7) & bool(dark)          # skin stretched across the opening: the mouth
         Vj, FF = forelimbs(Vj); keep = ~np.isin(NODE, FORE_NODES); mouthF = mouthF[keep[F].all(1)]
         hc = Vj[LAB == 'head'].mean(0) if False else None
         cells = [render(Vj, a, SKIN, F=FF, fcol=mouthF) for a, _ in views[:3]]

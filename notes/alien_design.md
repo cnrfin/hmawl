@@ -51,6 +51,9 @@ Optional night enemy, unlocked by two events; replaces the owl's slot in the wil
   flaring wider toward the chin, hinged under the ears; at the reveal it drops 45-65 degrees and the whole lower head
   gapes. Rig: Celia's braid nodes 8 / 9 (children of the head, unused - no hair) give a jaw bone for the pose layer
   (as the lizard gape). SET=jaw: J1 closed, J2 open 45, J3 wider jaw open 65.
+  Picked: J3 with the bell (user, from the first jaw render): the whole lower head flares smoothly, widest at the
+  bottom (1.6x), and the scream swings it down ~70 degrees from under the ears (jaw_bell). Option: dark mouth where
+  the skin stretches.
 
 ## After the first defeat: the well
 - A red glow appears in the town well and beckons the player down. Below: a small new map (our own).
