@@ -3785,3 +3785,7 @@ so, door fades are timed there, possibly per frame. Not traced yet.
 - noalien1 (user: drop the alien, keep the 4 animals, owl out for good): zt.c / pm.c / skill.c back to gold1 (5255024)
   plus night_frame; pm test 81617135, normal bc3ab279. Install on the pre-alien base HM_AWL_g4b.iso (the alien ISOs
   carry an unused alien owl.arc, scream SFX 446 and the hud5 commonall; all harmless, never loaded).
+- nl2 (user: no big difference at night): ambient x0.4, light x0.35, fog x0.6 (patched together when the ambient
+  track is freshly patched); night_dbg ('NITE': patch count, track pointers) for a dump check. pm normal f9831c47,
+  test cdbd5eaf. If the dump shows the tracks patched but the field still bright, the terrain is not lit by the
+  channel lighting (vertex colours / baked) and needs another route.

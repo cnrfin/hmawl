@@ -413,29 +413,35 @@ extern u8 *pm_player;
    func_80022DE4): track = u32 n, f32 8.0, n x {RGBA, f32 key}, key 0-8 = 3 hours each. The night keys (before 05:00,
    after 19:18) of the ambient (+0x04) and the light (+0x64) are scaled once per load; the game ignores their alpha
    (ambient forced to 0, light to FF), so alpha 0xFE on the first key marks a patched track. The fades keep working. */
-#define NIGHT_AMB  0.6f
-#define NIGHT_LT   0.5f
-static void night_track(u8 *t, float k)
+#define NIGHT_AMB  0.4f                                 /* nl2 (user: no big difference at 0.6 / 0.5) */
+#define NIGHT_LT   0.35f
+#define NIGHT_FOG  0.6f
+struct { u32 magic, patches; u8 *amb, *lt, *fog; } night_dbg;   /* 'NITE' (dump) */
+static s32 night_track(u8 *t, float k, s32 force)
 {
     u32 n, i, c;
     float key;
-    if ((u32)t < 0x80000000u || (u32)t >= 0x81800000u) return;
+    if ((u32)t < 0x80000000u || (u32)t >= 0x81800000u) return 0;
     n = *(u32 *)t;
-    if (n == 0 || n > 32 || *(float *)(t + 4) != 8.0f || (*(u32 *)(t + 8) & 0xFF) == 0xFE) return;
+    if (n == 0 || n > 32 || *(float *)(t + 4) != 8.0f || (!force && (*(u32 *)(t + 8) & 0xFF) == 0xFE)) return 0;
     for (i = 0; i < n; i++) {
         c = *(u32 *)(t + 8 + 8 * i); key = *(float *)(t + 12 + 8 * i);
         if (key <= 1.7f || key >= 6.3f)
             c = ((u32)((c >> 24) * k) << 24) | ((u32)(((c >> 16) & 0xFF) * k) << 16) | ((u32)(((c >> 8) & 0xFF) * k) << 8) | (c & 0xFF);
         *(u32 *)(t + 8 + 8 * i) = c;
     }
-    *(u32 *)(t + 8) = (*(u32 *)(t + 8) & 0xFFFFFF00u) | 0xFEu;
+    if (!force) *(u32 *)(t + 8) = (*(u32 *)(t + 8) & 0xFFFFFF00u) | 0xFEu;
+    return 1;
 }
 static void night_frame(void)
 {
     u8 *o = *(u8 **)0x803493CC;
     if ((u32)o < 0x80000000u || (u32)o >= 0x81800000u) return;
-    night_track(*(u8 **)(o + 0x04), NIGHT_AMB);
-    night_track(*(u8 **)(o + 0x64), NIGHT_LT);
+    night_dbg.magic = 0x4E495445u; night_dbg.amb = *(u8 **)(o + 0x04); night_dbg.lt = *(u8 **)(o + 0x64); night_dbg.fog = *(u8 **)(o + 0xE8);
+    if (night_track(night_dbg.amb, NIGHT_AMB, 0)) {      /* a fresh load: the light and fog (no alpha marker of their own:
+                                                           the fog may use its alpha) with it */
+        night_track(night_dbg.lt, NIGHT_LT, 0); night_track(night_dbg.fog, NIGHT_FOG, 1); night_dbg.patches++;
+    }
 }
 void zt_frame(u8 *g, s32 map, volatile u32 *held, volatile u32 *press)
 {
