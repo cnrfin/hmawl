@@ -43,6 +43,10 @@ Optional night enemy, unlocked by two events; replaces the owl's slot in the wil
   at chest height, M2 forearms lower reaching forward, M3 very hunched with forearms low and hands dangling.
   Then (user): the neck a round tube of one radius (0.016) all along; a rounded upper back (bulge + more spine curve);
   the head upright, facing straight ahead whatever the lean.
+  Picked: M3's strong hunch with T-rex arms (user): upper arms hang (set in world space, so the spine's lean does not
+  swing them back), forearms point up from the elbow, wrists bent so the hands hang down. SET=trex: T1 forearms up and
+  forward, T2 steeper, T3 elbows tucked back. In the blockout the base's mitten forearm / hand is replaced by a round
+  forearm, a palm and three long fingers (the final mesh needs a real forearm and hand).
 
 ## After the first defeat: the well
 - A red glow appears in the town well and beckons the player down. Below: a small new map (our own).

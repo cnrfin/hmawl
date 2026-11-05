@@ -76,6 +76,13 @@ def alien_rest(V):
     # a thin neck (user): a round tube of one radius all the way along
     nk = LAB == 'neck'; cz = np.median(z[nk]); dx, dz = x[nk], z[nk] - cz; rr = np.hypot(dx, dz) + 1e-9
     V[nk, 0] = dx / rr * 0.016; V[nk, 2] = cz + dz / rr * 0.016
+    # forearms: round tubes (the base's forearm is part of its flat mitten hand); hands bigger, fingers longer
+    for fn, sx in ((15, 1), (26, -1)):
+        fa = NODE == fn; dy, dz = y[fa] - 0.795, z[fa] + 0.005; rr = np.hypot(dy, dz) + 1e-9
+        V[fa, 1] = 0.795 + dy / rr * 0.014; V[fa, 2] = -0.005 + dz / rr * 0.014
+    for hn, wn in ((17, 16), (28, 27)):
+        hd = np.isin(NODE, [hn, hn + 2, hn + 3]); c = P[wn]
+        V[hd] = c + (V[hd] - c) * np.array([1.5, 1.15, 1.35])
     # a rounded upper back (user): the back of the chest bulges out
     bk = (LAB == 'torso') & (z < 0) & (y > 0.62) & (y < 0.84)
     V[bk, 2] -= 0.035 * np.sin(np.clip((y[bk] - 0.62) / 0.22, 0, 1) * np.pi)
@@ -104,6 +111,7 @@ def pose(spec, V0=V0):
         if n in Sc:
             c, s = Sc[n]; X = (X + P[n] - c) * s + c - P[n]
         return X @ R[n].T + t[n]
+    pose.last = (R, t)
     out = np.zeros_like(V0)
     for n in np.unique(NODE):
         idx = np.where(NODE == n)[0]; X = V0[idx]
@@ -168,7 +176,16 @@ def fore(elbow_axis, deg, wrist=None, sh=84, out=0, fwd=0, flen=3.0, extra=None)
     r = {12: rot((1, 0, 0), -fwd) @ rot((0, 0, 1), -sh + out), 23: rot((1, 0, 0), -fwd) @ rot((0, 0, 1), sh - out), 7: rot((0, 0, 1), 16),
          15: rot(ax, deg), 26: rot(ax * [1, -1, -1], deg)}
     if wrist is not None: r[16] = rot(wrist[0], wrist[1]); r[27] = rot(np.array(wrist[0]) * [1, -1, -1], wrist[1])
-    if extra: r.update(extra)
+    if extra:
+        r.update(extra)
+        # the arm angles above are meant in the world, not on top of the spine's lean: undo the parents' rotation
+        def acc(n):
+            Rn = np.eye(3); chain = []
+            while n >= 0: chain.append(n); n = PAR[n]
+            for c in reversed(chain): Rn = Rn @ r.get(c, np.eye(3))
+            return Rn
+        for sh_n in (12, 23):
+            r[sh_n] = acc(PAR[sh_n]).T @ r[sh_n]
     sc = dict(B['scl']); sc[15] = (P[15], (flen, 1, 1)); sc[26] = (P[26], (flen, 1, 1))   # the forearm mesh itself
     return dict(len=merge(B['len'], {16: flen, 27: flen}), rot=r, scl=sc)
 
@@ -181,7 +198,7 @@ def hunch(k):
 
 SKIN = np.array([214, 210, 212]) / 255; HUM = np.array([150, 158, 170]) / 255; BG = np.array([30, 30, 36]) / 255
 
-def render(V, ang, col, W=280, H=470, sc=240, oy=None):
+def render(V, ang, col, W=280, H=470, sc=240, oy=None, F=F):
     c, s = np.cos(ang), np.sin(ang)
     X = V @ np.array([[c, 0, -s], [0, 1, 0], [s, 0, c]]).T
     sx = W / 2 + X[:, 0] * sc; sy = (H - 14 if oy is None else oy) - X[:, 1] * sc; z = X[:, 2]
@@ -205,6 +222,37 @@ def render(V, ang, col, W=280, H=470, sc=240, oy=None):
         sub[m] = zz[m]; img[y0:y1 + 1, x0:x1 + 1][m] = col * shade[i]
     return Image.fromarray((np.clip(img, 0, 1) * 255).astype(np.uint8))
 
+def tube(a, b, ra, rb, k=8):
+    """a closed cylinder a -> b (radii ra, rb): vertices, faces"""
+    a, b = np.asarray(a, float), np.asarray(b, float); d = b - a; L = np.linalg.norm(d) + 1e-9; d /= L
+    u = np.cross(d, [0, 0, 1]) if abs(d[2]) < 0.9 else np.cross(d, [1, 0, 0]); u /= np.linalg.norm(u); w = np.cross(d, u)
+    ang = np.linspace(0, 2 * np.pi, k, endpoint=False)
+    ring = lambda c, r: c + r * (np.cos(ang)[:, None] * u + np.sin(ang)[:, None] * w)
+    Vt = np.vstack([ring(a, ra), ring(b, rb), a, b]); Ft = []
+    for i in range(k):
+        j = (i + 1) % k
+        Ft += [(i, j, k + j), (i, k + j, k + i), (2 * k, j, i), (2 * k + 1, k + i, k + j)]
+    return Vt, np.array(Ft)
+
+FORE_NODES = [15, 16, 17, 19, 20, 26, 27, 28, 30, 31]
+def forelimbs(V):
+    """replace the base's mitten forearm / hand with a round forearm, a palm and three long fingers (blockout)"""
+    R, t = pose.last
+    keep = ~np.isin(NODE, FORE_NODES)
+    Fk = F[keep[F].all(1)]
+    Vs, Fs = [V], [Fk]; base = len(V)
+    def add(vt, ft):
+        nonlocal base
+        Vs.append(vt); Fs.append(ft + base); base += len(vt)
+    for e, w, sx in ((15, 16, 1), (26, 27, -1)):
+        add(*tube(t[e], t[w], 0.017, 0.012))
+        hd = R[w] @ np.array([sx, 0, 0]); side = R[w] @ np.array([0, 0, 1])
+        palm_end = t[w] + hd * 0.07
+        add(*tube(t[w], palm_end, 0.016, 0.02))
+        for f in (-1, 0, 1):
+            add(*tube(palm_end + side * 0.012 * f, palm_end + hd * 0.09 + side * 0.02 * f, 0.006, 0.004, 6))
+    return np.vstack(Vs), np.vstack(Fs)
+
 try: font = ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf', 20); small = ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf', 14)
 except Exception: font = small = ImageFont.load_default()
 VH = pose(human)
@@ -217,6 +265,10 @@ if SET == 'mantis':
     LIST = (('M1', 'Mantis, hunched: forearms up at chest height', fore((0, 1, 0), -105, ((0, 1, 0), -85), fwd=18, out=10, extra=hunch(1.0))),
             ('M2', 'Mantis, hunched: forearms lower, reaching forward', fore((0, 1, 0), -80, ((0, 1, 0), -80), fwd=10, out=8, extra=hunch(1.0))),
             ('M3', 'Mantis, very hunched: forearms low, hands dangling', fore((0, 1, 0), -70, ((0, 1, 0), -90), fwd=5, out=6, extra=hunch(1.5))))
+if SET == 'trex':   # M3's hunch, forearms up from the elbow, wrists bent so the hands hang down (user: like a T-rex)
+    LIST = (('T1', 'T-rex arms: forearms up and forward, hands hanging down', fore((0, 1, 0), -130, ((0, 1, 0), 128), fwd=-5, out=4, extra=hunch(1.5))),
+            ('T2', 'T-rex arms: forearms steeper, hands hanging down', fore((0, 1, 0), -150, ((0, 1, 0), 145), fwd=0, out=4, extra=hunch(1.5))),
+            ('T3', 'T-rex arms: elbows tucked back, forearms up, hands down', fore((0, 1, 0), -140, ((0, 1, 0), 135), fwd=-20, out=4, extra=hunch(1.5))))
 if SET == 'fore':
     LIST = (('B1', 'Mantis: long forearms folded up in front, hands hanging limp', fore((0, 1, 0), -120, ((0, 1, 0), -85), fwd=40, out=12)),
             ('B2', 'Reversed: elbows bent backwards, forearms up behind the shoulders', fore((0, 1, 0), 125, ((0, 1, 0), 70), fwd=-35, out=14)),
@@ -224,7 +276,9 @@ if SET == 'fore':
             ('B4', 'Raised: upper arms out level, forearms straight up, wrists bent over', fore((0, 0, 1), 90, ((0, 0, 1), 80), sh=8)))
 for tag, nm, spec in LIST:
     V = pose(spec, VA)
-    cells = [render(VH, np.radians(25), HUM)] + [render(V, a, SKIN) for a, _ in views]
+    if SET in ('trex', 'mantis', 'fore'): V, FF = forelimbs(V)
+    else: FF = F
+    cells = [render(VH, np.radians(25), HUM)] + [render(V, a, SKIN, F=FF) for a, _ in views]
     sheet = Image.new('RGB', (280 * len(cells), 470 + 34), (30, 30, 36)); dr = ImageDraw.Draw(sheet)
     for k, cimg in enumerate(cells):
         sheet.paste(cimg, (280 * k, 34)); dr.text((280 * k + 6, 38), 'base human' if k == 0 else views[k - 1][1], fill=(160, 160, 170), font=small)
@@ -233,4 +287,4 @@ for tag, nm, spec in LIST:
 out = Image.new('RGB', (rows[0].width, sum(r.height for r in rows)))
 y = 0
 for r in rows: out.paste(r, (0, y)); y += r.height
-out.save(OUT + {'fore': '/alien_forelimbs.png', 'mantis': '/alien_mantis.png'}.get(SET, '/alien_bodies_base.png'))
+out.save(OUT + {'fore': '/alien_forelimbs.png', 'mantis': '/alien_mantis.png', 'trex': '/alien_trex.png'}.get(SET, '/alien_bodies_base.png'))
