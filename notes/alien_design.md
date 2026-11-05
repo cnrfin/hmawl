@@ -63,6 +63,11 @@ Optional night enemy, unlocked by two events; replaces the owl's slot in the wil
   tints the whole model, so it can't do eyes alone. Glow: unknown how the blue flowers by the spring glow (map
   material, effect or particles: to look up); fallbacks: full-bright red eye texture (reads as lit at night) plus a
   soft red halo drawn at the projected eye positions with HUD quads (as the Z-target reticle), or a particle.
+- Decided (user): eyes full-bright red even at night. Plan: the red eyes as a small separate model attached to the
+  head bone the way held items are attached to the hand (logs.c item_bind / held_attach), so it has its own draw
+  instance with the flat-colour switch on (+0x3D = 1, colour white: lighting off - findings 7.44, enemy2 test: white =
+  the texture unlit). Hidden (+0x3C = 0) until the scream, then shown over the normal eyes. Optional halo with HUD
+  quads on top.
 
 ## After the first defeat: the well
 - A red glow appears in the town well and beckons the player down. Below: a small new map (our own).
