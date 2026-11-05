@@ -1410,6 +1410,9 @@ static s32 ht_bone(s32 n, u8 *trs, s32 r)                /* r: anim_eval's resul
     if (sp == 4) {                                      /* alien stage 2: held in its standing pose (absolute local rotations
                                                            over whatever clip plays); its own size, no 2x */
         if (n < AL_NODES) { q[0] = AL_Q[n][0]; q[1] = AL_Q[n][1]; q[2] = AL_Q[n][2]; q[3] = AL_Q[n][3]; trs[0] |= 4; }
+        if (n > 0) { t[0] = rm[3]; t[1] = rm[7]; t[2] = rm[11]; trs[0] |= 8; }   /* alien6b: the built skeleton's own bone
+                                       lengths, not Celia's clip (its braid track put node 9 - the jaw rim - 0.24 below the
+                                       hinge: the jaw hung like a sheet) */
         if (n == 0) {                                   /* alien3 (user: not intimidating): 1.6x, as the animals' 2x */
             float *sc = (float *)(trs + 4);
             if (trs[0] & 1) { sc[0] *= AL_SCALE; sc[1] *= AL_SCALE; sc[2] *= AL_SCALE; }

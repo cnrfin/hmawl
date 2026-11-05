@@ -178,3 +178,9 @@ Optional night enemy, unlocked by two events; replaces the owl's slot in the wil
   The linings are gone: dark caps close the cut faces (under the head, on top of the jaw, both sides of the back cut).
   Reticle: aim_h 1.25 for 0x30, box 1.3x wide, 2x tall. alien6: owl.arc 104,992 B (1345 vertices), pm alien test
   af847369, test 357d9183, normal 1b148236.
+- alien6 test (user + dump dc071552): the jaw hung from the face like a long sheet, invisible from behind. Cause (by
+  elimination - neck and limbs, also lengthened in the .act, came out right): Celia's clip keeps her braid's own node 9
+  translation (0.24 below node 8), and the record's translation comes from the clip, so the jaw rim (node 9) dropped
+  ~0.4 below the hinge at 1.6x and the band-rim faces stretched. alien7: for the alien, every node but the root takes
+  its translation from the built skeleton's rest matrix (rm[3] / rm[7] / rm[11]), never from the clip. pm alien test
+  305121b7, test 94ceb247, normal 176dd7d3 (owl.arc unchanged from alien6).
