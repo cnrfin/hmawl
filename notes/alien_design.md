@@ -73,6 +73,8 @@ Optional night enemy, unlocked by two events; replaces the owl's slot in the wil
   low creased forehead, long thin nose, thin down-turned mouth, nose-to-mouth folds, sagging lines below the corners,
   hollow cheeks. Small and low on the dome (eyes at y 0.962 on the base head, mouth 0.906). The jaw now splits at the
   painted mouth line (jaw_bell top 0.909, hinge 0.93) so the scream opens below the nose and the eyes stay.
+  Then (user): no features at all, just big black empty eyes - the fear is the mouth; aliens have bigger eyes.
+  face.py (FACE=eyes): E1 round, E2 big tilted ovals, E3 huge and far apart; black, red with a glow at the scream.
 
 ## After the first defeat: the well
 - A red glow appears in the town well and beckons the player down. Below: a small new map (our own).

@@ -107,6 +107,34 @@ def paint_face(red=False):
     img = img * (1 - P.tintA[..., None]) + P.tint * P.tintA[..., None]
     return Image.fromarray(np.clip(img, 0, 255).astype(np.uint8))
 
+def paint_eyes(kind, red=False):
+    """user: just big black empty eyes, no other features (the fear is in the mouth). kind: (rx, ry, ey, ex, tilt)"""
+    rx, ry, ey, ex, tilt = kind
+    img = Image.fromarray(np.tile(SKIN_RGB, (TH, TW, 1)).astype(np.uint8))
+    mask = Image.new('L', (TW, TH), 0); d = ImageDraw.Draw(mask)
+    for sx in (-1, 1):
+        cx = sx * ex
+        pts = []
+        for t in np.linspace(0, 2 * np.pi, 64, endpoint=False):
+            x, y = rx * np.cos(t), ry * np.sin(t)
+            if tilt: x, y = x * np.cos(sx * tilt) - y * np.sin(sx * tilt), x * np.sin(sx * tilt) + y * np.cos(sx * tilt)
+            pts.append(px(cx + x, ey + y))
+        d.polygon(pts, fill=255)
+    m = np.array(mask.filter(ImageFilter.GaussianBlur(1.5))).astype(float)[..., None] / 255
+    a = np.array(img).astype(float)
+    if red:
+        glow = np.array(mask.filter(ImageFilter.GaussianBlur(14))).astype(float)[..., None] / 255
+        a = a * (1 - 0.6 * glow) + np.array([255, 40, 30]) * 0.6 * glow
+        a = a * (1 - m) + np.array([255, 22, 16]) * m
+    else:
+        rim = np.array(mask.filter(ImageFilter.GaussianBlur(6))).astype(float)[..., None] / 255
+        a = a * (1 - 0.35 * rim)                                       # a faint socket shadow round the edge
+        a = a * (1 - m) + np.array([8, 6, 8]) * m
+    return Image.fromarray(np.clip(a, 0, 255).astype(np.uint8))
+
+EYES = {'E1 round': (0.024, 0.024, 0.968, 0.045, 0), 'E2 big ovals, tilted': (0.026, 0.034, 0.972, 0.046, 0.35),
+        'E3 huge, far apart': (0.034, 0.036, 0.97, 0.058, 0.15)}
+
 # ---------------- head: smooth the base's face dent (its sculpted nose / sockets) before painting on it
 def smooth_face(V, it=12):
     V = V.copy(); fr = (LAB == 'head') & (V[:, 2] > 0.04) & (V[:, 1] > 0.88) & (V[:, 1] < 1.08)
@@ -156,7 +184,7 @@ def render_tex(V, UV, ON, tex, ang, Fz, W=280, H=470, sc=240, oy=None, fcol=None
             img[y0:y1 + 1, x0:x1 + 1][m] = skin * shade[i]
     return Image.fromarray((np.clip(img, 0, 1) * 255).astype(np.uint8))
 
-if __name__ == '__main__':
+if __name__ == '__main__' and os.environ.get('FACE', 'eyes') == 'painted':
     texN = paint_face(False); texR = paint_face(True)
     texN.save(OUT + '/alien_face.png'); texR.save(OUT + '/alien_face_red.png')
     T2 = fore((0, 1, 0), -150, ((0, 1, 0), 145), fwd=0, out=4, extra=hunch(1.5))
@@ -184,3 +212,31 @@ if __name__ == '__main__':
     out = Image.new('RGB', (rows[0].width, sum(r.height for r in rows))); y = 0
     for r in rows: out.paste(r, (0, y)); y += r.height
     out.save(OUT + '/alien_face_sheet.png')
+
+if __name__ == '__main__' and os.environ.get('FACE', 'eyes') == 'eyes':
+    T2 = fore((0, 1, 0), -150, ((0, 1, 0), 145), fwd=0, out=4, extra=hunch(1.5))
+    VS = smooth_face(VA); UV, ON = face_uv(VS)
+    try: font = ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf', 20); small = ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf', 14)
+    except Exception: font = small = ImageFont.load_default()
+    JW = dict(top=0.909, soft=0.008, hinge=(0, 0.93, -0.04))
+    rows = []
+    for nm, kind in EYES.items():
+        cells = []
+        for wd, op, red in ((1.0, 0, False), (1.6, 70, True)):
+            tex = paint_eyes(kind, red)
+            Vc = pose(T2, jaw_bell(VS, wd, 0, **JW)); Vj = pose(T2, jaw_bell(VS, wd, op, **JW))
+            ar = lambda X: np.linalg.norm(np.cross(X[F[:, 1]] - X[F[:, 0]], X[F[:, 2]] - X[F[:, 0]]), axis=1)
+            mouthF = ar(Vj) > 1.8 * ar(Vc) + 1e-7
+            Vf, FF = forelimbs(Vj); keep = ~np.isin(NODE, FORE_NODES); fmask = keep[F].all(1)
+            UVf = np.vstack([UV, np.zeros((len(Vf) - len(UV), 2))]); ONf = np.concatenate([ON, np.zeros(len(Vf) - len(ON), bool)])
+            mF = np.concatenate([mouthF[fmask], np.zeros(len(FF) - fmask.sum(), bool)])
+            Hc = Vj[LAB == 'head'].mean(0) + np.array([0, -0.05, 0])
+            cells.append(render_tex(Vf, UVf, ONf, tex, np.radians(20), FF, fcol=mF))
+            cells.append(render_tex(Vf - Hc, UVf, ONf, tex, 0, FF, sc=700, oy=235, fcol=mF))
+        sheet = Image.new('RGB', (280 * len(cells), 470 + 34), (30, 30, 36)); dr = ImageDraw.Draw(sheet)
+        for k, ci in enumerate(cells):
+            sheet.paste(ci, (280 * k, 34)); dr.text((280 * k + 6, 38), ['closed', 'face', 'scream', 'face'][k], fill=(160, 160, 170), font=small)
+        dr.text((8, 6), nm, fill=(235, 225, 220), font=font); rows.append(sheet); print(nm)
+    out = Image.new('RGB', (rows[0].width, sum(r.height for r in rows))); y = 0
+    for r in rows: out.paste(r, (0, y)); y += r.height
+    out.save(OUT + '/alien_eyes_sheet.png')
