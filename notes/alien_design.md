@@ -89,6 +89,9 @@ Optional night enemy, unlocked by two events; replaces the owl's slot in the wil
   fingers: forelimbs_big). Walk: a shuffle (knees bent, feet barely lifting) when we animate it. FACE=v2 renders it.
 - Eyes at the scream (user): the eyes stay black with a small glowing red dot in each (about a third of the eye),
   readable at lock-on range. In game the dots are the separate full-bright model (two small discs on the head bone).
+- Sockets (user): the eyes set into the head - each eye area pushed in (up to 0.055, deepest at its centre) under a
+  small brow, plus a soft socket shadow painted round each eye (face.py sockets). The final mesh needs more vertices
+  round the eyes for real sockets (the base head has ~10 per eye).
 
 ## After the first defeat: the well
 - A red glow appears in the town well and beckons the player down. Below: a small new map (our own).

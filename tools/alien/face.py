@@ -122,8 +122,8 @@ def paint_eyes(kind, red=False):
         d.polygon(pts, fill=255)
     m = np.array(mask.filter(ImageFilter.GaussianBlur(1.5))).astype(float)[..., None] / 255
     a = np.array(img).astype(float)
-    rim = np.array(mask.filter(ImageFilter.GaussianBlur(6))).astype(float)[..., None] / 255
-    a = a * (1 - 0.35 * rim)
+    rim = np.array(mask.filter(ImageFilter.GaussianBlur(16))).astype(float)[..., None] / 255
+    a = a * (1 - 0.75 * np.clip(rim * 1.6, 0, 1))                     # a deep socket shadow round each eye
     a = a * (1 - m) + np.array([8, 6, 8]) * m                          # the black eye stays
     if red:                                                           # user: a small red dot in each black eye
         dot = Image.new('L', (TW, TH), 0); dd = ImageDraw.Draw(dot)
@@ -332,9 +332,23 @@ def render_layers(V, layers, ang, Fz, W=280, H=470, sc=240, oy=None, fcol=None):
         img[y0:y1 + 1, x0:x1 + 1][m] = col[m] if col is not None else skin * shade[i]
     return Image.fromarray((np.clip(img, 0, 1) * 255).astype(np.uint8))
 
+def sockets(V, kind, depth=0.055, brow=0.014):
+    """user: the eyes set deeper in the head - each eye's area pushed in (deepest at its centre), the skin just above
+       pushed out a little into a brow that shades it"""
+    rx, ry, ey, ex, tilt = kind; V = V.copy(); hd = (LAB == 'head') & (V[:, 2] > 0)
+    for sx in (-1, 1):
+        dx = (V[:, 0] - sx * ex) / (rx * 1.25); dy = (V[:, 1] - ey) / (ry * 1.25); r2 = dx * dx + dy * dy
+        inner = hd & (r2 < 1); k = (1 - r2[inner]) ** 1.5
+        cen = np.array([sx * ex * 0.6, ey, 0.0]); dirn = V[inner] - cen; dirn /= np.linalg.norm(dirn, axis=1, keepdims=True)
+        V[inner] -= dirn * (depth * k)[:, None]
+        bw = hd & (dy > 0.6) & (dy < 1.6) & (np.abs(dx) < 1.0)
+        V[bw, 2] += brow * (1 - np.abs(dx[bw])) * np.sin((dy[bw] - 0.6) / 1.0 * np.pi)
+    return V
+
 if __name__ == '__main__' and os.environ.get('FACE', 'eyes') == 'v2':
     T2 = fore((0, 1, 0), -150, ((0, 1, 0), 145), fwd=0, out=4, extra=hunch(1.5))
-    VS = gaunt(smooth_face(VA)); UV, ON = face_uv(VS)
+    VS = gaunt(smooth_face(VA)); UV, ON = face_uv(VS)          # texture placed before the sockets are pushed in
+    VS = sockets(VS, EYES['E3 huge, far apart'])
     UVb = np.stack([(VS[:, 0] - BX0) / (BX1 - BX0), (BY1 - VS[:, 1]) / (BY1 - BY0)], 1)
     ONb = (LAB == 'torso') & (VS[:, 2] > -0.01)
     ribs = paint_ribs(); ribs.save(OUT + '/alien_ribs.png')
@@ -353,11 +367,12 @@ if __name__ == '__main__' and os.environ.get('FACE', 'eyes') == 'v2':
         L2 = (np.vstack([UVb, np.zeros((ext, 2))]), np.concatenate([ONb, np.zeros(ext, bool)]), ribs)
         mF = np.concatenate([mouthF[fmask], np.zeros(len(FF) - fmask.sum(), bool)])
         cells = [render_layers(Vf, [L1, L2], a, FF, fcol=mF) for a in (0, np.radians(35), np.radians(90))]
-        Hc = Vj[LAB == 'torso'].mean(0) + np.array([0, 0.05, 0])
-        cells.append(render_layers(Vf - Hc, [L1, L2], np.radians(-30), FF, sc=620, oy=235, fcol=mF))
+        for ang in (np.radians(-30), np.radians(25)):
+            Hc = Vj[LAB == 'head'].mean(0) + np.array([0, -0.06, 0])
+            cells.append(render_layers(Vf - Hc, [L1, L2], ang, FF, sc=700, oy=235, fcol=mF))
         sheet = Image.new('RGB', (280 * len(cells), 470 + 34), (30, 30, 36)); dr = ImageDraw.Draw(sheet)
         for k, ci in enumerate(cells):
-            sheet.paste(ci, (280 * k, 34)); dr.text((280 * k + 6, 38), ['front', '3/4', 'side', 'close'][k], fill=(160, 160, 170), font=small)
+            sheet.paste(ci, (280 * k, 34)); dr.text((280 * k + 6, 38), ['front', '3/4', 'side', 'face', 'face'][k], fill=(160, 160, 170), font=small)
         dr.text((8, 6), nm, fill=(235, 225, 220), font=font); rows.append(sheet); print(nm)
     out = Image.new('RGB', (rows[0].width, sum(r.height for r in rows))); y = 0
     for r in rows: out.paste(r, (0, y)); y += r.height
