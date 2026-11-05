@@ -409,6 +409,7 @@ static void hurt_frame(volatile u32 *held, volatile u32 *press);
 static void collapse_frame(u8 *g, s32 map, volatile u32 *held, volatile u32 *press);
 static void food_frame(u8 *g);
 extern u8 *pm_player;
+static void code_poke(u32 *a, u32 want, u32 other);
 void zt_frame(u8 *g, s32 map, volatile u32 *held, volatile u32 *press)
 {
 #ifdef NO_ZT
@@ -431,6 +432,10 @@ void zt_frame(u8 *g, s32 map, volatile u32 *held, volatile u32 *press)
 #ifdef ALIEN_TEST
         if ((u32)tm >= 0x80000000u && (u32)tm < 0x81800000u) *(s32 *)(tm + 0x3F8) = 0x30;   /* test: the alien every day
                                                                   (the owl slot; shows the next time the valley loads) */
+        /* alien3: the animal is built at the day change, before this runs (dump 31139935: species 0x30 but a turtle in
+           the valley), so the game's two rolls themselves give 0x30: addi r0,rX,0x2C -> li r0,0x30 */
+        code_poke((u32 *)0x800132C8, 0x38000030u, 0x3804002Cu);
+        code_poke((u32 *)0x80013B84, 0x38000030u, 0x3803002Cu);
 #else
         if ((u32)tm >= 0x80000000u && (u32)tm < 0x81800000u && *(s32 *)(tm + 0x3F8) == 0x30) *(s32 *)(tm + 0x3F8) = 0x2C + (s32)(F(0x8017D3E8, u32, (void))() % 4u);
 #endif
@@ -1081,8 +1086,9 @@ static void ht_want(u8 *g, u8 *a)                        /* the head's target: t
 }
 /* Alien stage 2 (notes/alien_design.md): the owl slot's model is the alien. It stands still opposite Celia's farm
    (user's spot), on the ground, facing the player; its own AI is off (en_ctl), no fight yet. */
-#define ALIEN_X 216.0f
-#define ALIEN_Z 121.8f
+#define ALIEN_X 125.8f                                  /* alien3: the user's spot (dump 31139935; the map tool's X / Z
+                                                           are the world's Z / X) */
+#define ALIEN_Z 211.7f
 static void alien_frame(u8 *g, u8 *a, u8 *in)
 {
     float v[3], y, *p = SLOT_POS(g, 0);

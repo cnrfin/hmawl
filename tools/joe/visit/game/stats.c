@@ -211,6 +211,13 @@ void stats_frame(u8 *g, s32 map, volatile u32 *held, volatile u32 *press, s32 bu
     if (ST.last >= 0) {
         d = ST.last - cur;
         if (d > 0 && ST.ignore > 0) { s32 k = d < ST.ignore ? d : ST.ignore; d -= k; ST.ignore -= k; }
+        {   /* alien3 (user: EXP rose just walking about): only stamina spent while a tool is in use counts - the game also
+               drains a little stamina from moving. A tool held (field / animal tools, as skill.c) and the player not free
+               (state 1 = walking / standing in the field) */
+            s32 it = *(s32 *)(g + 0x11CC4); u8 *pl = pm_player;
+            s32 tool = (it >= 0x4DE && it <= 0x4F1) || it == 0x502 || (it >= 0x4F6 && it <= 0x4FD);
+            if (!tool || (OK(pl) && *(s32 *)(pl + 0x1364) == 1)) d = 0;
+        }
         if (d > 0 && d < 30000) {
             s32 back = d * 2 * CNT(g, C_END) / 100;
             if (back > 0) { cur += back; *(s32 *)(g + 0x11B84) = cur; ST.refund += back; }

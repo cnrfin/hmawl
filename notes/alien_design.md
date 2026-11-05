@@ -150,3 +150,12 @@ Optional night enemy, unlocked by two events; replaces the owl's slot in the wil
 - ALIEN_TEST (pm.bin): the day's species is forced to 0x30 (shows the next time the valley loads). Normal builds still
   drop the owl from the roll.
 - The blue glow the user mentioned is at about (146, 21.1, 278), by tall plants with glowing bulbs (for the eye glow).
+- alien2 test (user, a2t, days 1-10; dump 31139935): never seen. Two causes: the spot - the map tool's (X, Y, Z) has
+  the world's X and Z swapped (user stood at world (125.8, 6.4, 211.7) for the tool's (216-218, 6.5, 121-123)); and
+  the species - g_system+0x3F8 read 0x30 but the valley's animal was a turtle: the animal is built at the day change
+  (rolls at 0x800132CC / 0x80013B88), before zt_frame forces the value. alien3: ALIEN_TEST patches both rolls'
+  addi r0,rX,0x2C to li r0,0x30 (code_poke 0x800132C8 / 0x80013B84) and the bench's midnight roll gives 0x30; the
+  alien stands at (125.8, ground, 211.7).
+- Also alien3 (user: EXP rose just walking): stats.c counted every non-hit stamina drop; the game drains a little
+  stamina from moving. Now only drops while a tool is held and the player is not free (state 1) count.
+  alien3: pm alien test 72e18eb3, test 756d6d21, normal 906b2b48.
