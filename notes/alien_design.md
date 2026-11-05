@@ -117,3 +117,21 @@ Optional night enemy, unlocked by two events; replaces the owl's slot in the wil
   clothes - the alien has neither.
 - Animations: it runs on Celia's 49-node skeleton (owl: 10), so each clip costs more. Keep few, short clips (idle,
   shuffle, the scream) and let zt.c's pose layer do the rest (hunch, arms, jaw, head turn), as with the animals.
+
+## Stage 1: the model as game files (tools/alien/build_alien.py NAME OUTDIR; readback.py PREFIX OUT.png)
+- Bind pose = T-pose on Celia's 49-node skeleton with the design's bone lengths baked into the .act (local T x the
+  length factors, as the goddess build scales); the hunch, T2 arms, head and jaw are run-time poses (zt.c), not mesh.
+- Rest shape: alien_rest + gaunt + smooth_face + E3 sockets; forearms / palm / 4 fingers are new tubes (forearm on
+  15 / 26, hand on 16 / 27); rigid skin (one node per vertex).
+- Jaw: head faces below the painted mouth line (rest y < 0.909, front) on node 8 (Celia's braid, child of 7),
+  moved to the hinge (rest 0, 0.93, -0.04); vertices on the split are duplicated so the jaw separates cleanly.
+  Mouth inside: reversed-winding linings of the lower head (node 7) and the jaw (node 8), shrunk 0.92 toward the head
+  centre - they never poke out and only show through the open mouth.
+- Textures baked from the design onto the model's own UVs: head 128x128 (cylindrical, E3 eyes + socket shadow),
+  body 64x128 (ribs; a dark patch for the linings). CMPR.
+- Winding: the triangles go in reversed relative to blank_v3 / build_blank.py (the readback culls like the game; with
+  blank's order the face showed through the back of the head).
+- alien1: 1241 vertices, 2230 triangles, 24 skin groups; alien.arc 79,200 B (gpl 38 KB, skn 17 KB, textures 12 KB),
+  alien.anm.arc 36,736 B (Celia's 10 animations retargeted, for now). The readback (bind, posed, screaming) from the
+  files matches the design.
+- Scream sound (user): alien_scream.mp3, 2.4 s mono 48 kHz - kept with the build files (not in the repo), for stage 3.
