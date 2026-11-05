@@ -12,6 +12,11 @@ Optional night enemy, unlocked by two events; replaces the owl's slot in the wil
 3. From then on the alien can be met roaming at night, plus random red glows, hums / strange sounds and HUD static.
 
 ## The alien
+- Look (user references, 6 images in the user's Archive.zip; our own design from their shared traits, no copy of any
+  one): not a grey - uncannily human. A huge pale dome of a head (mushroom / bulb shape) on a thin neck, with a small,
+  ordinary, tired human face set low in it (droopy eyes, a slight frown, old-man creases); pale grey-pink skin; thin,
+  human-proportioned body that is slightly too long. From behind (head turned away) it reads as a big pale dome on a
+  thin figure; the small human face is the reveal.
 - Head always turned away from the player. On Z-lock: the head snaps round, black eyes glow red, it screams, the
   farmer is frozen in fear for about a second, then the fight starts.
 
