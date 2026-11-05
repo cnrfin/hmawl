@@ -240,3 +240,117 @@ if __name__ == '__main__' and os.environ.get('FACE', 'eyes') == 'eyes':
     out = Image.new('RGB', (rows[0].width, sum(r.height for r in rows))); y = 0
     for r in rows: out.paste(r, (0, y)); y += r.height
     out.save(OUT + '/alien_eyes_sheet.png')
+
+
+# ---------------- v2 (user's reference, ideas only): ribs and a sunken belly, bigger hands
+BX0, BX1, BY0, BY1 = -0.13, 0.13, 0.48, 0.86
+def paint_ribs():
+    W, H = 256, 384
+    dk = Image.new('L', (W, H), 0); lt = Image.new('L', (W, H), 0)
+    P = lambda x, y: ((x - BX0) / (BX1 - BX0) * W, (BY1 - y) / (BY1 - BY0) * H)
+    d1 = ImageDraw.Draw(dk); d2 = ImageDraw.Draw(lt)
+    for k in range(7):                                             # ribs: arcs down and out from the breastbone
+        y0 = 0.80 - 0.028 * k
+        for sx in (-1, 1):
+            pts = [P(sx * (0.012 + 0.09 * t), y0 - 0.035 * t ** 1.6 - 0.002 * k * t) for t in np.linspace(0, 1, 14)]
+            d1.line([(a, b + 5) for a, b in pts], fill=150, width=5)   # the shadow under each rib
+            d2.line(pts, fill=110, width=4)                             # the rib catching light
+    d1.line([P(0, 0.82), P(0, 0.70)], fill=120, width=4)              # breastbone
+    d1.ellipse([*P(-0.06, 0.66), *P(0.06, 0.55)], fill=120)           # sunken belly under the ribcage
+    for sx in (-1, 1): d1.line([P(sx * 0.07, 0.83), P(sx * 0.11, 0.78)], fill=110, width=6)   # collarbones
+    dk = np.array(dk.filter(ImageFilter.GaussianBlur(3))).astype(float) / 255
+    lt = np.array(lt.filter(ImageFilter.GaussianBlur(2))).astype(float) / 255
+    img = np.tile(SKIN_RGB, (H, W, 1)) * (1 - 0.75 * dk[..., None]); img = img + (255 - img) * 0.45 * lt[..., None]
+    return Image.fromarray(np.clip(img, 0, 255).astype(np.uint8))
+
+def gaunt(V):
+    """sunken belly, narrow waist under a slightly flared ribcage"""
+    V = V.copy(); tor = LAB == 'torso'; y = V[:, 1]
+    belly = tor & (y > 0.53) & (y < 0.68) & (V[:, 2] > 0)
+    V[belly, 2] *= 0.55 + 0.45 * np.abs(y[belly] - 0.605) / 0.075
+    waist = tor & (y > 0.56) & (y < 0.66); V[waist, 0] *= 0.85
+    cage = tor & (y >= 0.68) & (y < 0.80); V[cage, 0] *= 1.06
+    return V
+
+def forelimbs_big(V, palm=0.1, finger=0.14):
+    """the T-rex hands, oversized: longer palm, four long fingers, knuckles"""
+    R, t = pose.last
+    keep = ~np.isin(NODE, FORE_NODES); Fk = F[keep[F].all(1)]
+    Vs, Fs = [V], [Fk]; base = [len(V)]
+    def add(vt, ft): Vs.append(vt); Fs.append(ft + base[0]); base[0] += len(vt)
+    for e, w, sx in ((15, 16, 1), (26, 27, -1)):
+        add(*tube(t[e], t[w], 0.017, 0.012))
+        hd = R[w] @ np.array([sx, 0, 0]); side = R[w] @ np.array([0, 0, 1])
+        pe = t[w] + hd * palm
+        add(*tube(t[w], pe, 0.016, 0.026))
+        for f in (-1.5, -0.5, 0.5, 1.5):
+            k0 = pe + side * 0.012 * f; k1 = k0 + hd * finger * 0.55 + side * 0.006 * f
+            add(*tube(k0, k1, 0.007, 0.0065, 6)); add(*tube(k1, k1 + hd * finger * 0.45 + side * 0.004 * f, 0.0065, 0.003, 6))
+    return np.vstack(Vs), np.vstack(Fs)
+
+def render_layers(V, layers, ang, Fz, W=280, H=470, sc=240, oy=None, fcol=None):
+    """as render_tex, with several planar texture layers: [(UV, ON, tex), ...] (a face takes the first whose 3 vertices are ON)"""
+    Ts = [np.asarray(tx).astype(float) / 255 for _, _, tx in layers]
+    c, s = np.cos(ang), np.sin(ang)
+    X = V @ np.array([[c, 0, -s], [0, 1, 0], [s, 0, c]]).T
+    sx = W / 2 + X[:, 0] * sc; sy = (H - 14 if oy is None else oy) - X[:, 1] * sc; z = X[:, 2]
+    img = np.tile(BG, (H, W, 1)); zb = np.full((H, W), -1e9)
+    N = np.cross(X[Fz[:, 1]] - X[Fz[:, 0]], X[Fz[:, 2]] - X[Fz[:, 0]]); N /= np.linalg.norm(N, axis=1, keepdims=True) + 1e-12
+    Lt = np.array([0.35, 0.55, 0.75]); Lt /= np.linalg.norm(Lt)
+    shade = 0.32 + 0.68 * np.clip(N @ Lt, 0, 1) + 0.15 * (1 - np.abs(N[:, 2])) ** 3
+    skin = SKIN_RGB / 255
+    for i, (a, b, cc) in enumerate(Fz):
+        inside = N[i, 2] <= 0
+        xs = np.array([sx[a], sx[b], sx[cc]]); ys = np.array([sy[a], sy[b], sy[cc]])
+        x0, x1 = int(max(0, xs.min())), int(min(W - 1, xs.max() + 1)); y0, y1 = int(max(0, ys.min())), int(min(H - 1, ys.max() + 1))
+        if x0 > x1 or y0 > y1: continue
+        gx, gy = np.meshgrid(np.arange(x0, x1 + 1) + 0.5, np.arange(y0, y1 + 1) + 0.5)
+        den = (ys[1] - ys[2]) * (xs[0] - xs[2]) + (xs[2] - xs[1]) * (ys[0] - ys[2])
+        if abs(den) < 1e-9: continue
+        l0 = ((ys[1] - ys[2]) * (gx - xs[2]) + (xs[2] - xs[1]) * (gy - ys[2])) / den
+        l1 = ((ys[2] - ys[0]) * (gx - xs[2]) + (xs[0] - xs[2]) * (gy - ys[2])) / den; l2 = 1 - l0 - l1
+        m = (l0 >= -1e-6) & (l1 >= -1e-6) & (l2 >= -1e-6)
+        zz = l0 * z[a] + l1 * z[b] + l2 * z[cc]
+        sub = zb[y0:y1 + 1, x0:x1 + 1]; m &= zz > sub
+        if not m.any(): continue
+        sub[m] = zz[m]
+        if inside or (fcol is not None and fcol[i]): img[y0:y1 + 1, x0:x1 + 1][m] = np.array([0.14, 0.04, 0.05]); continue
+        col = None
+        for (UV, ON, _), T in zip(layers, Ts):
+            if ON[a] and ON[b] and ON[cc]:
+                th, tw = T.shape[:2]
+                uu = l0 * UV[a, 0] + l1 * UV[b, 0] + l2 * UV[cc, 0]; vv = l0 * UV[a, 1] + l1 * UV[b, 1] + l2 * UV[cc, 1]
+                col = T[np.clip((vv * th).astype(int), 0, th - 1), np.clip((uu * tw).astype(int), 0, tw - 1)] * shade[i]; break
+        img[y0:y1 + 1, x0:x1 + 1][m] = col[m] if col is not None else skin * shade[i]
+    return Image.fromarray((np.clip(img, 0, 1) * 255).astype(np.uint8))
+
+if __name__ == '__main__' and os.environ.get('FACE', 'eyes') == 'v2':
+    T2 = fore((0, 1, 0), -150, ((0, 1, 0), 145), fwd=0, out=4, extra=hunch(1.5))
+    VS = gaunt(smooth_face(VA)); UV, ON = face_uv(VS)
+    UVb = np.stack([(VS[:, 0] - BX0) / (BX1 - BX0), (BY1 - VS[:, 1]) / (BY1 - BY0)], 1)
+    ONb = (LAB == 'torso') & (VS[:, 2] > -0.01)
+    ribs = paint_ribs(); ribs.save(OUT + '/alien_ribs.png')
+    try: font = ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf', 20); small = ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf', 14)
+    except Exception: font = small = ImageFont.load_default()
+    JW = dict(top=0.909, soft=0.008, hinge=(0, 0.93, -0.04)); kind = EYES['E3 huge, far apart']
+    rows = []
+    for nm, wd, op, red in (('the design: T2, E3 eyes, ribs, sunken belly, big hands', 1.0, 0, False), ('the scream', 1.6, 70, True)):
+        tex = paint_eyes(kind, red)
+        Vc = pose(T2, jaw_bell(VS, wd, 0, **JW)); Vj = pose(T2, jaw_bell(VS, wd, op, **JW))
+        ar = lambda X: np.linalg.norm(np.cross(X[F[:, 1]] - X[F[:, 0]], X[F[:, 2]] - X[F[:, 0]]), axis=1)
+        mouthF = ar(Vj) > 1.8 * ar(Vc) + 1e-7
+        Vf, FF = forelimbs_big(Vj); keep = ~np.isin(NODE, FORE_NODES); fmask = keep[F].all(1)
+        ext = len(Vf) - len(UV)
+        L1 = (np.vstack([UV, np.zeros((ext, 2))]), np.concatenate([ON, np.zeros(ext, bool)]), tex)
+        L2 = (np.vstack([UVb, np.zeros((ext, 2))]), np.concatenate([ONb, np.zeros(ext, bool)]), ribs)
+        mF = np.concatenate([mouthF[fmask], np.zeros(len(FF) - fmask.sum(), bool)])
+        cells = [render_layers(Vf, [L1, L2], a, FF, fcol=mF) for a in (0, np.radians(35), np.radians(90))]
+        Hc = Vj[LAB == 'torso'].mean(0) + np.array([0, 0.05, 0])
+        cells.append(render_layers(Vf - Hc, [L1, L2], np.radians(-30), FF, sc=620, oy=235, fcol=mF))
+        sheet = Image.new('RGB', (280 * len(cells), 470 + 34), (30, 30, 36)); dr = ImageDraw.Draw(sheet)
+        for k, ci in enumerate(cells):
+            sheet.paste(ci, (280 * k, 34)); dr.text((280 * k + 6, 38), ['front', '3/4', 'side', 'close'][k], fill=(160, 160, 170), font=small)
+        dr.text((8, 6), nm, fill=(235, 225, 220), font=font); rows.append(sheet); print(nm)
+    out = Image.new('RGB', (rows[0].width, sum(r.height for r in rows))); y = 0
+    for r in rows: out.paste(r, (0, y)); y += r.height
+    out.save(OUT + '/alien_v2.png')

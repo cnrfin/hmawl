@@ -83,6 +83,10 @@ Optional night enemy, unlocked by two events; replaces the owl's slot in the wil
 - While the farmer is frozen it closes in and grabs; mashing buttons breaks free sooner (shorter freeze with Endurance?).
 - A grab drains (HP or fullness) until the player breaks free; then it reels back, open to hits.
 - Roaming: it hardly moves while watched, shuffles closer when the player looks away.
+- Applied from the user's model reference (ideas only, nothing from its files): ribs, breastbone, collarbones and a
+  sunken belly painted on the torso (tools/alien/alien_ribs.png, our own) with the belly pulled in and the waist
+  narrowed under a slightly wider ribcage (face.py gaunt); oversized T-rex hands (longer palm, four long jointed
+  fingers: forelimbs_big). Walk: a shuffle (knees bent, feet barely lifting) when we animate it. FACE=v2 renders it.
 
 ## After the first defeat: the well
 - A red glow appears in the town well and beckons the player down. Below: a small new map (our own).
