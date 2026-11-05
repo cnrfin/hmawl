@@ -1,0 +1,186 @@
+"""The alien's face (user: an original face like the references - small, tired, uncannily human; no anime features).
+Painted procedurally as a texture in face coordinates (rest-space metres on the base head: x -0.15..0.15, y 0.84..1.06),
+then shown on the T2 body with the bell jaw closed and screaming, with normal and red eyes.
+usage: face.py OUTDIR"""
+import sys, os, numpy as np
+from PIL import Image, ImageDraw, ImageFilter, ImageFont
+HERE = os.path.dirname(os.path.abspath(__file__))
+OUT = sys.argv[1]
+os.environ['SET'] = 'none'
+_argv = sys.argv; sys.argv = ['x', OUT]
+exec(open(os.path.join(HERE, 'body_candidates.py')).read().split("try: font")[0])
+sys.argv = _argv
+
+# ---------------- painting
+TW = TH = 512
+X0, X1, Y0, Y1 = -0.15, 0.15, 0.84, 1.06
+def px(x, y): return ((x - X0) / (X1 - X0) * TW, (Y1 - y) / (Y1 - Y0) * TH)
+SKIN_RGB = np.array([206, 198, 197], float)
+
+class Paint:
+    def __init__(s):
+        s.dark = Image.new('L', (TW, TH), 0); s.light = Image.new('L', (TW, TH), 0)
+        s.tint = np.zeros((TH, TW, 3)); s.tintA = np.zeros((TH, TW))
+    def stroke(s, layer, pts, w, val, blur):
+        im = Image.new('L', (TW, TH), 0); d = ImageDraw.Draw(im)
+        d.line([px(*p) for p in pts], fill=val, width=max(1, int(w)), joint='curve')
+        im = im.filter(ImageFilter.GaussianBlur(blur))
+        L = s.dark if layer == 'd' else s.light
+        L.paste(Image.fromarray(np.maximum(np.array(L), np.array(im)).astype(np.uint8)))
+    def blob(s, layer, c, rx, ry, val, blur):
+        im = Image.new('L', (TW, TH), 0); d = ImageDraw.Draw(im)
+        (cx, cy) = px(*c); sx = rx / (X1 - X0) * TW; sy = ry / (Y1 - Y0) * TH
+        d.ellipse((cx - sx, cy - sy, cx + sx, cy + sy), fill=val)
+        im = im.filter(ImageFilter.GaussianBlur(blur))
+        L = s.dark if layer == 'd' else s.light
+        L.paste(Image.fromarray(np.maximum(np.array(L), np.array(im)).astype(np.uint8)))
+    def colour(s, mask, rgb, a):
+        m = np.array(mask).astype(float) / 255 * a
+        s.tint = s.tint * (1 - m[..., None]) + np.array(rgb) * m[..., None]; s.tintA = np.maximum(s.tintA, m)
+
+def curve(f, x0, x1, n=24): return [(x, f(x)) for x in np.linspace(x0, x1, n)]
+
+def paint_face(red=False):
+    P = Paint()
+    EY, EX = 0.962, 0.043                                             # eyes: low on the dome, a little too far apart
+    for sx in (-1, 1):
+        cx = sx * EX
+        P.blob('d', (cx, EY + 0.002), 0.03, 0.017, 95, 9)             # deep, shadowed socket
+        P.blob('d', (cx + sx * 0.004, EY - 0.012), 0.024, 0.008, 70, 6)   # bags under the eyes
+        P.stroke('d', curve(lambda x: EY - 0.017 - 9 * (x - cx) ** 2, cx - 0.02, cx + 0.018), 3, 110, 2)   # bag crease
+        # heavy upper lid: a fold above the eye, the lid itself drooping over half the eye
+        P.stroke('d', curve(lambda x: EY + 0.009 - 14 * (x - cx - sx * 0.003) ** 2, cx - 0.02, cx + 0.02), 4, 150, 1.5)
+        P.blob('l', (cx, EY + 0.0045), 0.017, 0.0035, 60, 3)           # lid catching light
+        # the eye opening: a low, narrow almond (half closed)
+        im = Image.new('L', (TW, TH), 0); d = ImageDraw.Draw(im)
+        top = [px(x, EY + 0.0015 - 3.2 * (x - cx) ** 2 * 0 - 0.0) for x in np.linspace(cx - 0.016, cx + 0.016, 20)]
+        bot = [px(x, EY - 0.004 + 10 * (x - cx) ** 2) for x in np.linspace(cx + 0.016, cx - 0.016, 20)]
+        d.polygon(top + bot, fill=255); eye = im.filter(ImageFilter.GaussianBlur(1.2))
+        if red:
+            P.colour(eye, (255, 24, 18), 1.0)
+            P.colour(eye.filter(ImageFilter.GaussianBlur(7)), (255, 40, 30), 0.55)   # bleed: reads as glowing
+        else:
+            P.colour(eye, (62, 52, 54), 0.95)                          # sclera barely shows: dull, dark
+            P.blob('d', (cx + sx * 0.002, EY - 0.001), 0.0062, 0.0042, 255, 1)     # iris / pupil under the lid
+            P.blob('l', (cx + sx * 0.0035, EY + 0.0002), 0.0012, 0.0010, 150, 0.6)  # a small wet highlight
+        P.stroke('d', curve(lambda x: EY + 0.0015, cx - 0.016, cx + 0.016), 3, 200, 1)   # lid edge (lashless)
+        # crow's feet
+        for k in range(3):
+            P.stroke('d', [(cx + sx * 0.022, EY + 0.002 - 0.004 * k), (cx + sx * 0.033, EY + 0.004 - 0.007 * k)], 2, 70, 1.2)
+    # no eyebrows: only a faint brow ridge shadow, and creases on a low forehead
+    for sx in (-1, 1):
+        P.stroke('l', curve(lambda x: EY + 0.026 - 6 * (x - sx * 0.04) ** 2, sx * 0.02, sx * 0.065), 7, 55, 5)
+    for k, yy in enumerate((1.0, 1.012, 1.024)):
+        P.stroke('d', curve(lambda x: yy + 3 * x * x, -0.05 + 0.01 * k, 0.05 - 0.01 * k), 2, 55 - 10 * k, 1.5)
+    P.stroke('d', [(-0.004, EY + 0.02), (-0.002, EY + 0.006)], 2, 70, 1.2)          # a frown line between the brows
+    P.stroke('d', [(0.005, EY + 0.018), (0.003, EY + 0.006)], 2, 55, 1.2)
+    # nose: long and thin, a soft shadow down one side, small nostrils
+    P.stroke('l', [(0, EY + 0.006), (0.001, 0.938)], 6, 60, 4)
+    P.stroke('d', [(0.011, EY - 0.004), (0.012, 0.938)], 5, 60, 4)
+    P.blob('d', (0, 0.931), 0.012, 0.004, 90, 4)                       # under the tip
+    for sx in (-1, 1): P.blob('d', (sx * 0.0075, 0.9325), 0.0035, 0.0018, 210, 1.2)
+    P.blob('l', (0.002, 0.937), 0.005, 0.003, 70, 2)                   # tip highlight
+    # mouth: thin, wide-ish, the corners pulled down
+    MY = 0.906
+    mouth = curve(lambda x: MY - 2.2 * x * x - 0.0 * x, -0.027, 0.027)
+    P.stroke('d', mouth, 4, 230, 1.0)
+    P.stroke('d', curve(lambda x: MY - 0.006 - 2.0 * x * x, -0.018, 0.018), 6, 70, 3)   # under the lower lip
+    lips = Image.new('L', (TW, TH), 0); d = ImageDraw.Draw(lips)
+    d.line([px(*p) for p in curve(lambda x: MY + 0.002 - 2.2 * x * x, -0.024, 0.024)], fill=255, width=6)
+    P.colour(lips.filter(ImageFilter.GaussianBlur(2)), (168, 140, 142), 0.5)
+    P.stroke('d', curve(lambda x: MY + 0.0095 - 1.0 * x * x, -0.006, 0.006, 6), 3, 70, 1.5)   # philtrum dip
+    # the creases that make it old and tired: nose-to-mouth folds, sagging lines below the corners
+    for sx in (-1, 1):
+        P.stroke('d', curve(lambda t: 0, 0, 1, 2), 1, 0, 1)
+        fold = [(sx * (0.014 + 0.016 * t ** 0.8), 0.935 - 0.034 * t) for t in np.linspace(0, 1, 16)]
+        P.stroke('d', fold, 4, 150, 1.6)
+        P.stroke('l', [(sx * (0.018 + 0.016 * t ** 0.8), 0.935 - 0.034 * t) for t in np.linspace(0, 1, 16)], 6, 60, 3)
+        P.stroke('d', [(sx * (0.028 + 0.004 * t), MY - 0.003 - 0.025 * t) for t in np.linspace(0, 1, 10)], 3, 110, 1.6)
+        P.blob('d', (sx * 0.05, 0.925), 0.02, 0.025, 45, 12)          # hollow cheeks
+    P.blob('d', (0, 0.876), 0.03, 0.01, 60, 8)                         # under the chin
+    P.blob('l', (0, 0.888), 0.02, 0.008, 45, 6)                        # chin
+    # compose: skin, darkening (multiply), light, colour
+    dk = np.array(P.dark).astype(float) / 255; lt = np.array(P.light).astype(float) / 255
+    img = np.tile(SKIN_RGB, (TH, TW, 1))
+    img = img * (1 - 0.62 * dk[..., None]) * np.array([1.0, 0.97, 0.98]) ** (dk[..., None] * 3)
+    img = img + (255 - img) * 0.35 * lt[..., None]
+    img = img * (1 - P.tintA[..., None]) + P.tint * P.tintA[..., None]
+    return Image.fromarray(np.clip(img, 0, 255).astype(np.uint8))
+
+# ---------------- head: smooth the base's face dent (its sculpted nose / sockets) before painting on it
+def smooth_face(V, it=12):
+    V = V.copy(); fr = (LAB == 'head') & (V[:, 2] > 0.04) & (V[:, 1] > 0.88) & (V[:, 1] < 1.08)
+    nb = [set() for _ in range(len(V))]
+    for a, b, c in F: nb[a] |= {b, c}; nb[b] |= {a, c}; nb[c] |= {a, b}
+    idx = np.where(fr)[0]
+    for _ in range(it):
+        V[idx] = 0.5 * V[idx] + 0.5 * np.array([V[list(nb[i])].mean(0) for i in idx])
+    return V
+
+def face_uv(V):
+    u = (V[:, 0] - X0) / (X1 - X0); v = (Y1 - V[:, 1]) / (Y1 - Y0)
+    on = (LAB == 'head') & (V[:, 2] > -0.02)
+    return np.stack([u, v], 1), on
+
+def render_tex(V, UV, ON, tex, ang, Fz, W=280, H=470, sc=240, oy=None, fcol=None):
+    T = np.asarray(tex).astype(float) / 255; th, tw = T.shape[:2]
+    c, s = np.cos(ang), np.sin(ang)
+    X = V @ np.array([[c, 0, -s], [0, 1, 0], [s, 0, c]]).T
+    sx = W / 2 + X[:, 0] * sc; sy = (H - 14 if oy is None else oy) - X[:, 1] * sc; z = X[:, 2]
+    img = np.tile(BG, (H, W, 1)); zb = np.full((H, W), -1e9)
+    N = np.cross(X[Fz[:, 1]] - X[Fz[:, 0]], X[Fz[:, 2]] - X[Fz[:, 0]]); N /= np.linalg.norm(N, axis=1, keepdims=True) + 1e-12
+    Lt = np.array([0.35, 0.55, 0.75]); Lt /= np.linalg.norm(Lt)
+    shade = 0.32 + 0.68 * np.clip(N @ Lt, 0, 1) + 0.15 * (1 - np.abs(N[:, 2])) ** 3
+    skin = SKIN_RGB / 255
+    for i, (a, b, cc) in enumerate(Fz):
+        inside = N[i, 2] <= 0
+        xs = np.array([sx[a], sx[b], sx[cc]]); ys = np.array([sy[a], sy[b], sy[cc]])
+        x0, x1 = int(max(0, xs.min())), int(min(W - 1, xs.max() + 1)); y0, y1 = int(max(0, ys.min())), int(min(H - 1, ys.max() + 1))
+        if x0 > x1 or y0 > y1: continue
+        gx, gy = np.meshgrid(np.arange(x0, x1 + 1) + 0.5, np.arange(y0, y1 + 1) + 0.5)
+        den = (ys[1] - ys[2]) * (xs[0] - xs[2]) + (xs[2] - xs[1]) * (ys[0] - ys[2])
+        if abs(den) < 1e-9: continue
+        l0 = ((ys[1] - ys[2]) * (gx - xs[2]) + (xs[2] - xs[1]) * (gy - ys[2])) / den
+        l1 = ((ys[2] - ys[0]) * (gx - xs[2]) + (xs[0] - xs[2]) * (gy - ys[2])) / den; l2 = 1 - l0 - l1
+        m = (l0 >= -1e-6) & (l1 >= -1e-6) & (l2 >= -1e-6)
+        zz = l0 * z[a] + l1 * z[b] + l2 * z[cc]
+        sub = zb[y0:y1 + 1, x0:x1 + 1]; m &= zz > sub
+        if not m.any(): continue
+        sub[m] = zz[m]
+        if inside or (fcol is not None and fcol[i]): col = np.array([0.14, 0.04, 0.05]); img[y0:y1 + 1, x0:x1 + 1][m] = col; continue
+        if ON[a] and ON[b] and ON[cc]:
+            uu = l0 * UV[a, 0] + l1 * UV[b, 0] + l2 * UV[cc, 0]; vv = l0 * UV[a, 1] + l1 * UV[b, 1] + l2 * UV[cc, 1]
+            ti = np.clip((vv * th).astype(int), 0, th - 1); tj = np.clip((uu * tw).astype(int), 0, tw - 1)
+            img[y0:y1 + 1, x0:x1 + 1][m] = (T[ti, tj] * shade[i])[m]
+        else:
+            img[y0:y1 + 1, x0:x1 + 1][m] = skin * shade[i]
+    return Image.fromarray((np.clip(img, 0, 1) * 255).astype(np.uint8))
+
+if __name__ == '__main__':
+    texN = paint_face(False); texR = paint_face(True)
+    texN.save(OUT + '/alien_face.png'); texR.save(OUT + '/alien_face_red.png')
+    T2 = fore((0, 1, 0), -150, ((0, 1, 0), 145), fwd=0, out=4, extra=hunch(1.5))
+    VS = smooth_face(VA)
+    UV, ON = face_uv(VS)
+    try: font = ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf', 20); small = ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf', 14)
+    except Exception: font = small = ImageFont.load_default()
+    rows = []
+    for nm, wd, op, tex in (('normal: jaw closed', 1.0, 0, texN), ('the scream: jaw open, eyes red', 1.6, 70, texR)):
+        JW = dict(top=0.909, soft=0.008, hinge=(0, 0.93, -0.04))       # the split is the painted mouth line
+        Vc = pose(T2, jaw_bell(VS, wd, 0, **JW)); Vj = pose(T2, jaw_bell(VS, wd, op, **JW))
+        ar = lambda X: np.linalg.norm(np.cross(X[F[:, 1]] - X[F[:, 0]], X[F[:, 2]] - X[F[:, 0]]), axis=1)
+        mouthF = ar(Vj) > 1.8 * ar(Vc) + 1e-7
+        Vf, FF = forelimbs(Vj); keep = ~np.isin(NODE, FORE_NODES); fmask = keep[F].all(1)
+        UVf = np.vstack([UV, np.zeros((len(Vf) - len(UV), 2))]); ONf = np.concatenate([ON, np.zeros(len(Vf) - len(ON), bool)])
+        mF = np.concatenate([mouthF[fmask], np.zeros(len(FF) - fmask.sum(), bool)])
+        Hc = Vj[LAB == 'head'].mean(0) + np.array([0, -0.07, 0])
+        cells = [render_tex(Vf, UVf, ONf, tex, a, FF, fcol=mF) for a in (0, np.radians(35))]
+        for a in (0, np.radians(30)):
+            cells.append(render_tex(Vf - Hc, UVf, ONf, tex, a, FF, sc=900, oy=235, fcol=mF))
+        sheet = Image.new('RGB', (280 * len(cells), 470 + 34), (30, 30, 36)); dr = ImageDraw.Draw(sheet)
+        for k, ci in enumerate(cells):
+            sheet.paste(ci, (280 * k, 34)); dr.text((280 * k + 6, 38), ['front', '3/4', 'face', 'face 3/4'][k], fill=(160, 160, 170), font=small)
+        dr.text((8, 6), nm, fill=(235, 225, 220), font=font); rows.append(sheet); print(nm)
+    out = Image.new('RGB', (rows[0].width, sum(r.height for r in rows))); y = 0
+    for r in rows: out.paste(r, (0, y)); y += r.height
+    out.save(OUT + '/alien_face_sheet.png')

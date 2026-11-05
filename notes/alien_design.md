@@ -68,6 +68,11 @@ Optional night enemy, unlocked by two events; replaces the owl's slot in the wil
   instance with the flat-colour switch on (+0x3D = 1, colour white: lighting off - findings 7.44, enemy2 test: white =
   the texture unlit). Hidden (+0x3C = 0) until the scream, then shown over the normal eyes. Optional halo with HUD
   quads on top.
+- Face (user: original, like the references, not anime): painted procedurally (tools/alien/face.py ->
+  alien_face.png / alien_face_red.png, our own art): heavy half-closed lids in shadowed sockets, bags, no eyebrows,
+  low creased forehead, long thin nose, thin down-turned mouth, nose-to-mouth folds, sagging lines below the corners,
+  hollow cheeks. Small and low on the dome (eyes at y 0.962 on the base head, mouth 0.906). The jaw now splits at the
+  painted mouth line (jaw_bell top 0.909, hinge 0.93) so the scream opens below the nose and the eyes stay.
 
 ## After the first defeat: the well
 - A red glow appears in the town well and beckons the player down. Below: a small new map (our own).

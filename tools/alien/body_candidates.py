@@ -251,14 +251,14 @@ def jaw(V, width=1.35, open_deg=0.0, mouth=0.905):
         V = V * (1 - w[:, None]) + (q @ Rj.T + HINGE) * w[:, None]
     return V
 
-def jaw_bell(V, width=1.6, open_deg=0.0):
+def jaw_bell(V, width=1.6, open_deg=0.0, top=0.965, soft=0.03, hinge=(0, 0.975, -0.03)):
     """the first jaw render (user's pick, J3): the whole lower head flares smoothly into a bell, widest at the bottom,
        and opening swings that whole lower head down from a hinge under the ears (the skin stretches, no cut)."""
     V = V.copy(); hd = LAB == 'head'
-    w = np.clip((0.965 - V[:, 1]) / 0.03, 0, 1) * (V[:, 2] > -0.09) * hd; w = w * w * (3 - 2 * w)
-    V[:, 0] *= 1 + (width - 1) * w * np.clip((0.975 - V[:, 1]) / 0.05, 0, 1)
+    w = np.clip((top - V[:, 1]) / soft, 0, 1) * (V[:, 2] > -0.09) * hd; w = w * w * (3 - 2 * w)
+    V[:, 0] *= 1 + (width - 1) * w * np.clip((top + 0.01 - V[:, 1]) / 0.05, 0, 1)
     if open_deg:
-        hg = np.array([0, 0.975, -0.03]); q = V - hg; Rj = rot((1, 0, 0), open_deg)
+        hg = np.array(hinge); q = V - hg; Rj = rot((1, 0, 0), open_deg)
         V = V * (1 - w[:, None]) + (q @ Rj.T + hg) * w[:, None]
     return V
 
