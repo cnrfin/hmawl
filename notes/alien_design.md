@@ -105,3 +105,15 @@ Optional night enemy, unlocked by two events; replaces the owl's slot in the wil
 - What the cow gets out of it, and whether the events repeat.
 - Reward for a defeat (besides the well).
 - The well map: layout, what is down there (a guardian? just the key?), how the player gets back up.
+
+## Budget (replaces the owl)
+- Wild models load one at a time into a block the field setup sizes at run time to the BIGGEST of the five model
+  files (0x8002BAC4: max file size over the model table lbl_8024A534). So a bigger alien does not break anything, it
+  just grows that reserved block every time the valley loads - and memory is tight (findings 7.4x memfix).
+- Sizes now: owl ~48 KB of parts (gpl 18 KB, skn 10 KB, textures 18 KB; 10 nodes); tanuki gpl 31 KB / 966 vertices
+  (the biggest gpl), turtle 823, lizard 779, mouse 705 vertices. The base body is 1018 vertices / 2032 triangles.
+- Target: ~1000 vertices, ~2000 triangles, small CMPR textures (body 64x128, head 64x64, eye dots 8x8): about the
+  tanuki's size, so the block barely grows. The goddess (2832 triangles, 152 KB) shows what to avoid: hair and
+  clothes - the alien has neither.
+- Animations: it runs on Celia's 49-node skeleton (owl: 10), so each clip costs more. Keep few, short clips (idle,
+  shuffle, the scream) and let zt.c's pose layer do the rest (hunch, arms, jaw, head turn), as with the animals.
