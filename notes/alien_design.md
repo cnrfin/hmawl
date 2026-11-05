@@ -184,3 +184,5 @@ Optional night enemy, unlocked by two events; replaces the owl's slot in the wil
   ~0.4 below the hinge at 1.6x and the band-rim faces stretched. alien7: for the alien, every node but the root takes
   its translation from the built skeleton's rest matrix (rm[3] / rm[7] / rm[11]), never from the clip. pm alien test
   305121b7, test 94ceb247, normal 176dd7d3 (owl.arc unchanged from alien6).
+- alien7 test (user + dump 18baa9b3): correct from all sides. Memory gauge: gap 595 KB now, lowest seen 592 KB (the
+  pools stay far apart with the alien loaded). Stage 2 done.
