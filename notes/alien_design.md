@@ -39,6 +39,8 @@ Optional night enemy, unlocked by two events; replaces the owl's slot in the wil
   neck (0.6x). Forelimb options (SET=fore): B1 mantis (folded up in front, hands limp), B2 reversed (elbows bent
   backwards, forearms up behind), B3 sideways (elbows bend outward, forearms up beside the head), B4 raised (upper
   arms level, forearms straight up, wrists bent over).
+  Picked: the mantis (user: arms lower, shoulders more hunched, neck thinner -> neck 0.42x). SET=mantis: M1 forearms up
+  at chest height, M2 forearms lower reaching forward, M3 very hunched with forearms low and hands dangling.
 
 ## After the first defeat: the well
 - A red glow appears in the town well and beckons the player down. Below: a small new map (our own).

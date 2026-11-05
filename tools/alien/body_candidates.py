@@ -73,7 +73,7 @@ def alien_rest(V):
     cx = np.sign(x[leg]) * 0.06
     V[leg, 0] = cx + (x[leg] - cx) * 0.72; V[leg, 2] = 0.005 + (z[leg] - 0.005) * 0.72
     # a thin neck (user)
-    nk = LAB == 'neck'; V[nk, 0] *= 0.6; V[nk, 2] = (z[nk] - 0.0) * 0.6
+    nk = LAB == 'neck'; V[nk, 0] *= 0.42; V[nk, 2] = (z[nk] - 0.0) * 0.42
     # no ears
     e = head & (ax > 0.19) & (np.abs(y - 1.025) < 0.07) & (np.abs(z - 0.015) < 0.06)
     V[e, 0] = np.sign(x[e]) * np.minimum(ax[e], 0.2)
@@ -156,15 +156,21 @@ D = dict(   # The Wide: head and face far too wide and a little flat, long thin 
     rot=merge(arms_down(80, -14), {11: rot((0, 0, 1), -12), 22: rot((0, 0, 1), 12)}),
     scl={7: (HEADC, (1.4, 0.88, 1.08)), 6: (P[6], (0.8, 1, 0.8))})
 
-def fore(elbow_axis, deg, wrist=None, sh=84, out=0, fwd=0, flen=3.0):
+def fore(elbow_axis, deg, wrist=None, sh=84, out=0, fwd=0, flen=3.0, extra=None):
     """B with the forelimbs folded up at the elbow (user): elbow turned deg about elbow_axis (rest frame, left arm;
        mirrored for the right), optional wrist turn, shoulder angle sh, upper arm out sideways by 'out' degrees."""
     ax = np.array(elbow_axis, float); axR = ax * [-1, 1, 1] * -1     # mirror: x stays, rotation sense flips
     r = {12: rot((1, 0, 0), -fwd) @ rot((0, 0, 1), -sh + out), 23: rot((1, 0, 0), -fwd) @ rot((0, 0, 1), sh - out), 7: rot((0, 0, 1), 16),
          15: rot(ax, deg), 26: rot(ax * [1, -1, -1], deg)}
     if wrist is not None: r[16] = rot(wrist[0], wrist[1]); r[27] = rot(np.array(wrist[0]) * [1, -1, -1], wrist[1])
+    if extra: r.update(extra)
     sc = dict(B['scl']); sc[15] = (P[15], (flen, 1, 1)); sc[26] = (P[26], (flen, 1, 1))   # the forearm mesh itself
     return dict(len=merge(B['len'], {16: flen, 27: flen}), rot=r, scl=sc)
+
+def hunch(k):
+    """shoulders up and rolled forward, upper back curved, neck leaning out (strength k)"""
+    return {4: rot((1, 0, 0), 8 * k), 5: rot((1, 0, 0), 12 * k), 6: rot((1, 0, 0), 30 * k), 7: rot((1, 0, 0), -22 * k) @ rot((0, 0, 1), 12),
+            11: rot((0, 0, 1), 14 * k) @ rot((0, 1, 0), -18 * k), 22: rot((0, 0, 1), -14 * k) @ rot((0, 1, 0), 18 * k)}
 
 SKIN = np.array([214, 210, 212]) / 255; HUM = np.array([150, 158, 170]) / 255; BG = np.array([30, 30, 36]) / 255
 
@@ -200,6 +206,10 @@ rows = []
 import os
 SET = os.environ.get('SET', 'all')
 LIST = (('A', 'The Listener', A), ('B', 'The Tall One', B), ('C', 'The Contorted', C), ('D', 'The Wide', D))
+if SET == 'mantis':
+    LIST = (('M1', 'Mantis, hunched: forearms up at chest height', fore((0, 1, 0), -105, ((0, 1, 0), -85), fwd=18, out=10, extra=hunch(1.0))),
+            ('M2', 'Mantis, hunched: forearms lower, reaching forward', fore((0, 1, 0), -80, ((0, 1, 0), -80), fwd=10, out=8, extra=hunch(1.0))),
+            ('M3', 'Mantis, very hunched: forearms low, hands dangling', fore((0, 1, 0), -70, ((0, 1, 0), -90), fwd=5, out=6, extra=hunch(1.5))))
 if SET == 'fore':
     LIST = (('B1', 'Mantis: long forearms folded up in front, hands hanging limp', fore((0, 1, 0), -120, ((0, 1, 0), -85), fwd=40, out=12)),
             ('B2', 'Reversed: elbows bent backwards, forearms up behind the shoulders', fore((0, 1, 0), 125, ((0, 1, 0), 70), fwd=-35, out=14)),
@@ -216,4 +226,4 @@ for tag, nm, spec in LIST:
 out = Image.new('RGB', (rows[0].width, sum(r.height for r in rows)))
 y = 0
 for r in rows: out.paste(r, (0, y)); y += r.height
-out.save(OUT + ('/alien_forelimbs.png' if SET == 'fore' else '/alien_bodies_base.png'))
+out.save(OUT + {'fore': '/alien_forelimbs.png', 'mantis': '/alien_mantis.png'}.get(SET, '/alien_bodies_base.png'))
