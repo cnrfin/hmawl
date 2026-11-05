@@ -3769,3 +3769,16 @@ so, door fades are timed there, possibly per frame. Not traced yet.
   +0x30 (field tools) gets d x 5 % x Attack on top (remainder carried; capped 60000). Off the field the last values are
   forgotten, so a load or scene change never counts as a rise. The game's level bytes (+0x2E / +0x32) follow on the next
   tool use. pm test 7c3dfa06, normal 77a9e1ea.
+
+### 7.60 Field lighting by time of day (darker nights)
+- Environment object [0x803493CC] (built func_8012F480, files loaded func_80022C40, names at 0x802C1240): mapenv.lam
+  (ambient, track at +0x04), mapenv.llt (lights, tracks +0x64 / +0xE8, light objects +0x3C / +0x40), mapenv.lfg (fog,
+  +0x18). Per frame func_80022DE4: t = seconds / 86400; ambient lerp -> 0x803490D8; light colour lerp x weather factor
+  (func_80130120, table 0x802548F8 {1,.8,.5,.3,.3,.2,0,0}) -> lightobj + 0x70 (and 0x803493E4); track +0xE4 -> 0x803490DC
+  = fog colour. Draw setup func_8002327C (GXSetChanAmbColor = func_801CF444, GXInitLightColor = func_801CF3BC,
+  GXSetFog = func_801D1978). Track = u32 n, f32 8.0, n x {RGBA, f32 key}, keys 0-8 (3 h each).
+- Valley (dump 1745e059, 2:12): ambient 434852 at night (AAAAAA by day), light 6E7DFF at night (FFFFC8 / FFEF00 by day,
+  black at the 05:30 / 18:30 switch), fog 192341 at night.
+- alien9b: zt.c night_frame scales the night keys (key <= 1.7 or >= 6.3) of the ambient by 0.6 and the light by 0.5,
+  once per load (alpha 0xFE on the first key marks it; the game ignores those alphas). pm alien test 647b2921, test
+  0444206a, normal 256adefe.
