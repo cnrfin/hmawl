@@ -122,11 +122,19 @@ def paint_eyes(kind, red=False):
         d.polygon(pts, fill=255)
     m = np.array(mask.filter(ImageFilter.GaussianBlur(1.5))).astype(float)[..., None] / 255
     a = np.array(img).astype(float)
-    if red:
-        glow = np.array(mask.filter(ImageFilter.GaussianBlur(14))).astype(float)[..., None] / 255
-        a = a * (1 - 0.6 * glow) + np.array([255, 40, 30]) * 0.6 * glow
-        a = a * (1 - m) + np.array([255, 22, 16]) * m
-    else:
+    rim = np.array(mask.filter(ImageFilter.GaussianBlur(6))).astype(float)[..., None] / 255
+    a = a * (1 - 0.35 * rim)
+    a = a * (1 - m) + np.array([8, 6, 8]) * m                          # the black eye stays
+    if red:                                                           # user: a small red dot in each black eye
+        dot = Image.new('L', (TW, TH), 0); dd = ImageDraw.Draw(dot)
+        for sx in (-1, 1):
+            cx, cy = px(sx * ex, ey); r = min(rx, ry) * 0.32 / (X1 - X0) * TW
+            dd.ellipse((cx - r, cy - r, cx + r, cy + r), fill=255)
+        core = np.array(dot.filter(ImageFilter.GaussianBlur(1.2))).astype(float)[..., None] / 255
+        halo = np.array(dot.filter(ImageFilter.GaussianBlur(6))).astype(float)[..., None] / 255 * m
+        a = a * (1 - 0.8 * halo) + np.array([200, 20, 15]) * 0.8 * halo
+        a = a * (1 - core) + np.array([255, 40, 30]) * core
+    if False:
         rim = np.array(mask.filter(ImageFilter.GaussianBlur(6))).astype(float)[..., None] / 255
         a = a * (1 - 0.35 * rim)                                       # a faint socket shadow round the edge
         a = a * (1 - m) + np.array([8, 6, 8]) * m

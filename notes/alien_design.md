@@ -87,6 +87,8 @@ Optional night enemy, unlocked by two events; replaces the owl's slot in the wil
   sunken belly painted on the torso (tools/alien/alien_ribs.png, our own) with the belly pulled in and the waist
   narrowed under a slightly wider ribcage (face.py gaunt); oversized T-rex hands (longer palm, four long jointed
   fingers: forelimbs_big). Walk: a shuffle (knees bent, feet barely lifting) when we animate it. FACE=v2 renders it.
+- Eyes at the scream (user): the eyes stay black with a small glowing red dot in each (about a third of the eye),
+  readable at lock-on range. In game the dots are the separate full-bright model (two small discs on the head bone).
 
 ## After the first defeat: the well
 - A red glow appears in the town well and beckons the player down. Below: a small new map (our own).
