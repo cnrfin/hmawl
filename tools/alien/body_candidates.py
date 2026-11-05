@@ -73,7 +73,12 @@ def alien_rest(V):
     cx = np.sign(x[leg]) * 0.06
     V[leg, 0] = cx + (x[leg] - cx) * 0.72; V[leg, 2] = 0.005 + (z[leg] - 0.005) * 0.72
     # a thin neck (user)
-    nk = LAB == 'neck'; V[nk, 0] *= 0.42; V[nk, 2] = (z[nk] - 0.0) * 0.42
+    # a thin neck (user): a round tube of one radius all the way along
+    nk = LAB == 'neck'; cz = np.median(z[nk]); dx, dz = x[nk], z[nk] - cz; rr = np.hypot(dx, dz) + 1e-9
+    V[nk, 0] = dx / rr * 0.016; V[nk, 2] = cz + dz / rr * 0.016
+    # a rounded upper back (user): the back of the chest bulges out
+    bk = (LAB == 'torso') & (z < 0) & (y > 0.62) & (y < 0.84)
+    V[bk, 2] -= 0.035 * np.sin(np.clip((y[bk] - 0.62) / 0.22, 0, 1) * np.pi)
     # no ears
     e = head & (ax > 0.19) & (np.abs(y - 1.025) < 0.07) & (np.abs(z - 0.015) < 0.06)
     V[e, 0] = np.sign(x[e]) * np.minimum(ax[e], 0.2)
@@ -168,13 +173,15 @@ def fore(elbow_axis, deg, wrist=None, sh=84, out=0, fwd=0, flen=3.0, extra=None)
     return dict(len=merge(B['len'], {16: flen, 27: flen}), rot=r, scl=sc)
 
 def hunch(k):
-    """shoulders up and rolled forward, upper back curved, neck leaning out (strength k)"""
-    return {4: rot((1, 0, 0), 8 * k), 5: rot((1, 0, 0), 12 * k), 6: rot((1, 0, 0), 30 * k), 7: rot((1, 0, 0), -22 * k) @ rot((0, 0, 1), 12),
+    """shoulders up and rolled forward, upper back rounded, neck leaning out (strength k); the head is turned back
+       up so it faces straight ahead (user), whatever the lean"""
+    a4, a5, a6 = 14 * k, 20 * k, 34 * k
+    return {4: rot((1, 0, 0), a4), 5: rot((1, 0, 0), a5), 6: rot((1, 0, 0), a6), 7: rot((1, 0, 0), -(a4 + a5 + a6)),
             11: rot((0, 0, 1), 14 * k) @ rot((0, 1, 0), -18 * k), 22: rot((0, 0, 1), -14 * k) @ rot((0, 1, 0), 18 * k)}
 
 SKIN = np.array([214, 210, 212]) / 255; HUM = np.array([150, 158, 170]) / 255; BG = np.array([30, 30, 36]) / 255
 
-def render(V, ang, col, W=240, H=470, sc=250, oy=None):
+def render(V, ang, col, W=280, H=470, sc=240, oy=None):
     c, s = np.cos(ang), np.sin(ang)
     X = V @ np.array([[c, 0, -s], [0, 1, 0], [s, 0, c]]).T
     sx = W / 2 + X[:, 0] * sc; sy = (H - 14 if oy is None else oy) - X[:, 1] * sc; z = X[:, 2]
@@ -218,9 +225,9 @@ if SET == 'fore':
 for tag, nm, spec in LIST:
     V = pose(spec, VA)
     cells = [render(VH, np.radians(25), HUM)] + [render(V, a, SKIN) for a, _ in views]
-    sheet = Image.new('RGB', (240 * len(cells), 470 + 34), (30, 30, 36)); dr = ImageDraw.Draw(sheet)
+    sheet = Image.new('RGB', (280 * len(cells), 470 + 34), (30, 30, 36)); dr = ImageDraw.Draw(sheet)
     for k, cimg in enumerate(cells):
-        sheet.paste(cimg, (240 * k, 34)); dr.text((240 * k + 6, 38), 'base human' if k == 0 else views[k - 1][1], fill=(160, 160, 170), font=small)
+        sheet.paste(cimg, (280 * k, 34)); dr.text((280 * k + 6, 38), 'base human' if k == 0 else views[k - 1][1], fill=(160, 160, 170), font=small)
     dr.text((8, 6), '%s  %s' % (tag, nm), fill=(235, 225, 220), font=font)
     sheet.save('%s/base_%s.png' % (OUT, tag)); rows.append(sheet); print(tag)
 out = Image.new('RGB', (rows[0].width, sum(r.height for r in rows)))
