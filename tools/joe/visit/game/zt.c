@@ -45,7 +45,7 @@ static float aim_h(s32 id)                              /* reticle / visibility 
 {
     u8 *a;
     if (id != ZT_WILD || !(a = wild_obj())) return 0.85f;
-    switch (*(s32 *)(a + 0x128)) { case 0x2D: return 0.30f; case 0x2E: return 0.70f; case 0x30: return 0.6f; }
+    switch (*(s32 *)(a + 0x128)) { case 0x2D: return 0.30f; case 0x2E: return 0.70f; case 0x30: return 1.25f; }   /* 0x30: the alien (1.6x, ~2.5 tall) */
     return 0.4f;                                        /* lizard, turtle (all x2: the animals are drawn 2x, EN_SCALE) */
 }
 /* ---- Enemy step 2: HP, damage, hit flash, FF7-style defeat (user design) ----
@@ -326,6 +326,9 @@ static void reticle(u8 *g)
     } else h = 1.0f + 0.05f * zsin((t - RET_SNAP) * (6.28318548f / 42.0f));   /* gentle pulse, 1.4 s */
     sc = RET_DEPTH / w; if (sc < 0.6f) sc = 0.6f; if (sc > 1.6f) sc = 1.6f;
     hx = (s32)(RET_H * sc * h); hy = (s32)(RET_H * 1.15f * sc * h);
+    {   u8 *wa = Z.target == ZT_WILD ? wild_obj() : 0;     /* alien5b (user): the box takes in the whole alien */
+        if (wa && *(s32 *)(wa + 0x128) == 0x30) { hx = hx * 13 / 10; hy = hy * 2; }
+    }
     e7y = *(s16 *)(a + AGC_E7_Y); cx -= E7_X; cy -= e7y;
     col = RET_COL | (u32)Z.alpha;
     bar = Z.target == ZT_WILD && EN.maxhp > 0 && en_alive();

@@ -170,3 +170,11 @@ Optional night enemy, unlocked by two events; replaces the owl's slot in the wil
   and the atlas fixed it. But the face showed only from behind: inside-out, exactly as the Postman (findings 7.24).
   The game culls the opposite side to the readback's default, so the "fix" made for the readback in stage 1 was wrong.
   alien5: blank's triangle order (as build_blank), the readback now culls like the game (cull=-1). owl.arc 100,032 B.
+- alien6 (user: no spiky teeth; the jaw should flare when open; the reticle should take in the whole alien):
+  the head mesh is cut exactly along planes (y 0.909 mouth line, y 0.885, and z -0.02 below the mouth) so the jaw edge
+  is straight; jaw = the front below the mouth line, upper band on node 8, rim (below 0.885) on node 9 (its child, put
+  at the same hinge: newT[9] = 0); band / rim boundary vertices on 8, so the rim faces stretch into a bell when node 9
+  spreads more (readback: jaw 60 degrees, band 1.3x, rim 1.9x). Faces joining the jaw to the neck keep head copies.
+  The linings are gone: dark caps close the cut faces (under the head, on top of the jaw, both sides of the back cut).
+  Reticle: aim_h 1.25 for 0x30, box 1.3x wide, 2x tall. alien6: owl.arc 104,992 B (1345 vertices), pm alien test
+  af847369, test 357d9183, normal 1b148236.

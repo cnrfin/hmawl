@@ -25,12 +25,43 @@ SK = SCR + 'celia/'; W_ = SCR + 'wally/'
 # ------------------------------------------------------------------ the design in the bind pose
 E3 = EYES['E3 huge, far apart']
 VR = sockets(gaunt(smooth_face(VA)), E3)                   # rest shape on Celia's own joints
+# alien5b (user: no spiky teeth; the jaw should flare open): the head is cut exactly along a straight mouth line and
+# two more planes, so the jaw edge is clean; the jaw (front, below the mouth) has an upper band on node 8 and a rim on
+# node 9 that spreads wider, the skin between them stretching into a bell.
+MOUTH, MID, ZC = 0.909, 0.885, -0.02
+def split_plane(V, F, axis, c, below=None):
+    global LAB, NODE
+    V = [tuple(v) for v in V]; out = []; cache = {}
+    def cut(a, b):
+        k = (min(a, b), max(a, b))
+        if k not in cache:
+            pa, pb = np.array(V[a]), np.array(V[b]); t = (c - pa[axis]) / (pb[axis] - pa[axis])
+            cache[k] = len(V); V.append(tuple(pa + (pb - pa) * t))
+        return cache[k]
+    newlab = []
+    for f in F:
+        f = [int(x) for x in f]
+        if not all(LAB[x] == 'head' for x in f) if all(x < len(LAB) for x in f) else True: out.append(f); continue
+        if below is not None and min(V[x][1] for x in f) > below: out.append(f); continue
+        sd = [V[x][axis] - c for x in f]
+        if all(d >= -1e-9 for d in sd) or all(d <= 1e-9 for d in sd): out.append(f); continue
+        # rotate so the lone vertex (on its own side) is first
+        for r in range(3):
+            a, b, cc = f[r], f[(r + 1) % 3], f[(r + 2) % 3]; da, db, dc = sd[r], sd[(r + 1) % 3], sd[(r + 2) % 3]
+            if (da > 0) != (db > 0) and (da > 0) != (dc > 0): break
+        ab, ac = cut(a, b), cut(a, cc)
+        out += [[a, ab, ac], [ab, b, cc], [ab, cc, ac]]
+    n_new = len(V) - len(LAB)
+    LAB = np.concatenate([LAB, np.array(['head'] * n_new)]); NODE = np.concatenate([NODE, np.full(n_new, 7)])
+    return np.array(V), np.array(out)
+for ax_, c_, bl in ((1, MOUTH, None), (1, MID, None), (2, ZC, MOUTH)):
+    VR, F = split_plane(VR, F, ax_, c_, bl)
 BIND = dict(len=merge(B['len'], {16: 3.0, 27: 3.0}), scl=dict(B['scl']))
 VBIND = pose(BIND, VR); Rb, tb = pose.last                 # T-pose on the lengthened skeleton (R = identity)
 newT = []
 for n, nd in enumerate(nodes):                              # local translations: Celia's, scaled like the bones
     newT.append(np.array(nd['T']) * BIND['len'].get(n, 1.0))
-JW_TOP, HINGE_R = 0.909, np.array([0, 0.93, -0.04])        # jaw: below the painted mouth line; hinge under the ears
+JW_TOP, HINGE_R = MOUTH, np.array([0, 0.93, -0.04])        # jaw: below the painted mouth line; hinge under the ears
 hc = np.array([0, 1.08, 0.0]); hs = np.array(B['scl'][7][1])
 def head_bind(p):                                           # a rest-space head point -> bind space (node 7 rigid)
     q = (np.asarray(p) - hc) * hs + hc
@@ -38,6 +69,7 @@ def head_bind(p):                                           # a rest-space head 
 HINGE_B = head_bind(HINGE_R)
 R7 = Wr[7][:3, :3]                                          # Celia's rest world rotation of the head node
 newT[8] = R7.T @ (HINGE_B - tb[7]) / np.linalg.norm(R7[:, 0])   # node 8 (braid, child of 7) at the hinge
+newT[9] = np.zeros(3)                                       # node 9 (its child): the same point (the rim scales about the hinge too)
 
 keep = ~np.isin(NODE, FORE_NODES)
 PV = []; NODEV = []; KIND = []                              # positions, node, kind ('b' body, 'h' head, 'j' jaw, 'c' cavity)
@@ -46,30 +78,36 @@ for i in np.where(keep)[0]:
     idx_map[i] = len(PV); PV.append(VBIND[i]); NODEV.append(int(NODE[i]))
     KIND.append('h' if LAB[i] == 'head' else 'b')
 TRI = []
-JAWV = (LAB == 'head') & (VR[:, 1] < JW_TOP) & (VR[:, 2] > -0.01)
+EPS = 1e-6
+inside = lambda x: VR[x, 1] < MOUTH - EPS and VR[x, 2] > ZC + EPS          # strictly inside the jaw region
+jnode = lambda x: 8 if VR[x, 1] >= MID - EPS else 9                         # upper band / rim
 dup = {}; dupH = {}
 for a, b, c in F:
     if not (keep[a] and keep[b] and keep[c]): continue
-    if all(LAB[x] == 'head' for x in (a, b, c)) and sum(JAWV[x] for x in (a, b, c)) >= 2:   # a jaw face
+    f = (a, b, c)
+    cen = VR[list(f)].mean(0)
+    if all(LAB[x] == 'head' for x in f) and cen[1] < MOUTH and cen[2] > ZC:   # a jaw face
         tri = []
-        for x in (a, b, c):
-            if JAWV[x]: v = idx_map[x]
-            else:
+        for x in f:
+            if inside(x): v = idx_map[x]
+            else:                                           # on the mouth line / the back cut: a jaw copy
                 if x not in dup:
-                    dup[x] = len(PV); PV.append(VBIND[x]); NODEV.append(8); KIND.append('j')
+                    dup[x] = len(PV); PV.append(VBIND[x]); NODEV.append(jnode(x)); KIND.append('j')
                 v = dup[x]
             tri.append(v)
         TRI.append(tri)
-    else:                                                   # head / body faces: a jaw vertex here gets a head copy
+    else:                                                   # head / neck faces: a jaw vertex here gets a head copy
         tri = []
-        for x in (a, b, c):
-            if JAWV[x]:
+        for x in f:
+            if LAB[x] == 'head' and inside(x):
                 if x not in dupH:
                     dupH[x] = len(PV); PV.append(VBIND[x]); NODEV.append(7); KIND.append('h')
                 tri.append(dupH[x])
             else: tri.append(idx_map[x])
         TRI.append(tri)
-for i in np.where(JAWV & keep)[0]: NODEV[idx_map[i]] = 8; KIND[idx_map[i]] = 'j'
+for i in np.where(keep)[0]:
+    if LAB[i] == 'head' and inside(i): NODEV[idx_map[i]] = jnode(i); KIND[idx_map[i]] = 'j'
+
 
 REST_Y = {}
 for i, v in idx_map.items(): REST_Y[v] = VR[i, 1]
@@ -87,20 +125,29 @@ for e, w, sx in ((15, 16, 1), (26, 27, -1)):
     for f in (-1.5, -0.5, 0.5, 1.5):
         k0 = pe + side * 0.012 * f; k1 = k0 + ax_ * 0.077 + side * 0.006 * f
         add_mesh(*tube(k0, k1, 0.007, 0.0065, 4), w, 'b'); add_mesh(*tube(k1, k1 + ax_ * 0.063 + side * 0.004 * f, 0.0065, 0.003, 4), w, 'b')
-# the mouth's inside: dark linings - shrunk copies of the lower head (node 7) and of the jaw (node 8) with the
-# winding reversed, so only their inner sides show, and only through the open mouth (they never poke out)
-LC = head_bind(np.array([0, 0.96, -0.02]))
-def lining(faces, node):
-    cp = {}
-    for t in faces:
-        ids = []
-        for v in t:
-            if v not in cp: cp[v] = len(PV); PV.append(LC + (PV[v] - LC) * 0.92); NODEV.append(node); KIND.append('c')
-            ids.append(cp[v])
-        TRI.append([ids[0], ids[2], ids[1]])
-jaw_f = [t for t in TRI if all(NODEV[v] == 8 for v in t)]
-low_f = [t for t in TRI if all(NODEV[v] == 7 and KIND[v] == 'h' for v in t) and min(REST_Y[v] for v in t) < 0.96]
-lining(jaw_f, 8); lining(low_f, 7)
+# the mouth's inside: dark caps on the cut faces - under the head and on top of the jaw at the mouth line, and on
+# both sides of the back cut - so the open mouth is dark inside with clean edges (no linings, nothing to poke out)
+def cap(points, node, normal):
+    pts = np.array(points)
+    if len(pts) < 3: return
+    c = pts.mean(0); n = np.array(normal, float)
+    u = np.cross(n, [0, 0, 1.0] if abs(n[2]) < 0.9 else [1.0, 0, 0]); u /= np.linalg.norm(u); w = np.cross(n, u)
+    ang = np.arctan2((pts - c) @ w, (pts - c) @ u); pts = pts[np.argsort(ang)]
+    o = len(PV); PV.append(c); NODEV.append(node); KIND.append('c')
+    for p in pts: PV.append(p); NODEV.append(node); KIND.append('c')
+    k = len(pts)
+    for i in range(k):
+        a_, b_ = o + 1 + i, o + 1 + (i + 1) % k
+        tri = [o, a_, b_]
+        if np.dot(np.cross(PV[a_] - PV[o], PV[b_] - PV[o]), n) < 0: tri = [o, b_, a_]
+        TRI.append(tri)
+on_mouth = [i for i in range(len(VR)) if LAB[i] == 'head' and abs(VR[i, 1] - MOUTH) < 1e-6 and VR[i, 2] >= ZC - 1e-6]
+on_back = [i for i in range(len(VR)) if LAB[i] == 'head' and abs(VR[i, 2] - ZC) < 1e-6 and VR[i, 1] <= MOUTH + 1e-6
+           and VR[i, 1] > VR[LAB == 'head', 1].min() + 1e-3]
+cap([VBIND[i] for i in on_mouth], 7, (0, -1, 0))            # under the head (seen when the jaw drops)
+cap([VBIND[i] for i in on_mouth], 8, (0, 1, 0))             # on top of the jaw
+cap([VBIND[i] for i in on_back], 7, (0, 0, 1))              # the back cut: head side
+cap([VBIND[i] for i in on_back], 8, (0, 0, -1))             # ... jaw side
 PV = np.array(PV); NODEV = np.array(NODEV); KIND = np.array(KIND); TRI = np.array(TRI)
 
 # ------------------------------------------------------------------ UVs and baked textures
