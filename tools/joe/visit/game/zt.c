@@ -12,9 +12,7 @@ typedef int s32;
 typedef unsigned char u8;
 typedef short s16;
 #include "skill_hud.h"                                  /* AGC_RET_Q, UV_TRI, element 7 (the HUD quads) */
-#define SH_EYES
 #include "stat_hud.h"                                   /* E7_TOTAL: element 7 with the stat HUD (step 3) */
-#include "alien_pose.h"                                 /* the alien's standing pose (tools/alien/gen_pose.py) */
 #define F(addr, ret, args) ((ret (*) args)(addr))
 #define sfx_play   F(0x8012A52C, s32, (u8 *, s32, s32))
 #define CONTROL    (*(u8 *)(*(u8 **)0x80349218 + 8))      /* 1 = player free */
@@ -46,7 +44,7 @@ static float aim_h(s32 id)                              /* reticle / visibility 
 {
     u8 *a;
     if (id != ZT_WILD || !(a = wild_obj())) return 0.85f;
-    switch (*(s32 *)(a + 0x128)) { case 0x2D: return 0.30f; case 0x2E: return 0.70f; case 0x30: return 1.25f; }   /* 0x30: the alien (1.6x, ~2.5 tall) */
+    switch (*(s32 *)(a + 0x128)) { case 0x2D: return 0.30f; case 0x2E: return 0.70f; case 0x30: return 0.6f; }
     return 0.4f;                                        /* lizard, turtle (all x2: the animals are drawn 2x, EN_SCALE) */
 }
 /* ---- Enemy step 2: HP, damage, hit flash, FF7-style defeat (user design) ----
@@ -327,9 +325,6 @@ static void reticle(u8 *g)
     } else h = 1.0f + 0.05f * zsin((t - RET_SNAP) * (6.28318548f / 42.0f));   /* gentle pulse, 1.4 s */
     sc = RET_DEPTH / w; if (sc < 0.6f) sc = 0.6f; if (sc > 1.6f) sc = 1.6f;
     hx = (s32)(RET_H * sc * h); hy = (s32)(RET_H * 1.15f * sc * h);
-    {   u8 *wa = Z.target == ZT_WILD ? wild_obj() : 0;     /* alien5b (user): the box takes in the whole alien */
-        if (wa && *(s32 *)(wa + 0x128) == 0x30) { hx = hx * 13 / 10; hy = hy * 2; }
-    }
     e7y = *(s16 *)(a + AGC_E7_Y); cx -= E7_X; cy -= e7y;
     col = RET_COL | (u32)Z.alpha;
     bar = Z.target == ZT_WILD && EN.maxhp > 0 && en_alive();
@@ -413,11 +408,6 @@ static void hurt_frame(volatile u32 *held, volatile u32 *press);
 static void collapse_frame(u8 *g, s32 map, volatile u32 *held, volatile u32 *press);
 static void food_frame(u8 *g);
 extern u8 *pm_player;
-static void code_poke(u32 *a, u32 want, u32 other);
-/* alien stage 3: the reveal (alien_frame drives it; ht_bone, zoom, zt_frame and the eye dots read it) */
-static struct { u32 magic; s32 st, t, fear, far; float ba, hy, jaw, zoomk; s32 eyes; } RV;
-s32 al_eyes_on;                                          /* skill.c leaves the (hidden) tool row's quads to the eye dots */
-#define AL_ZOOM    5.0f                                  /* the scream's close-up: camera distance */
 /* Darker nights (user). The field light comes from three keyframe tracks the map loads (mapenv.lam ambient, .llt
    lights, .lfg fog; environment object [0x803493CC], built func_8012F480, interpolated by time of day in
    func_80022DE4): track = u32 n, f32 8.0, n x {RGBA, f32 key}, key 0-8 = 3 hours each. The night keys (before 05:00,
@@ -452,7 +442,7 @@ void zt_frame(u8 *g, s32 map, volatile u32 *held, volatile u32 *press)
 #ifdef NO_ZT
     (void)g; (void)map; (void)held; (void)press; return;   /* test build: Z targeting, reticle and combos off */
 #endif
-    {   /* battle16: no owl for now (user; it comes back later as the 1-5 am alien). The day's species is rolled as
+    {   /* battle16: no owl (user: out of the pool for good). The day's species is rolled as
            0x2C + rand() % (count + 1) with counts lbl_803469D0 / lbl_803469D8 (= 4: lizard, mouse, tanuki, turtle, owl);
            3 drops the owl (0x30). A day already rolled owl is re-rolled (takes effect when the valley next loads). */
         u8 *tm = *(u8 **)0x80349194;
@@ -466,31 +456,7 @@ void zt_frame(u8 *g, s32 map, volatile u32 *held, volatile u32 *press)
                 s32 k; for (k = 0; k < 4; k++) *(u32 *)(a + 0x734 + 4 * k) = 0xFFFFFF00u;
             }
         }
-#ifdef ALIEN_TEST
-        if ((u32)tm >= 0x80000000u && (u32)tm < 0x81800000u) *(s32 *)(tm + 0x3F8) = 0x30;   /* test: the alien every day
-                                                                  (the owl slot; shows the next time the valley loads) */
-        /* alien3: the animal is built at the day change, before this runs (dump 31139935: species 0x30 but a turtle in
-           the valley), so the game's two rolls themselves give 0x30: addi r0,rX,0x2C -> li r0,0x30 */
-        code_poke((u32 *)0x800132C8, 0x38000030u, 0x3804002Cu);
-        code_poke((u32 *)0x80013B84, 0x38000030u, 0x3803002Cu);
-#else
         if ((u32)tm >= 0x80000000u && (u32)tm < 0x81800000u && *(s32 *)(tm + 0x3F8) == 0x30) *(s32 *)(tm + 0x3F8) = 0x2C + (s32)(F(0x8017D3E8, u32, (void))() % 4u);
-#endif
-    }
-    {   /* alien stage 3: frozen in fear for a second (Z kept, so the lock holds), the whole HUD shaking. alien9: the
-           stick too - func_8003083C reads it from the pad struct (0x80341574 + 0x18 / 0x19, C stick + 0x1A / 0x1B) */
-        static s16 hx[8]; static s32 shook;
-        u8 *ag = AGC;
-        s16 *ex = ((u32)ag >= 0x80000000u && (u32)ag < 0x81800000u) ? (s16 *)(ag + AGC_ELEMENTS + 8) : 0;
-        s32 k;
-        if (RV.fear > 0) {
-            RV.fear--; *held &= 0x10u; *press = 0;
-            *(volatile u32 *)0x8034158Cu = 0;            /* stick x, y, C stick x, y */
-            if (ex) {
-                if (!shook) { for (k = 0; k < 8; k++) hx[k] = ex[6 * k]; shook = 1; }
-                for (k = 0; k < 8; k++) ex[6 * k] = (s16)(hx[k] + (s32)(F(0x8017D3E8, u32, (void))() % 13u) - 6);
-            }
-        } else if (shook) { if (ex) for (k = 0; k < 8; k++) ex[6 * k] = hx[k]; shook = 0; }
     }
     night_frame();
     stance_frame(g, map);
@@ -591,14 +557,13 @@ static struct { s32 on; float dist0, h0, tilt; } ZC;
    at the target (so stick-up also means toward the target, as in OoT) */
 static void zoom(u8 *c, s32 locked)
 {
-    float *dist = (float *)(c + 0x30), *ht = (float *)(c + 0x10), wd, wh, rate = ZT_ZRATE;
-    if (RV.zoomk > 0.01f) { locked = 1; rate = 0.35f; }    /* the scream: a sudden close-up */
+    float *dist = (float *)(c + 0x30), *ht = (float *)(c + 0x10), wd, wh;
     ZC.tilt += ((locked ? ZT_UP : 0) - ZC.tilt) * ZT_ZRATE;
     if (!locked && ZC.tilt < 0.0005f) ZC.tilt = 0;
     if (locked && !ZC.on) { ZC.on = 1; ZC.dist0 = *dist; ZC.h0 = *ht; }
     if (!ZC.on) return;
-    wd = locked ? ZT_DIST + (AL_ZOOM - ZT_DIST) * RV.zoomk : ZC.dist0; wh = locked ? ZT_HEIGHT : ZC.h0;
-    *dist += (wd - *dist) * rate; *ht += (wh - *ht) * ZT_ZRATE;
+    wd = locked ? ZT_DIST : ZC.dist0; wh = locked ? ZT_HEIGHT : ZC.h0;
+    *dist += (wd - *dist) * ZT_ZRATE; *ht += (wh - *ht) * ZT_ZRATE;
     if (!locked && (*dist - wd) * (*dist - wd) < 0.0004f && (*ht - wh) * (*ht - wh) < 0.0001f) {
         *dist = ZC.dist0; *ht = ZC.h0; ZC.on = 0;         /* back to the game's own values */
     }
@@ -1060,7 +1025,7 @@ static const u8 en_head[5] = { 19, 4, 5, 4, 0xFF };     /* head bone: lizard, ch
 #define HT_MAX   1.2f                                   /* about 70 degrees either way */
 #define HT_EASE  0.18f
 #define HT_SIGN  1.0f                                   /* flip if the head turns away */
-#define HT_BONES 64                                     /* the alien (owl slot) has Celia's 49 nodes */
+#define HT_BONES 40
 struct { u32 magic; float phi, want; u32 turns, scaled; } HT;   /* 'HTRK' (dump) */
 static float ht_m[HT_BONES][9];
 static u8 *en_skel;                                      /* the day's animal's skeleton instance (for zt_bone) */
@@ -1138,111 +1103,11 @@ static void ht_want(u8 *g, u8 *a)                        /* the head's target: t
     if (w > HT_MAX) w = HT_MAX; if (w < -HT_MAX) w = -HT_MAX;
     HT.want = w;
 }
-/* Alien stage 2 (notes/alien_design.md): the owl slot's model is the alien. It stands still opposite Celia's farm
-   (user's spot), on the ground, facing the player; its own AI is off (en_ctl), no fight yet. */
-#define AL_SCALE 1.6f
-#define ALIEN_X 125.8f                                  /* alien3: the user's spot (dump 31139935; the map tool's X / Z
-                                                           are the world's Z / X) */
-#define ALIEN_Z 211.7f
-/* Stage 3, the reveal (notes/alien_design.md): it stands with its back to the player, head turned away. Lock on, or
-   come within RV_NEAR, and the head snaps round 180 degrees; then the scream - jaw drops into the bell, red dots in
-   the eyes (HUD quads, always full bright), SE_SCREAM, a sudden camera close-up, the farmer frozen a second with the
-   HUD shaking - while the body turns to follow the head. Then the jaw closes and it keeps watching, eyes red, until
-   the player is far away again. */
-#define SE_SCREAM  446                                   /* the user's scream (GAME_ALL 446) */
-#define RV_NEAR    3.5f
-#define RV_FAR     12.0f
-#define RV_SNAP    8
-#define RV_HOLD    70
-#define RV_CLOSE   15
-#define PI_RV      3.14159274f
-static float wrapf(float x) { while (x > PI_RV) x -= 2 * PI_RV; while (x < -PI_RV) x += 2 * PI_RV; return x; }
-static void al_eye_dots(u8 *obj);
-static void alien_frame(u8 *g, u8 *a, u8 *in)
-{
-    float v[3], y, *p = SLOT_POS(g, 0), dx, dz, d2, to;
-    en_ctl = a; AG.on = 0; AG.homing = 0; PZ.sp = 4; PZ.st = -1;
-    v[0] = ALIEN_X; v[1] = 30.0f; v[2] = ALIEN_Z;
-    y = ground_at(*(void **)0x80349204, v);
-    if (y != y || y > 5000.0f || y < -5000.0f) y = 6.5f;
-    en_setpos(a, ALIEN_X, y, ALIEN_Z);
-    dx = p[0] - ALIEN_X; dz = p[2] - ALIEN_Z; d2 = dx * dx + dz * dz; to = zatan2(dx, dz);
-    RV.magic = 0x52455645u;                              /* 'REVE' (dump) */
-    switch (RV.st) {
-    case 0:                                              /* back to the player, looking away */
-        RV.ba = wrapf(to + PI_RV); RV.hy = 0; RV.jaw = 0; RV.zoomk = 0; RV.eyes = 0;
-        if (Z.target == ZT_WILD || d2 < RV_NEAR * RV_NEAR) { RV.st = 1; RV.t = 0; }
-        break;
-    case 1:                                              /* the head snaps round */
-        RV.t++; RV.hy = PI_RV * smooth01((float)RV.t / RV_SNAP);
-        if (RV.t >= RV_SNAP) {
-            RV.st = 2; RV.t = 0; RV.eyes = 1; RV.fear = 60;
-            sfx_play(*(u8 **)0x803491E4, SE_SCREAM, 0);
-            if (Z.target != ZT_WILD) {                   /* alien9: as OoT's ReDead, the scream locks the camera on it */
-                Z.target = ZT_WILD; Z.fvalid = 0; Z.r = -1; tpos(g, ZT_WILD, 1, &Z.tx, &Z.tz);
-            }
-        }
-        break;
-    case 2:                                              /* the scream */
-        RV.t++; RV.jaw = smooth01((float)RV.t / 6.0f); RV.zoomk = 1.0f;
-        if (RV.t > 20) RV.ba = wrapf(RV.ba + wrapf(to - RV.ba) * 0.08f);   /* the body comes round under the head */
-        RV.hy = wrapf(to - RV.ba);
-        if (RV.t >= RV_HOLD) { RV.st = 3; RV.t = 0; RV.zoomk = 0; }
-        break;
-    case 3:                                              /* the jaw closes */
-        RV.t++; RV.jaw = 1.0f - smooth01((float)RV.t / RV_CLOSE);
-        RV.ba = wrapf(RV.ba + wrapf(to - RV.ba) * 0.15f); RV.hy = wrapf(to - RV.ba);
-        if (RV.t >= RV_CLOSE) { RV.st = 4; RV.t = 0; RV.jaw = 0; RV.far = 0; }
-        break;
-    default:                                             /* watching, eyes red */
-        RV.ba = wrapf(RV.ba + wrapf(to - RV.ba) * 0.2f); RV.hy = wrapf(to - RV.ba);
-        if (Z.target != ZT_WILD && d2 > RV_FAR * RV_FAR) { if (++RV.far > 60) RV.st = 0; } else RV.far = 0;
-        break;
-    }
-    *(float *)(a + 0xF0) = zsin(RV.ba); *(float *)(a + 0xF8) = zsin(RV.ba + 1.57079637f);   /* alien9: the facing the game
-                                                           copies to +0x58 / +0x60 each frame (alien8 wrote those: lost) */
-    in[0x3C] = 1;
-    al_eye_dots(a);
-}
-/* the red dots: two pairs of HUD quads (the tool row's, hidden since the stat HUD) at the eyes' projected positions */
-static void al_eye_dots(u8 *obj)
-{
-    u8 *a = AGC;
-    s32 e, k, e7x, e7y;
-    if ((u32)a < 0x80000000u || (u32)a >= 0x81800000u || *(u32 *)(a + AGC_E7_COUNT) != E7_TOTAL) return;
-    if (!RV.eyes) {
-        if (al_eyes_on) for (k = 0; k < 4; k++) *(u32 *)(a + AGC_ROW_Q + 0x2C * k + 0xC) = 0, *(u32 *)(a + AGC_ROW_Q + 0x2C * k + 0x10) = 0,
-                                                 *(u32 *)(a + AGC_ROW_Q + 0x2C * k + 0x14) = 0, *(u32 *)(a + AGC_ROW_Q + 0x2C * k + 0x18) = 0;
-        al_eyes_on = 0; return;
-    }
-    al_eyes_on = 1;
-    e7y = *(s16 *)(a + AGC_E7_Y); e7x = *(s16 *)(a + AGC_ELEMENTS + 12 * 7 + 8);
-    {
-        float sb = zsin(RV.ba), cb = zsin(RV.ba + 1.57079637f), sh = zsin(RV.hy), ch = zsin(RV.hy + 1.57079637f);
-        float ox = *(float *)(obj + 0x4C), oy = *(float *)(obj + 0x50), oz = *(float *)(obj + 0x54);
-        for (e = 0; e < 2; e++) {
-            float ex = AL_EYE[e][0], ey = AL_EYE[e][1], ez = AL_EYE[e][2], sx, sy, w, sc;
-            float rx = ex * ch + ez * sh, rz = -ex * sh + ez * ch;          /* the head's twist */
-            float mx = (AL_HEAD[0] + rx) * AL_SCALE, my = (AL_HEAD[1] + ey) * AL_SCALE, mz = (AL_HEAD[2] + rz) * AL_SCALE;
-            s32 cx, cy, rh, rc;
-            w = proj(ox + mx * cb + mz * sb, oy + my, oz - mx * sb + mz * cb, &sx, &sy);
-            if (w <= 0) continue;
-            sc = RET_DEPTH / w; if (sc < 0.4f) sc = 0.4f; if (sc > 3.0f) sc = 3.0f;
-            cx = (s32)(sx * 320.0f) - e7x; cy = (s32)(-sy * 240.0f) - e7y;   /* (the shake's x: the dots stay put) */
-            rh = (s32)(22.0f * sc); rc = (s32)(6.0f * sc); if (rc < 3) rc = 3;   /* alien9: bigger, white-hot */
-            k = (AGC_ROW_Q - AGC_RET_Q) / 0x2C + e * 2;
-            quad(a, k, cx - rh, cy - rh, cx + rh, cy + rh, SH_UV_HALO, 0xFFFFFFFFu);          /* red halo (texture 5) */
-            quad(a, k + 1, cx - rc, cy - rc, cx + rc, cy + rc, SH_UV_CORE, 0xFFFFFFFFu);      /* white centre, red rim */
-            *(u32 *)(a + AGC_RET_Q + 0x2C * k) = 5; *(u32 *)(a + AGC_RET_Q + 0x2C * (k + 1)) = 5;
-        }
-    }
-}
 static void en_frame(u8 *g)
 {
     u8 *a = wild_obj(), *in;
     if (!a || !(in = wild_inst(a))) { en_ctl = 0; en_skel = 0; return; }
     en_scale(a);
-    if (*(s32 *)(a + 0x128) == 0x30) { alien_frame(g, a, in); return; }
     HT.magic = 0x4854524Bu; HT.phi += (HT.want - HT.phi) * HT_EASE; HT.want = 0.0f;   /* back to straight unless in battle */
     ag_frame(g, a);
     if (en_alive() && !EN.maxhp) {                            /* today's animal: its HP (per species) */
@@ -1540,31 +1405,6 @@ static s32 ht_bone(s32 n, u8 *trs, s32 r)                /* r: anim_eval's resul
         t[0] = rm[3]; t[1] = rm[7]; t[2] = rm[11]; trs[0] = 4 | 8; r = 1;
     }
     if (!(trs[0] & 4)) { q[0] = q[1] = q[2] = 0.0f; q[3] = 1.0f; trs[0] |= 4; }   /* a record without rotation: identity */
-    if (sp == 4) {                                      /* alien stage 2: held in its standing pose (absolute local rotations
-                                                           over whatever clip plays); its own size, no 2x */
-        if (n < AL_NODES) { q[0] = AL_Q[n][0]; q[1] = AL_Q[n][1]; q[2] = AL_Q[n][2]; q[3] = AL_Q[n][3]; trs[0] |= 4; }
-        if (n == 8 && RV.jaw > 0.001f) {                /* stage 3: the jaw drops (nlerp to the open pose) and widens */
-            float k = RV.jaw, l, *sc = (float *)(trs + 4);
-            for (i = 0; i < 4; i++) q[i] = AL_Q[8][i] * (1.0f - k) + AL_QJ8[i] * k;
-            l = rsq(q[0] * q[0] + q[1] * q[1] + q[2] * q[2] + q[3] * q[3]); for (i = 0; i < 4; i++) q[i] *= l;
-            sc[0] = 1.0f + 0.3f * k; sc[1] = 1.0f; sc[2] = 1.0f; trs[0] |= 1;
-        }
-        if (n == 9 && RV.jaw > 0.001f) {                /* ... and the rim spreads further: the bell (inherits node 8's) */
-            float k = RV.jaw, *sc = (float *)(trs + 4);
-            sc[0] = 1.0f + 0.45f * k; sc[1] = 1.0f; sc[2] = 1.0f + 0.2f * k; trs[0] |= 1;
-        }
-        if (n == 7 && pm && (RV.hy > 0.001f || RV.hy < -0.001f)) { c.trs = trs; c.pm = pm; p_rot(&c, 1, HT_SIGN * RV.hy); }   /* the head twist */
-        if (n > 0) { t[0] = rm[3]; t[1] = rm[7]; t[2] = rm[11]; trs[0] |= 8; }   /* alien6b: the built skeleton's own bone
-                                       lengths, not Celia's clip (its braid track put node 9 - the jaw rim - 0.24 below the
-                                       hinge: the jaw hung like a sheet) */
-        if (n == 0) {                                   /* alien3 (user: not intimidating): 1.6x, as the animals' 2x */
-            float *sc = (float *)(trs + 4);
-            if (trs[0] & 1) { sc[0] *= AL_SCALE; sc[1] *= AL_SCALE; sc[2] *= AL_SCALE; }
-            else { sc[0] = AL_SCALE; sc[1] = AL_SCALE; sc[2] = AL_SCALE; trs[0] |= 1; }
-            if (trs[0] & 8) { t[0] *= AL_SCALE; t[1] *= AL_SCALE; t[2] *= AL_SCALE; }
-        }
-        goto matrix;
-    }
     if (n == 0) {                                       /* user: every animal 2x. Scale (flag 1, +4) the root; its translation
                                                            doubles too, so the model grows about the object's origin (feet) */
         float *sc = (float *)(trs + 4);
@@ -1579,7 +1419,6 @@ static s32 ht_bone(s32 n, u8 *trs, s32 r)                /* r: anim_eval's resul
         p_rot(&c, 1, HT_SIGN * HT.phi);                 /* head tracking: about the model's up axis */
         HT.turns++;
     }
-matrix:
     {   float x = q[0], y = q[1], z = q[2], w = q[3];   /* this bone's rotation -> matrix (column vectors), model rotation */
         L[0] = 1 - 2 * (y * y + z * z); L[1] = 2 * (x * y - z * w); L[2] = 2 * (x * z + y * w);
         L[3] = 2 * (x * y + z * w); L[4] = 1 - 2 * (x * x + z * z); L[5] = 2 * (y * z - x * w);

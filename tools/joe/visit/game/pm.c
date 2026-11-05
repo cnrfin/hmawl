@@ -1071,11 +1071,7 @@ void pm_frame(void)
                 if (*clk / T_DAY != bench_start / T_DAY && (u32)tm >= 0x80000000u && (u32)tm < 0x81800000u) {
                     /* a new day: roll the day's wild animal as the morning after the bed does (0x80013B64..B88:
                        lbl_80349194 +0x3F8 = 0x2C + rand() % (lbl_803469D8 + 1)); the valley reload builds it from that */
-#ifdef ALIEN_TEST
-                    *(s32 *)(tm + 0x3F8) = 0x30;                                       /* test: the alien */
-#else
                     *(s32 *)(tm + 0x3F8) = 0x2C + (s32)(F(0x8017D3E8, u32, (void))() % (u32)(*(s32 *)0x803469D8 + 1));
-#endif
                     bench_rolls++;
                 }
                 *(s32 *)(g + 0x11B84) = *(s32 *)(g + 0x11B88);   /* stamina full */

@@ -1,3 +1,7 @@
+> **Dropped (user, Nov 5):** the alien enemy is cancelled; the owl stays out of the wild-animal pool for good and the
+> four animals remain the enemies. The alien code, tools/alien and alien_pose.h were removed (git history has them:
+> last alien commit 153bb4e). Kept: the darker nights (findings 7.60) and the night-lighting research.
+
 # The alien: agreed direction (user, in discussion)
 
 Optional night enemy, unlocked by two events; replaces the owl's slot in the wild-animal roll only once unlocked.

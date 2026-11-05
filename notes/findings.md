@@ -3782,3 +3782,6 @@ so, door fades are timed there, possibly per frame. Not traced yet.
 - alien9b: zt.c night_frame scales the night keys (key <= 1.7 or >= 6.3) of the ambient by 0.6 and the light by 0.5,
   once per load (alpha 0xFE on the first key marks it; the game ignores those alphas). pm alien test 647b2921, test
   0444206a, normal 256adefe.
+- noalien1 (user: drop the alien, keep the 4 animals, owl out for good): zt.c / pm.c / skill.c back to gold1 (5255024)
+  plus night_frame; pm test 81617135, normal bc3ab279. Install on the pre-alien base HM_AWL_g4b.iso (the alien ISOs
+  carry an unused alien owl.arc, scream SFX 446 and the hud5 commonall; all harmless, never loaded).
