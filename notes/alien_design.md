@@ -17,6 +17,12 @@ Optional night enemy, unlocked by two events; replaces the owl's slot in the wil
   ordinary, tired human face set low in it (droopy eyes, a slight frown, old-man creases); pale grey-pink skin; thin,
   human-proportioned body that is slightly too long. From behind (head turned away) it reads as a big pale dome on a
   thin figure; the small human face is the reveal.
+- "Just a little off" (user): longer neck and limbs, a contorted posture, a wide face. Proposed set (few strong
+  wrongs, the rest subtle): neck ~1.5x, forearms / shins ~1.2x, one extra knuckle-length on the fingers; face ~1.3x too
+  wide with eyes set a touch too far apart and a slightly too-long philtrum; shoulders raised and rolled forward,
+  head jutting, one shoulder lower; knees slightly bent and turned in; elbows bending a little the wrong way at rest.
+  Motion: no bob, overly smooth glide, then sudden stiff jerks; the head lags the body, then snaps; blinks rarely and
+  slowly; breathing too slow and too deep. Many of these are bone lengths / rest poses, so they can be tuned in game.
 - Head always turned away from the player. On Z-lock: the head snaps round, black eyes glow red, it screams, the
   farmer is frozen in fear for about a second, then the fight starts.
 
