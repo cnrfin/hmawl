@@ -297,8 +297,8 @@ if SET == 'jaw':
     T2 = fore((0, 1, 0), -150, ((0, 1, 0), 145), fwd=0, out=4, extra=hunch(1.5))
     render.insides = True
     rows = []
-    for tag, nm, wd, op, dark in (('J3', 'bell jaw closed', 1.6, 0, 0), ('J3', 'the scream (as you picked)', 1.6, 70, 0),
-                                  ('J3', 'the scream, with a dark mouth where the skin stretches', 1.6, 70, 1)):
+    for tag, nm, wd, op, dark in (('J3', 'closed: a normal face, no jaw showing', 1.0, 0, 0), ('J3', 'opening: the bell starts to flare', 1.3, 35, 1),
+                                  ('J3', 'the scream: full bell', 1.6, 70, 1)):
         Vc = pose(T2, jaw_bell(VA, wd, 0)); Vj = pose(T2, jaw_bell(VA, wd, op))
         ar = lambda X: np.linalg.norm(np.cross(X[F[:, 1]] - X[F[:, 0]], X[F[:, 2]] - X[F[:, 0]]), axis=1)
         mouthF = (ar(Vj) > 1.8 * ar(Vc) + 1e-7) & bool(dark)          # skin stretched across the opening: the mouth

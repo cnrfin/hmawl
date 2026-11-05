@@ -54,6 +54,15 @@ Optional night enemy, unlocked by two events; replaces the owl's slot in the wil
   Picked: J3 with the bell (user, from the first jaw render): the whole lower head flares smoothly, widest at the
   bottom (1.6x), and the scream swings it down ~70 degrees from under the ears (jaw_bell). Option: dark mouth where
   the skin stretches.
+  Then (user): a normal face when closed (no jaw, no flare); the bell flares only as the jaw opens. Mock-up: width
+  1.0 closed -> 1.3 at 35 degrees -> 1.6 at 70. In game: jaw bone (Celia's braid node 8) rotation + x scale together
+  (pose records have a scale flag; root-bone scale already works), lower head weighted to it, more toward the bottom
+  (two-bone skin groups), node 9 for an extra flare at the rim if one bone is not enough.
+- Red eyes at the scream (user): characters have eye texture frames (f0_e.tpl, ~58 frames; expressions pick an
+  {eye, mouth} frame, face slot +0x124) - paint a red-eye frame and switch to it, as blinking does. The hit flash
+  tints the whole model, so it can't do eyes alone. Glow: unknown how the blue flowers by the spring glow (map
+  material, effect or particles: to look up); fallbacks: full-bright red eye texture (reads as lit at night) plus a
+  soft red halo drawn at the projected eye positions with HUD quads (as the Z-target reticle), or a particle.
 
 ## After the first defeat: the well
 - A red glow appears in the town well and beckons the player down. Below: a small new map (our own).
