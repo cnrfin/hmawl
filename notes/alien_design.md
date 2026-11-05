@@ -26,6 +26,13 @@ Optional night enemy, unlocked by two events; replaces the owl's slot in the wil
 - Head always turned away from the player. On Z-lock: the head snaps round, black eyes glow red, it screams, the
   farmer is frozen in fear for about a second, then the fight starts.
 
+- Body (user): built on our base human (blank body, tools/goddess/data/blank_v3 / small-bust variant, Celia's
+  skeleton) so it matches the villagers; the off-ness is bone lengths, joint angles and head scale on that base.
+  Candidates (tools/alien/body_candidates.py): A The Listener (neck 1.9x pushed forward, hunched, arms a little long,
+  knees bent in), B The Tall One (taller, neck 2.2x, long limbs, stiff, head tilted), C The Contorted (bent and
+  twisted, shoulder dropped, head cocked, one arm longer), D The Wide (head 1.4x wide and flatter, long neck, narrow
+  sloping shoulders, elbows bent the wrong way).
+
 ## After the first defeat: the well
 - A red glow appears in the town well and beckons the player down. Below: a small new map (our own).
 - Reward: a key that opens the unused shed on the player's farm (never used in vanilla).
