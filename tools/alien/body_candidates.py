@@ -57,7 +57,31 @@ def rot(axis, deg):
                      [y * x * (1 - c) + z * s, c + y * y * (1 - c), y * z * (1 - c) - x * s],
                      [z * x * (1 - c) - y * s, z * y * (1 - c) + x * s, c + z * z * (1 - c)]])
 
-def pose(spec):
+def alien_rest(V):
+    """v2 (user: too feminine, too like the villagers): rest-shape changes shared by every candidate."""
+    V = V.copy(); x, y, z = V[:, 0], V[:, 1], V[:, 2]
+    head = LAB == 'head'; ax = np.abs(x)
+    # straight, sexless torso: no waist, narrow hips, flat chest
+    tor = LAB == 'torso'
+    hip = tor & (y < 0.6); V[hip, 0] *= 0.8; V[hip, 2] = -0.005 + (z[hip] + 0.005) * 0.85
+    wst = tor & (y >= 0.6) & (y < 0.7); V[wst, 0] *= 1.08
+    chs = tor & (y >= 0.68) & (z > 0.03); V[chs, 2] = 0.03 + (z[chs] - 0.03) * 0.35
+    # gaunt limbs
+    arm = np.isin(NODE, [13, 15, 24, 26]) | ((NODE == 12) & (ax > 0.2)) | ((NODE == 23) & (ax > 0.2))
+    V[arm, 1] = 0.795 + (y[arm] - 0.795) * 0.72; V[arm, 2] = -0.005 + (z[arm] + 0.005) * 0.72
+    leg = np.isin(NODE, [37, 38, 44, 45]) | ((LAB == 'legL') | (LAB == 'legR')) & (y < 0.5)
+    cx = np.sign(x[leg]) * 0.06
+    V[leg, 0] = cx + (x[leg] - cx) * 0.72; V[leg, 2] = 0.005 + (z[leg] - 0.005) * 0.72
+    # no ears
+    e = head & (ax > 0.19) & (np.abs(y - 1.025) < 0.07) & (np.abs(z - 0.015) < 0.06)
+    V[e, 0] = np.sign(x[e]) * np.minimum(ax[e], 0.2)
+    # the skull swells up and back into a dome above a face of normal size
+    dm = head & (y > 1.0); t = y[dm] - 1.0
+    V[dm, 1] = 1.0 + t * 1.32; V[dm, 2] = np.where(z[dm] < 0, z[dm] * (1 + 1.6 * t), z[dm])
+    return V
+VA = alien_rest(V0)
+
+def pose(spec, V0=V0):
     """spec: len {node: k} (scales the bone from its effective parent), rot {node: R} (world rotation at the joint),
        scl {node: (centre, (sx, sy, sz))} (non-uniform scale of that node's own vertices, rest space)."""
     L, Rd, Sc = spec.get('len', {}), spec.get('rot', {}), spec.get('scl', {})
@@ -98,9 +122,10 @@ def merge(*ds):
 
 human = dict(rot=arms_down())
 
+HANDS = {17: 1.5, 28: 1.5}
 A = dict(   # The Listener: long neck pushed forward, head jutting and tipped down, shoulders hunched up and rolled in,
             # arms a little too long, knees slightly bent and in
-    len={7: 1.9, 13: 1.15, 15: 1.2, 16: 1.15, 24: 1.15, 26: 1.2, 27: 1.15},
+    len=merge(HANDS, {7: 1.9, 13: 1.15, 15: 1.2, 16: 1.15, 24: 1.15, 26: 1.2, 27: 1.15}),
     rot=merge(arms_down(70, 14), {6: rot((1, 0, 0), 38), 7: rot((1, 0, 0), -12), 5: rot((1, 0, 0), 10),
               11: rot((0, 0, 1), 10) @ rot((0, 1, 0), -14), 22: rot((0, 0, 1), -10) @ rot((0, 1, 0), 14),
               37: rot((1, 0, 0), -10) @ rot((0, 0, 1), 3), 44: rot((1, 0, 0), -10) @ rot((0, 0, 1), -3),
@@ -108,14 +133,14 @@ A = dict(   # The Listener: long neck pushed forward, head jutting and tipped do
     scl={7: (HEADC, (1.05, 1.08, 1.05))})
 
 B = dict(   # The Tall One: 1.3x, neck twice as long, long thin limbs, stiff and straight, head tilted to one side
-    len={7: 2.2, 4: 1.25, 5: 1.25, 6: 1.2, 13: 1.3, 15: 1.35, 16: 1.2, 24: 1.3, 26: 1.35, 27: 1.2,
-         38: 1.35, 39: 1.35, 45: 1.35, 46: 1.35},
+    len=merge(HANDS, {7: 2.2, 4: 1.25, 5: 1.25, 6: 1.2, 13: 1.3, 15: 1.35, 16: 1.2, 24: 1.3, 26: 1.35, 27: 1.2,
+         38: 1.35, 39: 1.35, 45: 1.35, 46: 1.35}),
     rot=merge(arms_down(84, 2), {7: rot((0, 0, 1), 16)}),
     scl={7: (HEADC, (0.95, 1.06, 0.98)), 3: (P[3], (0.85, 1, 0.9)), 4: (P[4], (0.85, 1, 0.9)), 5: (P[5], (0.85, 1, 0.9))})
 
 C = dict(   # The Contorted: bent at the waist and twisted, one shoulder dropped, head cocked far over, one arm longer,
             # knees bent, feet turned in
-    len={7: 1.6, 24: 1.25, 26: 1.35, 27: 1.2, 13: 1.05, 15: 1.05},
+    len=merge(HANDS, {7: 1.6, 24: 1.25, 26: 1.35, 27: 1.2, 13: 1.05, 15: 1.05}),
     rot=merge(arms_down(64, 25, 0), {4: rot((1, 0, 0), 22) @ rot((0, 1, 0), 18), 5: rot((0, 0, 1), -12),
               6: rot((1, 0, 0), 20), 7: rot((0, 0, 1), -55) @ rot((1, 0, 0), 10),
               23: rot((0, 0, 1), 84), 26: rot((0, 1, 0), -4),
@@ -125,11 +150,11 @@ C = dict(   # The Contorted: bent at the waist and twisted, one shoulder dropped
 
 D = dict(   # The Wide: head and face far too wide and a little flat, long thin neck, narrow sloping shoulders,
             # elbows bent the wrong way, long forearms
-    len={7: 1.6, 11: 0.75, 22: 0.75, 15: 1.25, 26: 1.25},
+    len=merge(HANDS, {7: 1.6, 11: 0.75, 22: 0.75, 15: 1.25, 26: 1.25}),
     rot=merge(arms_down(80, -14), {11: rot((0, 0, 1), -12), 22: rot((0, 0, 1), 12)}),
     scl={7: (HEADC, (1.4, 0.88, 1.08)), 6: (P[6], (0.8, 1, 0.8))})
 
-SKIN = np.array([235, 214, 205]) / 255; HUM = np.array([150, 158, 170]) / 255; BG = np.array([30, 30, 36]) / 255
+SKIN = np.array([214, 210, 212]) / 255; HUM = np.array([150, 158, 170]) / 255; BG = np.array([30, 30, 36]) / 255
 
 def render(V, ang, col, W=240, H=470, sc=250, oy=None):
     c, s = np.cos(ang), np.sin(ang)
@@ -161,7 +186,7 @@ VH = pose(human)
 views = [(0, 'front'), (np.radians(40), '3/4'), (np.radians(90), 'side'), (np.pi, 'back')]
 rows = []
 for tag, nm, spec in (('A', 'The Listener', A), ('B', 'The Tall One', B), ('C', 'The Contorted', C), ('D', 'The Wide', D)):
-    V = pose(spec)
+    V = pose(spec, VA)
     cells = [render(VH, np.radians(25), HUM)] + [render(V, a, SKIN) for a, _ in views]
     sheet = Image.new('RGB', (240 * len(cells), 470 + 34), (30, 30, 36)); dr = ImageDraw.Draw(sheet)
     for k, cimg in enumerate(cells):

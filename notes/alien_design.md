@@ -32,6 +32,9 @@ Optional night enemy, unlocked by two events; replaces the owl's slot in the wil
   knees bent in), B The Tall One (taller, neck 2.2x, long limbs, stiff, head tilted), C The Contorted (bent and
   twisted, shoulder dropped, head cocked, one arm longer), D The Wide (head 1.4x wide and flatter, long neck, narrow
   sloping shoulders, elbows bent the wrong way).
+  v2 (user: too feminine, too like the villagers), shared by all four: straight torso with no waist or hips, flat
+  chest, gaunt arms and legs (0.72x thick), no ears, the skull swelling up and back into a dome above a normal-sized
+  face, hands 1.5x long, pale cool grey skin.
 
 ## After the first defeat: the well
 - A red glow appears in the town well and beckons the player down. Below: a small new map (our own).
