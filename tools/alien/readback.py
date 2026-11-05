@@ -49,7 +49,7 @@ def draw(ps, angs, zm, yc, W=250, H=360, lab='', tilt=0.0):
     for ang in angs:
         img = np.zeros((H, W, 3)) + [40, 42, 50]; zb = np.full((H, W), -1e9); sc = H / 1.6 * zm; oy = H / 2 + yc * sc
         Rv = raster.rotX(tilt) @ raster.rotY(ang)
-        for P, Q, F, t, Nn in ps: view.smooth_tex(img, zb, P, F, Q, t, Rv, sc, W / 2, oy, normals=Nn, weld_key=False)
+        for P, Q, F, t, Nn in ps: view.smooth_tex(img, zb, P, F, Q, t, Rv, sc, W / 2, oy, normals=Nn, weld_key=False, cull=-1)   # the game's culling (alien4 test)
         ims.append(Image.fromarray(img.clip(0, 255).astype(np.uint8)))
     o = Image.new('RGB', (W * len(ims), H + 20), (30, 30, 36))
     for i, im in enumerate(ims): o.paste(im, (W * i, 20))

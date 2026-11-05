@@ -198,7 +198,7 @@ filled = set(s_ for s_, i in order)
 for s_ in range(nbuf):
     if s_ not in filled: P2[s_] = P2[s_ - 1]; N2[s_] = N2[s_ - 1]
 tris = {0: [], 1: []}
-for t, tu, g in zip(TRI, TUV, GROUP): tris[g].append((tuple(pos_of[int(i)] for i in t)[::-1], tuple(tu)[::-1]))   # the readback (game culling) wants this winding
+for t, tu, g in zip(TRI, TUV, GROUP): tris[g].append((tuple(pos_of[int(i)] for i in t), tuple(tu)))   # blank's order: right in game (alien4 test: the reversed order drew the face only from behind, as the Postman pm9)
 uvs = UVL
 q = lambda x: int(np.clip(np.round(x * (1 << FRAC)), -32768, 32767))
 vbuf = b''.join(struct.pack('>6h', *[q(c) for c in P2[i]], *[q(c) for c in N2[i]]) for i in range(len(P2)))

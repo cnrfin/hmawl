@@ -166,3 +166,7 @@ Optional night enemy, unlocked by two events; replaces the owl's slot in the wil
   u 0-0.25, head u 0.5-1, no seam wrap) stored as BOTH b0 images (owl.arc 99,776 B); 1.6x root scale (AL_SCALE) in
   ht_bone; tool EXP = stamina drops within 40 frames of a tool-skill pool rise (pools tracked everywhere now, reset on a
   map change), so milking in the barn counts and walking does not.
+- alien4 test (user + dump 4b378370): textures right now (eyes, ribs) - so the animal slot does draw with b0 image 0,
+  and the atlas fixed it. But the face showed only from behind: inside-out, exactly as the Postman (findings 7.24).
+  The game culls the opposite side to the readback's default, so the "fix" made for the readback in stage 1 was wrong.
+  alien5: blank's triangle order (as build_blank), the readback now culls like the game (cull=-1). owl.arc 100,032 B.
