@@ -135,3 +135,18 @@ Optional night enemy, unlocked by two events; replaces the owl's slot in the wil
   alien.anm.arc 36,736 B (Celia's 10 animations retargeted, for now). The readback (bind, posed, screaming) from the
   files matches the design.
 - Scream sound (user): alien_scream.mp3, 2.4 s mono 48 kHz - kept with the build files (not in the repo), for stage 3.
+
+## Stage 2: first in-game look (alien2)
+- owl.arc / owl.anm.arc from build_alien.py NAME=owl (+ owl_f0.tpl placeholder like the original; anm = Celia's idle +
+  23 copies of her smallest clip, since the owl's code may ask for more clips than 10 and the pose layer sets every
+  rotation anyway). owl.arc 79,296 B, owl.anm.arc 42,656 B. owl_subact / owl_subanm stay the originals.
+- The wild model block is sized at run time to the biggest model file (now owl.arc), so expect a slightly larger
+  block: check the memory gauge in a dump.
+- zt.c: HT_BONES 40 -> 64 (49 nodes); ht_bone for species 0x30: local rotations = AL_Q (absolute, over the clip), no
+  2x root scale, no hit poses / head tracking yet. en_frame -> alien_frame: own AI off (en_ctl), no aggro, pinned at
+  (216, ground, 121.8) (user's spot opposite Celia's farm), facing the player.
+- Pose table: local[n] = Mrest[p]^T D[n] Mrest[p] Lrest[n] (Celia's rest rotations), rebuilt and compared with the
+  design's FK (errors ~1e-7).
+- ALIEN_TEST (pm.bin): the day's species is forced to 0x30 (shows the next time the valley loads). Normal builds still
+  drop the owl from the roll.
+- The blue glow the user mentioned is at about (146, 21.1, 278), by tall plants with glowing bulbs (for the eye glow).

@@ -13,6 +13,7 @@ typedef unsigned char u8;
 typedef short s16;
 #include "skill_hud.h"                                  /* AGC_RET_Q, UV_TRI, element 7 (the HUD quads) */
 #include "stat_hud.h"                                   /* E7_TOTAL: element 7 with the stat HUD (step 3) */
+#include "alien_pose.h"                                 /* the alien's standing pose (tools/alien/gen_pose.py) */
 #define F(addr, ret, args) ((ret (*) args)(addr))
 #define sfx_play   F(0x8012A52C, s32, (u8 *, s32, s32))
 #define CONTROL    (*(u8 *)(*(u8 **)0x80349218 + 8))      /* 1 = player free */
@@ -427,7 +428,12 @@ void zt_frame(u8 *g, s32 map, volatile u32 *held, volatile u32 *press)
                 s32 k; for (k = 0; k < 4; k++) *(u32 *)(a + 0x734 + 4 * k) = 0xFFFFFF00u;
             }
         }
+#ifdef ALIEN_TEST
+        if ((u32)tm >= 0x80000000u && (u32)tm < 0x81800000u) *(s32 *)(tm + 0x3F8) = 0x30;   /* test: the alien every day
+                                                                  (the owl slot; shows the next time the valley loads) */
+#else
         if ((u32)tm >= 0x80000000u && (u32)tm < 0x81800000u && *(s32 *)(tm + 0x3F8) == 0x30) *(s32 *)(tm + 0x3F8) = 0x2C + (s32)(F(0x8017D3E8, u32, (void))() % 4u);
+#endif
     }
     stance_frame(g, map);
     hurt_frame(held, press);                              /* battle21: enemy hits on the player */
@@ -995,7 +1001,7 @@ static const u8 en_head[5] = { 19, 4, 5, 4, 0xFF };     /* head bone: lizard, ch
 #define HT_MAX   1.2f                                   /* about 70 degrees either way */
 #define HT_EASE  0.18f
 #define HT_SIGN  1.0f                                   /* flip if the head turns away */
-#define HT_BONES 40
+#define HT_BONES 64                                     /* the alien (owl slot) has Celia's 49 nodes */
 struct { u32 magic; float phi, want; u32 turns, scaled; } HT;   /* 'HTRK' (dump) */
 static float ht_m[HT_BONES][9];
 static u8 *en_skel;                                      /* the day's animal's skeleton instance (for zt_bone) */
@@ -1073,11 +1079,27 @@ static void ht_want(u8 *g, u8 *a)                        /* the head's target: t
     if (w > HT_MAX) w = HT_MAX; if (w < -HT_MAX) w = -HT_MAX;
     HT.want = w;
 }
+/* Alien stage 2 (notes/alien_design.md): the owl slot's model is the alien. It stands still opposite Celia's farm
+   (user's spot), on the ground, facing the player; its own AI is off (en_ctl), no fight yet. */
+#define ALIEN_X 216.0f
+#define ALIEN_Z 121.8f
+static void alien_frame(u8 *g, u8 *a, u8 *in)
+{
+    float v[3], y, *p = SLOT_POS(g, 0);
+    en_ctl = a; AG.on = 0; AG.homing = 0; PZ.sp = 4; PZ.st = -1;
+    v[0] = ALIEN_X; v[1] = 30.0f; v[2] = ALIEN_Z;
+    y = ground_at(*(void **)0x80349204, v);
+    if (y != y || y > 5000.0f || y < -5000.0f) y = 6.5f;
+    en_setpos(a, ALIEN_X, y, ALIEN_Z);
+    ai_face(a, p[0] - ALIEN_X, p[2] - ALIEN_Z);
+    in[0x3C] = 1;
+}
 static void en_frame(u8 *g)
 {
     u8 *a = wild_obj(), *in;
     if (!a || !(in = wild_inst(a))) { en_ctl = 0; en_skel = 0; return; }
     en_scale(a);
+    if (*(s32 *)(a + 0x128) == 0x30) { alien_frame(g, a, in); return; }
     HT.magic = 0x4854524Bu; HT.phi += (HT.want - HT.phi) * HT_EASE; HT.want = 0.0f;   /* back to straight unless in battle */
     ag_frame(g, a);
     if (en_alive() && !EN.maxhp) {                            /* today's animal: its HP (per species) */
@@ -1375,6 +1397,11 @@ static s32 ht_bone(s32 n, u8 *trs, s32 r)                /* r: anim_eval's resul
         t[0] = rm[3]; t[1] = rm[7]; t[2] = rm[11]; trs[0] = 4 | 8; r = 1;
     }
     if (!(trs[0] & 4)) { q[0] = q[1] = q[2] = 0.0f; q[3] = 1.0f; trs[0] |= 4; }   /* a record without rotation: identity */
+    if (sp == 4) {                                      /* alien stage 2: held in its standing pose (absolute local rotations
+                                                           over whatever clip plays); its own size, no 2x */
+        if (n < AL_NODES) { q[0] = AL_Q[n][0]; q[1] = AL_Q[n][1]; q[2] = AL_Q[n][2]; q[3] = AL_Q[n][3]; trs[0] |= 4; }
+        goto matrix;
+    }
     if (n == 0) {                                       /* user: every animal 2x. Scale (flag 1, +4) the root; its translation
                                                            doubles too, so the model grows about the object's origin (feet) */
         float *sc = (float *)(trs + 4);
@@ -1389,6 +1416,7 @@ static s32 ht_bone(s32 n, u8 *trs, s32 r)                /* r: anim_eval's resul
         p_rot(&c, 1, HT_SIGN * HT.phi);                 /* head tracking: about the model's up axis */
         HT.turns++;
     }
+matrix:
     {   float x = q[0], y = q[1], z = q[2], w = q[3];   /* this bone's rotation -> matrix (column vectors), model rotation */
         L[0] = 1 - 2 * (y * y + z * z); L[1] = 2 * (x * y - z * w); L[2] = 2 * (x * z + y * w);
         L[3] = 2 * (x * y + z * w); L[4] = 1 - 2 * (x * x + z * z); L[5] = 2 * (y * z - x * w);

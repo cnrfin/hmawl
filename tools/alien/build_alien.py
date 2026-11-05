@@ -220,9 +220,16 @@ if __name__ == '__main__':
     check_strips(tris[0]); check_strips(tris[1])
     gpl, skn, actb = build_gpl(), build_skn(), build_act()
     b0 = tpl([body_tex, head_tex])
-    arc = u8([(NAME + '.act', actb), (NAME + '.gpl', gpl), (NAME + '.skn', skn), (NAME + '_b0.tpl', b0),
-              (NAME + '_f0_e.tpl', f0e), (NAME + '_f0_m.tpl', f0m), ('_tmp.txt', b'')])
-    anm = u8([('@', retarget_anim(open(SK + 'anm%02d.bin' % a, 'rb').read())) for a in range(ANIMS)])
+    files = [(NAME + '.act', actb), (NAME + '.gpl', gpl), (NAME + '.skn', skn), (NAME + '_b0.tpl', b0),
+             (NAME + '_f0_e.tpl', f0e), (NAME + '_f0_m.tpl', f0m)]
+    if NAME == 'owl':                                       # the owl's archive also has owl_f0.tpl (one face texture)
+        files.append(('owl_f0.tpl', tpl([Image.new('RGBA', (1, 1), (0, 0, 0, 0))])))
+    arc = u8(files + [('_tmp.txt', b'')])
+    clips = [retarget_anim(open(SK + 'anm%02d.bin' % a, 'rb').read()) for a in range(ANIMS)]
+    if NAME == 'owl':                                       # the owl's code may ask for more clips; the pose layer sets
+        small = min(clips, key=len)                         # every rotation anyway: idle first, the rest the smallest clip
+        anm = u8([('@', clips[0] if a == 0 else small) for a in range(24)])
+    else: anm = u8([('@', c) for c in clips])
     open(os.path.join(OUT, NAME + '.arc'), 'wb').write(arc)
     open(os.path.join(OUT, NAME + '.anm.arc'), 'wb').write(anm)
     for nm_, d_ in ((NAME + '.act', actb), (NAME + '.gpl', gpl), (NAME + '.skn', skn), (NAME + '_b0.tpl', b0),
