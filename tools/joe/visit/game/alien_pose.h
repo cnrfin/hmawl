@@ -52,3 +52,6 @@ static const float AL_Q[AL_NODES][4] = {
     {0.000000f, 0.835305f, 0.549787f, 0.000000f},
     {0.667878f, -0.000000f, -0.000000f, 0.744271f},
 };
+static const float AL_QJ8[4] = {0.807990f, -0.000000f, 0.000000f, 0.589197f};   /* node 8 with the jaw open 60 degrees */
+static const float AL_HEAD[3] = {-0.00000f, 0.75867f, 0.36376f};   /* head joint, posed, model space (before the 1.6x) */
+static const float AL_EYE[2][3] = {{-0.05151f, 0.04317f, 0.18793f}, {0.05151f, 0.04317f, 0.18793f}};   /* eye centres - head joint */

@@ -186,3 +186,15 @@ Optional night enemy, unlocked by two events; replaces the owl's slot in the wil
   305121b7, test 94ceb247, normal 176dd7d3 (owl.arc unchanged from alien6).
 - alien7 test (user + dump 18baa9b3): correct from all sides. Memory gauge: gap 595 KB now, lowest seen 592 KB (the
   pools stay far apart with the alien loaded). Stage 2 done.
+- Stage 3, the reveal (alien8, untested in game). zt.c RV state, driven by alien_frame:
+  st0 back to the player, head straight; lock-on (Z.target == ZT_WILD) or within 3.5 -> st1 the head (node 7, p_rot by
+  RV.hy) snaps 180 degrees over 8 frames (smoothstep) -> st2 the scream: SFX 446 (the user's scream, added to GAME_ALL
+  with tools/sound/add_sfx.py; arc afa711e1, samp 5418acda - kept out of the repo), jaw nlerps AL_Q[8] -> AL_QJ8 (60
+  degrees about x) over 6 frames with node 8 scaled x 1.3, node 9 x 1.45 / z 1.2 (the bell), red eye dots on, farmer
+  frozen 60 frames (pad cleared except Z so the lock holds; element 7's x jittered +-5 = HUD shake), camera close-up
+  (zoom(): distance -> AL_ZOOM 5.0 at rate 0.35 = sudden; after the scream back to the lock-on distance at ZT_ZRATE
+  0.10 = smooth); the body turns under the head after 20 frames; 70 frames -> st3 the jaw closes (15) -> st4 watching
+  with red eyes, facing the player; back to st0 after 60 frames unlocked beyond 12 units.
+  Eye dots: the 4 tool-row HUD quads (hidden since the stat HUD; skill.c leaves them alone while al_eyes_on), a glow
+  (0xFF180C70) and a dot (0xFF3020FF) per eye, projected from AL_HEAD + AL_EYE (gen_pose.py) through the body and
+  head turns at 1.6x; full bright since HUD quads are unlit. pm alien test c9c8708f, test 50546519, normal 32e6ba1b.

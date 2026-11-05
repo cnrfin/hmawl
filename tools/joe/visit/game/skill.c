@@ -94,7 +94,8 @@ static void pop_layout(u8 *a, s32 alpha, s32 rise)
     }
 }
 
-s32 skill_pop_on;                                        /* zt.c: the pop-up owns all its quads now */
+s32 skill_pop_on;
+extern s32 al_eyes_on;                                        /* zt.c: the pop-up owns all its quads now */
 /* step 2 (notes/stats_design.md): the farmer's level-up - "Level up!" pops up with sound 216 (user) */
 #define SFX_LVUP 216
 void skill_levelup(void)
@@ -136,7 +137,7 @@ void skill_frame(u8 *g, u32 pad_held, u32 pad_press)
     alpha = slide >= 90 ? 0 : 0xF0 - slide * 0xF0 / 90;     /* fades as the bars slide away */
     alpha = 0;                                           /* step 3: the stat HUD replaces the tool-skill row */
     lv = pool < 0 ? 0 : level_of(g, pool);
-    {
+    if (!al_eyes_on) {                                   /* alien stage 3: the row's quads are the eye dots while they show */
         u8 *q = QUAD(a, AGC_ROW_Q, 0);
         float *uv = (float *)(q + 0x1C); const float *src = pool == 1 ? UV_CAN : UV_HOE;
         for (k = 0; k < 4; k++) uv[k] = src[k];
