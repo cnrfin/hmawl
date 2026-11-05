@@ -57,6 +57,20 @@ def rehue(im, hue):
     rgb = np.array(Image.fromarray(hsv, 'HSV').convert('RGB'))
     return Image.fromarray(np.dstack([rgb, a[..., 3]]), 'RGBA')
 
+def eye_sprite(n, core):
+    """the alien's red eyes (zt.c al_eye_dots): halo = soft red glow; core = white-hot centre in a bright red rim"""
+    c = (n - 1) / 2; y, x = np.mgrid[0:n, 0:n]; r = np.hypot(x - c, y - c) / (n / 2)
+    a = np.zeros((n, n, 4))
+    if core:
+        hot = np.clip(1 - r / 0.45, 0, 1) ** 0.7                      # white in the middle
+        a[..., 0] = 255; a[..., 1] = 40 + 215 * hot; a[..., 2] = 30 + 225 * hot
+        a[..., 3] = 255 * np.clip((1 - r) / 0.25, 0, 1)
+    else:
+        a[..., 0] = 255; a[..., 1] = 30; a[..., 2] = 20
+        a[..., 3] = 255 * np.clip(np.exp(-(r / 0.5) ** 2) - np.exp(-4), 0, 1) / (1 - np.exp(-4))
+    a[r >= 1, 3] = 0
+    return Image.fromarray(a.clip(0, 255).astype(np.uint8), 'RGBA')
+
 def main():
     clz, out = sys.argv[1:3]
     u = clz_decompress(open(clz, 'rb').read()); arc = u8arc.read(u); nm = u8arc.names(arc)
@@ -78,6 +92,8 @@ def main():
     orange = crop(t2, 0.0, 0.771, 0.43, 0.844)                     # 110 x 7
     for k, (im, y) in {'blue': (rehue(green, 150), 24), 'purple': (rehue(green, 196), 40), 'cyan': (rehue(orange, 128), 58)}.items():
         atlas.alpha_composite(im, (0, y)); rect[k] = (0, y, im.width, im.height)
+    for k, im, xy in (('halo', eye_sprite(32, False), (176, 24)), ('core', eye_sprite(16, True), (212, 24))):   # alien eyes
+        atlas.alpha_composite(im, xy); rect[k] = (xy[0], xy[1], im.width, im.height)
     tpl2, tex = tpltool.append(tpl, np.array(atlas)); assert tex == 5
     uv5 = lambda k: (rect[k][0] / AW, rect[k][1] / AH, (rect[k][0] + rect[k][2]) / AW, (rect[k][1] + rect[k][3]) / AH)
     G = json.load(open(GLYPH)); code = {cd: i for i, cd in enumerate(G['codes'])}
@@ -145,7 +161,8 @@ def main():
           '#define SH_LV_SC   %d' % round(LV_SC / FONT_SC * 100),
           '#ifdef SH_DATA', 'static const float SH_DIG[11][4] = {%s};  /* 0-9, %% (texture 5) */' % ', '.join(fl(uv5(ch)) for ch in '0123456789%'),
           'static const unsigned char SH_DIG_W[11] = {%s};' % ', '.join(str(rect[ch][2]) for ch in '0123456789%'),
-          'static const float SH_UV_BLUE[4] = %s, SH_UV_PURPLE[4] = %s, SH_UV_CYAN[4] = %s;' % (fl(uv5('blue')), fl(uv5('purple')), fl(uv5('cyan'))), '#endif']
+          'static const float SH_UV_BLUE[4] = %s, SH_UV_PURPLE[4] = %s, SH_UV_CYAN[4] = %s;' % (fl(uv5('blue')), fl(uv5('purple')), fl(uv5('cyan'))), '#endif',
+          '#ifdef SH_EYES', 'static const float SH_UV_HALO[4] = %s, SH_UV_CORE[4] = %s;  /* the alien eyes (texture 5) */' % (fl(uv5('halo')), fl(uv5('core'))), '#endif']
     open(os.path.join(out, 'stat_hud.h'), 'w').write('\n'.join(h) + '\n')
     print('opguide.tpl +texture 5 (%dx%d), opguide.agc %d -> %d B (element 7: %d quads), commonall %d B sha1 %s'
           % (AW, AH, len(arc['files'][ka]), len(agc), total, len(c), hashlib.sha1(c).hexdigest()[:12]))

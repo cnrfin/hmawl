@@ -12,6 +12,7 @@ typedef int s32;
 typedef unsigned char u8;
 typedef short s16;
 #include "skill_hud.h"                                  /* AGC_RET_Q, UV_TRI, element 7 (the HUD quads) */
+#define SH_EYES
 #include "stat_hud.h"                                   /* E7_TOTAL: element 7 with the stat HUD (step 3) */
 #include "alien_pose.h"                                 /* the alien's standing pose (tools/alien/gen_pose.py) */
 #define F(addr, ret, args) ((ret (*) args)(addr))
@@ -447,13 +448,20 @@ void zt_frame(u8 *g, s32 map, volatile u32 *held, volatile u32 *press)
         if ((u32)tm >= 0x80000000u && (u32)tm < 0x81800000u && *(s32 *)(tm + 0x3F8) == 0x30) *(s32 *)(tm + 0x3F8) = 0x2C + (s32)(F(0x8017D3E8, u32, (void))() % 4u);
 #endif
     }
-    {   /* alien stage 3: frozen in fear for a second (Z kept, so the lock holds), the HUD shaking */
+    {   /* alien stage 3: frozen in fear for a second (Z kept, so the lock holds), the whole HUD shaking. alien9: the
+           stick too - func_8003083C reads it from the pad struct (0x80341574 + 0x18 / 0x19, C stick + 0x1A / 0x1B) */
+        static s16 hx[8]; static s32 shook;
         u8 *ag = AGC;
-        s16 *ex = ((u32)ag >= 0x80000000u && (u32)ag < 0x81800000u) ? (s16 *)(ag + AGC_ELEMENTS + 12 * 7 + 8) : 0;
+        s16 *ex = ((u32)ag >= 0x80000000u && (u32)ag < 0x81800000u) ? (s16 *)(ag + AGC_ELEMENTS + 8) : 0;
+        s32 k;
         if (RV.fear > 0) {
             RV.fear--; *held &= 0x10u; *press = 0;
-            if (ex) *ex = (s16)(E7_X + (s32)(F(0x8017D3E8, u32, (void))() % 11u) - 5);
-        } else if (ex && *ex != E7_X) *ex = E7_X;
+            *(volatile u32 *)0x8034158Cu = 0;            /* stick x, y, C stick x, y */
+            if (ex) {
+                if (!shook) { for (k = 0; k < 8; k++) hx[k] = ex[6 * k]; shook = 1; }
+                for (k = 0; k < 8; k++) ex[6 * k] = (s16)(hx[k] + (s32)(F(0x8017D3E8, u32, (void))() % 13u) - 6);
+            }
+        } else if (shook) { if (ex) for (k = 0; k < 8; k++) ex[6 * k] = hx[k]; shook = 0; }
     }
     stance_frame(g, map);
     hurt_frame(held, press);                              /* battle21: enemy hits on the player */
@@ -1140,6 +1148,9 @@ static void alien_frame(u8 *g, u8 *a, u8 *in)
         if (RV.t >= RV_SNAP) {
             RV.st = 2; RV.t = 0; RV.eyes = 1; RV.fear = 60;
             sfx_play(*(u8 **)0x803491E4, SE_SCREAM, 0);
+            if (Z.target != ZT_WILD) {                   /* alien9: as OoT's ReDead, the scream locks the camera on it */
+                Z.target = ZT_WILD; Z.fvalid = 0; Z.r = -1; tpos(g, ZT_WILD, 1, &Z.tx, &Z.tz);
+            }
         }
         break;
     case 2:                                              /* the scream */
@@ -1158,7 +1169,8 @@ static void alien_frame(u8 *g, u8 *a, u8 *in)
         if (Z.target != ZT_WILD && d2 > RV_FAR * RV_FAR) { if (++RV.far > 60) RV.st = 0; } else RV.far = 0;
         break;
     }
-    *(float *)(a + 0x58) = zsin(RV.ba); *(float *)(a + 0x60) = zsin(RV.ba + 1.57079637f);
+    *(float *)(a + 0xF0) = zsin(RV.ba); *(float *)(a + 0xF8) = zsin(RV.ba + 1.57079637f);   /* alien9: the facing the game
+                                                           copies to +0x58 / +0x60 each frame (alien8 wrote those: lost) */
     in[0x3C] = 1;
     al_eye_dots(a);
 }
@@ -1166,7 +1178,7 @@ static void alien_frame(u8 *g, u8 *a, u8 *in)
 static void al_eye_dots(u8 *obj)
 {
     u8 *a = AGC;
-    s32 e, k, e7y;
+    s32 e, k, e7x, e7y;
     if ((u32)a < 0x80000000u || (u32)a >= 0x81800000u || *(u32 *)(a + AGC_E7_COUNT) != E7_TOTAL) return;
     if (!RV.eyes) {
         if (al_eyes_on) for (k = 0; k < 4; k++) *(u32 *)(a + AGC_ROW_Q + 0x2C * k + 0xC) = 0, *(u32 *)(a + AGC_ROW_Q + 0x2C * k + 0x10) = 0,
@@ -1174,7 +1186,7 @@ static void al_eye_dots(u8 *obj)
         al_eyes_on = 0; return;
     }
     al_eyes_on = 1;
-    e7y = *(s16 *)(a + AGC_E7_Y);
+    e7y = *(s16 *)(a + AGC_E7_Y); e7x = *(s16 *)(a + AGC_ELEMENTS + 12 * 7 + 8);
     {
         float sb = zsin(RV.ba), cb = zsin(RV.ba + 1.57079637f), sh = zsin(RV.hy), ch = zsin(RV.hy + 1.57079637f);
         float ox = *(float *)(obj + 0x4C), oy = *(float *)(obj + 0x50), oz = *(float *)(obj + 0x54);
@@ -1186,10 +1198,12 @@ static void al_eye_dots(u8 *obj)
             w = proj(ox + mx * cb + mz * sb, oy + my, oz - mx * sb + mz * cb, &sx, &sy);
             if (w <= 0) continue;
             sc = RET_DEPTH / w; if (sc < 0.4f) sc = 0.4f; if (sc > 3.0f) sc = 3.0f;
-            cx = (s32)(sx * 320.0f) - E7_X; cy = (s32)(-sy * 240.0f) - e7y;
-            rh = (s32)(9.0f * sc); rc = (s32)(3.0f * sc); if (rc < 2) rc = 2;
-            quad(a, (AGC_ROW_Q - AGC_RET_Q) / 0x2C + e * 2, cx - rh, cy - rh, cx + rh, cy + rh, UV_GEME, 0xFF180C00u | 0x70u);   /* glow */
-            quad(a, (AGC_ROW_Q - AGC_RET_Q) / 0x2C + e * 2 + 1, cx - rc, cy - rc, cx + rc, cy + rc, UV_GEME, 0xFF3020FFu);       /* dot */
+            cx = (s32)(sx * 320.0f) - e7x; cy = (s32)(-sy * 240.0f) - e7y;   /* (the shake's x: the dots stay put) */
+            rh = (s32)(22.0f * sc); rc = (s32)(6.0f * sc); if (rc < 3) rc = 3;   /* alien9: bigger, white-hot */
+            k = (AGC_ROW_Q - AGC_RET_Q) / 0x2C + e * 2;
+            quad(a, k, cx - rh, cy - rh, cx + rh, cy + rh, SH_UV_HALO, 0xFFFFFFFFu);          /* red halo (texture 5) */
+            quad(a, k + 1, cx - rc, cy - rc, cx + rc, cy + rc, SH_UV_CORE, 0xFFFFFFFFu);      /* white centre, red rim */
+            *(u32 *)(a + AGC_RET_Q + 0x2C * k) = 5; *(u32 *)(a + AGC_RET_Q + 0x2C * (k + 1)) = 5;
         }
     }
 }

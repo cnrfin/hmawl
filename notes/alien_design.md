@@ -198,3 +198,18 @@ Optional night enemy, unlocked by two events; replaces the owl's slot in the wil
   Eye dots: the 4 tool-row HUD quads (hidden since the stat HUD; skill.c leaves them alone while al_eyes_on), a glow
   (0xFF180C70) and a dot (0xFF3020FF) per eye, projected from AL_HEAD + AL_EYE (gen_pose.py) through the body and
   head turns at 1.6x; full bright since HUD quads are unlit. pm alien test c9c8708f, test 50546519, normal 32e6ba1b.
+- alien8 test (user + dump 1745e059): scream and close-up worked; the head turned for a moment and back, the body
+  never turned, the eyes were dim and floated beside the head, the farmer could still walk, no visible HUD shake.
+  Causes: (1) the game copies the facing vector +0xF0 / +0xF8 into +0x58 / +0x60 every frame, so alien8's writes to
+  +0x58 / +0x60 were lost: the body stayed facing +z while RV.ba (the code's idea of it) came round, so the head
+  "unwound" (hy = to - ba) and the eye projection used the wrong body angle. The dome is near-symmetric, so only the
+  face texture visibly moved (user: "only the textures turned"). (2) Movement comes from the analog stick, read by
+  func_8003083C from the pad copy 0x80341574 + 0x18 / 0x19, not from the button word. (3) The dots used the grey gem
+  texture (max ~160 brightness) tinted red. (4) The shake moved element 7 only.
+  alien9: facing written to +0xF0 / +0xF8 (sin ba, cos ba); stick + C stick cleared (u32 at 0x8034158C) during the
+  freeze; all 8 HUD elements jitter +-6 px (saved / restored), the dots compensate; eye sprites in the stat HUD's
+  texture 5 (build_stat_hud.py eye_sprite: a 32 px red halo and a 16 px white-hot core with a red rim, drawn 44 / 12
+  px at the reticle's depth scale); and, after OoT's ReDead (zeldaret/oot z_en_rd.c: freezeTimer 40-60, auto lock-on,
+  re-scream every 60 frames while near and facing, separate head / upper-body yaw easing back), the scream forces the
+  Z lock onto the alien. commonall (hud5) 59aa5e53 (on weapons3, as hud1); pm alien test e71d1e34, test 799c7f64,
+  normal 3ce0987f. Next ReDead ideas for stage 4: re-scream on a cooldown while facing the player, controller rumble.

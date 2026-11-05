@@ -26,3 +26,6 @@ static const float SH_DIG[11][4] = {{0.000000f, 0.000000f, 0.066406f, 0.262500f}
 static const unsigned char SH_DIG_W[11] = {17, 8, 16, 15, 19, 17, 16, 15, 16, 15, 17};
 static const float SH_UV_BLUE[4] = {0.000000f, 0.300000f, 0.656250f, 0.450000f}, SH_UV_PURPLE[4] = {0.000000f, 0.500000f, 0.656250f, 0.650000f}, SH_UV_CYAN[4] = {0.000000f, 0.725000f, 0.429688f, 0.812500f};
 #endif
+#ifdef SH_EYES
+static const float SH_UV_HALO[4] = {0.687500f, 0.300000f, 0.812500f, 0.700000f}, SH_UV_CORE[4] = {0.828125f, 0.300000f, 0.890625f, 0.500000f};  /* the alien eyes (texture 5) */
+#endif
