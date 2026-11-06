@@ -3985,4 +3985,4 @@ so, door fades are timed there, possibly per frame. Not traced yet.
 - Facing: counter 30 = degrees farmer -> her (atan2(dx, dz), 0..359); the script runs cmd_59(0, counter 30) at every
   shot (as the Postman's event); his direction (game + 0x29F84) is also set each frame.
 - pm gqtest 5c76cc62 ('GSCN' 0x8037F32C), test 675fb83c, normal 7fab75ba; Common.arc f7348314.
-
+- gq11: user OK, the first summoning counts as finished for now. Letterbox left out (no HUD in events).
