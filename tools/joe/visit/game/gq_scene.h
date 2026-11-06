@@ -4,8 +4,9 @@
 #define GQ_C_CUE  26
 #define GQ_C_DONE 27
 #define GQ_C_YEAR1 28
+#define GQ_C_FACE 29
 #define GS_N 12
-#define GS_LETTERBOX 1
+#define GS_LETTERBOX 0
 #define GS_MUSIC_FADE 1
 #define GS_MUSIC_SHOT 5
 #define GS_END_WHITE 1
@@ -23,7 +24,7 @@ static const struct gshot { signed char subj, look, smooth, motion, act, after, 
     { 0, 0, 0, 4, 1, 0, 0, 622, 0, 0, { -40.0f, 3.4f, 0.84f, 0.91f, 40.0f, 3.4f, 1.12f, 0.91f } },   /* 8 Lore orbit */
     { 0, 0, 1, 0, 1, 0, 0, 292, 0, 0, { 5.0f, 2.4f, 1.05f, 1.01f, 5.0f, 1.9f, 1.05f, 1.01f } },   /* 9 Push-in */
     { 0, 0, 1, 6, 1, 0, 0, 405, 0, 0, { 15.0f, 2.6f, 0.35f, 1.05f, 15.0f, 2.6f, 0.35f, 1.05f } },   /* 10 Hero low angle */
-    { 2, 2, 1, 4, 1, 0, 0, 665, 0, 0, { 90.0f, 5.0f, 1.12f, 0.7f, 90.0f, 4.5f, 1.12f, 0.7f } },   /* 11 Two-shot */
-    { 0, 0, 1, 0, 3, 1, 1, 298, 0, 180, { 0.0f, 3.0f, 0.98f, 0.98f, 0.0f, 6.0f, 2.38f, 0.35f } },   /* 12 Farewell */
+    { 2, 2, 1, 4, 1, 0, 0, 665, 0, 0, { 90.0f, 3.6f, 1.19f, 0.7f, 90.0f, 3.3f, 1.19f, 0.7f } },   /* 11 Two-shot */
+    { 0, 0, 1, 0, 3, 1, 1, 208, 0, 90, { 0.0f, 3.0f, 0.98f, 0.98f, 0.0f, 4.2f, 1.82f, 0.35f } },   /* 12 Farewell */
 };
 #endif

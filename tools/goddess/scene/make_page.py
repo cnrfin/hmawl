@@ -25,10 +25,12 @@ S = [
  shot('Lore orbit', start=k(-40, 3.4, 1.2, 1.3), end=k(40, 3.4, 1.6, 1.3), ease='linear', lines=['A5'], motion='explain', note='Slow orbit while she tells the story.'),
  shot('Push-in', start=k(5, 2.4, 1.5, 1.45), end=k(5, 1.9, 1.5, 1.45), lines=['A6']),
  shot('Hero low angle', start=k(15, 2.6, .5, 1.5), lines=['A7'], motion='plead (bow)', note='"I am the Harvest Goddess." One bow, then idle.'),
- shot('Two-shot', 'pair', start=k(90, 5.0, 1.6, 1.0), end=k(90, 4.5, 1.6, 1.0), lines=['A8', 'A9'], motion='explain', note='A9 plays only in year 1.'),
- shot('Farewell', start=k(0, 3, 1.4, 1.4), end=k(0, 6, 3.4, .5), lines=['A10'], action='sink', actionWhen='afterLines', actionSeconds=3, splash=True, note='Crane up and back as she sinks; fade to white, control back.'),
+ shot('Two-shot', 'pair', start=k(90, 3.6, 1.7, 1.0), end=k(90, 3.3, 1.7, 1.0), lines=['A8', 'A9'], motion='explain', note='A9 plays only in year 1.'),
+ shot('Farewell', start=k(0, 3, 1.4, 1.4), end=k(0, 4.2, 2.6, .5), lines=['A10'], action='sink', actionWhen='afterLines', actionSeconds=1.5, splash=True, note='Crane up and back as she sinks; fade to white, control back.'),
 ]
-P = dict(settings=dict(letterbox=True, musicFade=True, fov=40, music='Marin Jazz', musicShot=5, endFade='white'), shots=S)
+P = dict(settings=dict(letterbox=False, musicFade=True, fov=40, music='Marin Jazz', musicShot=5, endFade='white',
+         faces=dict(A1='closed', A2='soft', A3='pout', A4='joy', A5='neutral', A6='smile', A7='smug', A8='smile', A9='blush', A10='smile'),
+         voices=dict(A2=389)), shots=S)
 if '--json' in sys.argv: json.dump(dict(file='spring_scene', version=1, **P), open(os.path.join(HERE, 'spring_scene.json'), 'w'), indent=1); sys.exit()
 out = T.replace('__THREE__', three).replace('__LINES__', json.dumps(lines)).replace('__PROPOSAL__', json.dumps(P, indent=1))
 open(sys.argv[2], 'w').write(out); print(len(out))

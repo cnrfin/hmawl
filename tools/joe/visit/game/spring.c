@@ -206,6 +206,7 @@ static void offering(u8 *g, s32 item)
         gq_scene_req = 1;                                        /* pm.c raises her and runs event GQ_SCENE_EVENT */
         if (OK(fd)) { u32 from = 0xFFFFFFFFu, to = 0xFFFFFF00u; fade_to(fd, &from, &to, 0, 0, 1.6f); }   /* gq4: one flash (white -> clear;
                                                            gq1-3's white-in, hold, white-out read as two) */
+        sfx_play(*(u8 **)0x803491E4, 306, 0);                   /* gq8: the magic sound (SFXList 306) */
         GQD.sum = 1; GQD.t = 0;
         return;
     }

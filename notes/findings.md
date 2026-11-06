@@ -3920,4 +3920,26 @@ so, door fades are timed there, possibly per frame. Not traced yet.
   bars off at once (under the white) and white -> clear 1 s. hg_0.anm.arc clip lengths (+8 float): 119, 25, 60, 120,
   105, 36, 60, 90, 59, 100.
 - pm gqtest f96b34b4, test 8f182acc, normal 9dd44074; Common.arc 4cbd6295 (debug.mes unchanged); 'GSCN' 0x8037EEEC.
+- gq7 test (user): no jiggle; explain should play once too; more faces; 3 lines (A8-A10) showed only grass / the bank
+  (the two-shot and farewell eyes sat under the banks round the pool: the editor's pool is far too wide); the sink
+  ran long; no letterbox at all (bars only for a moment as control came back, then a second white flash); keep the
+  pool's looping wind (our slot-0 fade took it); 306 (magic) on the fossil throw; 389 (Muffy's "Mm") on A2. The name
+  showed as "PQQf" (<20:00> is the vanilla farmer-name code: probably the test save's name).
+
+### 7.67 The first summoning, pass 3 (gq8)
+- Letterbox: the HUD object (player HUD, layout record 0x802F326C = opguide.agc) does not exist during events (found
+  in the free-roam dump 562a17fc at 0x80981AA0, absent from the mid-scene dump c94269d2), so element-7 quads can't
+  show there. Bars off (settings.letterbox false) until another route (e.g. quads in the message window's layout).
+- Faces: her slot's table (char 37 = the Postman's) is all static (0, 0) / (12, 4): no blinking. Muffy's table
+  (char 3) uses eye sets 58 / 61 / 67 / 69 / 73 and mouth sets 36 / 42 / 45 / 47 (67/47 neutral). GS_FACE: 1 closed
+  (2, 4), 2 neutral (67, 47), 3 smile (67, 36), 4 joy (9, 36), 5 pout (61, 45), 6 smug (7, 36), 7 blush (12, 36),
+  8 soft (69, 42). The script sets counter 29 before each line (settings.faces); neutral from the start; the table
+  is restored at the end. Voices: cmd_30(#id) + pop before the line (settings.voices: A2 = 389).
+- Explain and plead play once (func_80080294(.., 0)), idle after 2 x the clip's frames.
+- Camera eye kept 0.6 above the ground under it (ground_y from 20 up, only when within 3); two-shot 3.6 -> 3.3
+  away, farewell ends 4.2 away / 1.8 up; sink 1.5 s with the white starting 20 frames in (0.6 s), "done" 40 frames
+  after; no white -> clear of ours at the end. No slot-0 fades (the wind stays).
+- Jiggle: hg files from build_jiggle (jiggle test 6, 49 nodes, never tried in game before): make_hg.py --jiggle,
+  hg_0.arc f6af6157, hg_0.anm.arc c0c522d6 (clip lengths unchanged).
+- spring.c: SFX 306 with the summoning throw. pm gqtest 91354f45, test 539a2c3b, normal 34b68161; Common.arc 280644e6.
 

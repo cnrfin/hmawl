@@ -2,12 +2,27 @@
  "file": "spring_scene",
  "version": 1,
  "settings": {
-  "letterbox": true,
+  "letterbox": false,
   "musicFade": true,
   "fov": 40,
   "music": "Marin Jazz",
   "musicShot": 5,
-  "endFade": "white"
+  "endFade": "white",
+  "faces": {
+   "A1": "closed",
+   "A2": "soft",
+   "A3": "pout",
+   "A4": "joy",
+   "A5": "neutral",
+   "A6": "smile",
+   "A7": "smug",
+   "A8": "smile",
+   "A9": "blush",
+   "A10": "smile"
+  },
+  "voices": {
+   "A2": 389
+  }
  },
  "shots": [
   {
@@ -320,14 +335,14 @@
    "look": "subject",
    "start": {
     "yaw": 90,
-    "dist": 5.0,
-    "height": 1.12,
+    "dist": 3.6,
+    "height": 1.19,
     "aim": 0.7
    },
    "end": {
     "yaw": 90,
-    "dist": 4.5,
-    "height": 1.12,
+    "dist": 3.3,
+    "height": 1.19,
     "aim": 0.7
    },
    "ease": "inout",
@@ -358,8 +373,8 @@
    },
    "end": {
     "yaw": 0,
-    "dist": 6,
-    "height": 2.38,
+    "dist": 4.2,
+    "height": 1.82,
     "aim": 0.35
    },
    "ease": "inout",
@@ -370,7 +385,7 @@
    ],
    "action": "sink",
    "actionWhen": "afterLines",
-   "actionSeconds": 3,
+   "actionSeconds": 1.5,
    "motion": "idle",
    "flash": false,
    "splash": true,

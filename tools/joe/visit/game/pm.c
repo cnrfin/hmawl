@@ -716,18 +716,32 @@ static void joe_motion(s32 m)               /* start a clip once (sit down / sta
 s32 gq_scene_req;
 s32 gq_lbox;                                 /* letterbox bar height (HUD px), zt.c draws it */
 s32 gq_slot_busy(void) { return S.actor != 0 && S.who != WHO_HG; }
-struct { u32 magic; s32 st, t, at, cue, lastcue, shot, act, waited, camok, bow, eyes, white; float surf;
+struct { u32 magic; s32 st, t, at, cue, lastcue, shot, act, waited, camok, bow, eyes, white, face, ground; float surf;
          float eye[3], tgt[3]; } GS;      /* 'GSCN' (dump) */
 #define GD_SINK 1.8f
 #define GS_CAM       (EVMGR + 0x5FC)
 #define cam_update   F(0x80108BEC, void, (u8 *))
 #define motion_once  F(0x80080294, void, (u8 *, s32, s32))           /* (actor, clip, loop) - cmd_6D */
-#define GS_BOW_FRAMES 120                                           /* plead = 60 clip frames at 30 / s */
-static void gs_eyes(s32 closed);
+static const short GS_CLIP[10] = { 119, 25, 60, 120, 105, 36, 60, 90, 59, 100 };   /* hg_0.anm.arc clip frames (30 / s) */
+/* her faces (gq8): {eye, mouth}; eye >= 58 / mouth >= 36 = the game's animated sets (blink / talk), from Muffy's own
+   expression table (her frames are Muffy's); static frames: eye 2 closed, 7 half-lidded, 9 happy-closed, 12 blush;
+   mouth 4 still */
+static const unsigned char GS_FACE[9][2] = {
+    { 67, 47 },  /* 0 her own (unused: the table is restored) */
+    {  2,  4 },  /* 1 closed */
+    { 67, 47 },  /* 2 neutral */
+    { 67, 36 },  /* 3 smile */
+    {  9, 36 },  /* 4 joy (eyes shut happy) */
+    { 61, 45 },  /* 5 pout */
+    {  7, 36 },  /* 6 smug (half-lidded) */
+    { 12, 36 },  /* 7 blush */
+    { 69, 42 },  /* 8 soft */
+};
+static void gs_face(s32 f);
 static void gs_fade(u32 from, u32 to, float secs) { u8 *fd = FADER; if (fd) fade_start(fd, &from, &to, 0, 0, secs); }
 static void gs_motion(s32 m)
 {
-    if (m == 6) { S.motion = 6; motion_once(S.actor, 6, 0); GS.bow = GS_BOW_FRAMES; }
+    if (m == 4 || m == 6) { S.motion = m; motion_once(S.actor, m, 0); GS.bow = GS_CLIP[m] * 2 - 6; }   /* explain / plead once */
     else { GS.bow = 0; joe_motion(m); }
 }
 #define SE_WATER     300
@@ -761,6 +775,10 @@ static void gs_cam(u8 *g, const struct gshot *sh, float f)
     gs_pt(sh->subj, p, sp); gs_pt(sh->look, p, tp);
     GS.eye[0] = sp[0] + ux * k[1]; GS.eye[1] = GS.surf + k[2]; GS.eye[2] = sp[1] + uz * k[1];
     GS.tgt[0] = tp[0]; GS.tgt[1] = GS.surf + k[3]; GS.tgt[2] = tp[1];
+    {   Vec v; float gy;                                      /* never under the banks round the pool (gq7: 3 shots) */
+        v.x = GS.eye[0]; v.y = GS.eye[1] + 20.0f; v.z = GS.eye[2]; gy = ground_y(COLLMAP, &v);
+        if (gy == gy && gy > GS.eye[1] - 0.6f && gy < GS.eye[1] + 3.0f) { GS.eye[1] = gy + 0.6f; GS.ground++; }
+    }
     for (i = 0; i < 3; i++) { c[i] = (s32)(GS.eye[i] * 128.0f); c[3 + i] = (s32)(GS.tgt[i] * 128.0f); }
     cam = EVMGR ? GS_CAM : 0;
     GS.camok = cam && *(u32 *)(cam + 0xC) == (u32)(cam + 0x10);    /* the script's cmd_15 has pointed it at its own target */
@@ -794,11 +812,12 @@ static s32 gd_frame(u8 *g, s32 map, u32 t)
         }
         actor_setpos(S.actor, &S.pos); actor_setdir(S.actor, &S.dir); actor_hide(S.actor);
         joe_motion(0);
-        cn[GQ_C_CUE] = 0; cn[GQ_C_DONE] = 0;
+        cn[GQ_C_CUE] = 0; cn[GQ_C_DONE] = 0; cn[GQ_C_FACE] = 0;
         cn[GQ_C_YEAR1] = t / (T_DAY * 40u) == 0;                /* 4 seasons x 10 days */
         gs_cam(g, &GSHOT[0], 0);
         GS.st = 1; GS.t = 0; GS.at = -1; GS.cue = 0; GS.lastcue = 0; GS.shot = 0; GS.act = -1; GS.waited = 0;
-        GS.bow = 0; GS.eyes = 0; GS.white = 0;
+        GS.bow = 0; GS.eyes = 0; GS.white = 0; GS.face = -1; GS.ground = 0;
+        gs_face(2);                                             /* her own table is the Postman slot's: no blinking */
         gq_scene_req = 0;
         event_start(EVMGR, GQ_SCENE_EVENT, 0, 0);
         return 1;
@@ -817,7 +836,7 @@ static s32 gd_frame(u8 *g, s32 map, u32 t)
                 if (GS.cue < 32) {                              /* shot n starts */
                     GS.shot = n - 1; GS.t = 0;
                     gs_motion(sh->motion);
-                    if ((sh->fx & 4) != GS.eyes) { GS.eyes = sh->fx & 4; gs_eyes(GS.eyes); }
+                    if (sh->fx & 4) gs_face(1);                         /* eyes closed (the rise) */
                     if (sh->fx & 2) gs_fade(0xFFFFFFFFu, 0xFFFFFF00u, 1.2f);      /* white flash */
                     if (sh->act == 0) { S.pos.y = GS.surf - GD_SINK; actor_hide(S.actor); GS.act = -1; }
                     else if (sh->act == 1) { if (S.pos.y < GS.surf) S.pos.y = GS.surf; actor_show(S.actor); GS.act = -1; }
@@ -830,20 +849,23 @@ static s32 gd_frame(u8 *g, s32 map, u32 t)
             }
             GS.lastcue = GS.cue;
         }
+        {   s32 f = gs_get(g, GQ_C_FACE);                       /* the script's face for this line */
+            if (f > 0 && f < 9 && f != GS.eyes) { GS.eyes = f; gs_face(f); }
+        }
         sh = &GSHOT[GS.shot];
         if (GS.act >= 2 && GS.at >= 0) {                       /* rising / sinking */
             float k = smooth((float)GS.at / (float)(sh->actf > 0 ? sh->actf : 1));
             S.pos.y = GS.surf - GD_SINK * (GS.act == 2 ? 1.0f - k : k);
+            if (GS_END_WHITE && GS.act == 3 && GS.cue >= 32 && GS.at == 20 && !GS.white) {   /* white while she goes */
+                gs_fade(0xFFFFFF00u, 0xFFFFFFFFu, 0.6f); GS.white = 1;
+            }
             if (GS.at >= sh->actf) {
-                if (GS.act == 3) {
-                    actor_hide(S.actor);
-                    if (GS_END_WHITE && GS.cue >= 32) { gs_fade(0xFFFFFF00u, 0xFFFFFFFFu, 0.8f); GS.white = 1; }
-                }
+                if (GS.act == 3) actor_hide(S.actor);
                 GS.act = -1;
                 if (GS.cue >= 32 && !GS.white) cn[GQ_C_DONE] = GS.cue;
             } else GS.at++;
         }
-        if (GS.white && ++GS.white > 54) { cn[GQ_C_DONE] = GS.cue; }   /* the screen is white: the script ends */
+        if (GS.white && ++GS.white > 40 && GS.act < 0) cn[GQ_C_DONE] = GS.cue;   /* white: the script ends */
         if (GS.bow && --GS.bow == 0) joe_motion(0);                      /* one bow, then idle */
         if (GS.cue > 0 && GS.cue < 32 && GS.t >= sh->hold && (GS.act < 2 || sh->after)) cn[GQ_C_DONE] = GS.cue;
         actor_setpos(S.actor, &S.pos); actor_setdir(S.actor, &S.dir);
@@ -855,10 +877,9 @@ static s32 gd_frame(u8 *g, s32 map, u32 t)
         if (S.actor) despawn();
         if (S.loaded) release_model();
         S.who = 0; GS.st = 0;
-        if (GS.eyes) { GS.eyes = 0; gs_eyes(0); }
-        joe_expr_patch(0);
-        gq_lbox = 0;                                            /* (under the white) */
-        if (GS.white) { GS.white = 0; gs_fade(0xFFFFFFFFu, 0xFFFFFF00u, 1.0f); }
+        GS.eyes = 0; joe_expr_patch(0);
+        gq_lbox = 0;
+        GS.white = 0;                                           /* (the event's end clears the white itself: gq7 flashed twice) */
         return 0;
     }
     return 1;
@@ -929,19 +950,11 @@ static void joe_face(s32 eye, s32 mouth)
     for (k = 0; k < 11; k++) { joe_expr[k][0] = (u32)eye; joe_expr[k][1] = (u32)mouth; }
     face_set(slot + 0x124, 0);             /* applies only what changed (restarts the blink / flap there) */
 }
-/* the goddess's eyes (gq6): closed = eye frame 2 (her blink frame) with her own mouth; open = her own table back */
-static void gs_eyes(s32 closed)
+/* the goddess's face (gq8): the slot's expression table patched as Joe's, every entry = the face (GS_FACE) */
+static void gs_face(s32 f)
 {
-    u8 *slot;
-    if (!S.actor) return;
-    if (closed) {
-        u32 mouth = expr_patched ? joe_expr[0][1] : EXPR_TABS[CHAR_ID * 6][1];
-        joe_face(2, (s32)mouth);
-    } else {
-        joe_expr_patch(0);
-        slot = *(u8 **)(S.actor + 0xD4);
-        if ((u32)slot >= 0x80000000u && (u32)slot < 0x81800000u) face_set(slot + 0x124, 0);
-    }
+    if (f < 1 || f > 8) return;
+    joe_face(GS_FACE[f][0], GS_FACE[f][1]);
 }
 /* every frame Joe is out; in_event: our talk (1) or trade (2) event is running */
 static void joe_talk_frame(u8 *g, s32 in_event)
