@@ -716,7 +716,7 @@ static void joe_motion(s32 m)               /* start a clip once (sit down / sta
 s32 gq_scene_req;
 s32 gq_lbox;                                 /* letterbox bar height (HUD px), zt.c draws it */
 s32 gq_slot_busy(void) { return S.actor != 0 && S.who != WHO_HG; }
-struct { u32 magic; s32 st, t, at, cue, lastcue, shot, act, waited, camok, bow, eyes, white, face, ground; float surf;
+struct { u32 magic; s32 st, t, at, cue, lastcue, shot, act, waited, camok /* look-at retakes */, bow, eyes, white, face, ground; float surf;
          float eye[3], tgt[3]; } GS;      /* 'GSCN' (dump) */
 #define GD_SINK 1.8f
 #define GS_CAM       (EVMGR + 0x5FC)
@@ -781,8 +781,10 @@ static void gs_cam(u8 *g, const struct gshot *sh, float f)
     }
     for (i = 0; i < 3; i++) { c[i] = (s32)(GS.eye[i] * 128.0f); c[3 + i] = (s32)(GS.tgt[i] * 128.0f); }
     cam = EVMGR ? GS_CAM : 0;
-    GS.camok = cam && *(u32 *)(cam + 0xC) == (u32)(cam + 0x10);    /* the script's cmd_15 has pointed it at its own target */
-    if (!GS.camok) return;
+    if (!cam || GS.t + GS.shot == 0) return;                   /* (the script's cmd_14 / 15 have not run yet) */
+    if (*(u32 *)(cam + 0xC) != (u32)(cam + 0x10)) {            /* gq9: something re-pointed the look-at (the 3 odd shots?): */
+        *(u32 *)(cam + 0xC) = (u32)(cam + 0x10); GS.camok++;   /* take it back, and count it */
+    }
     for (i = 0; i < 3; i++) { ((float *)cam)[i] = GS.eye[i]; ((float *)(cam + 0x10))[i] = GS.tgt[i]; ((float *)(cam + 0x1C))[i] = 0; }
     cam_update(cam);
 }
@@ -817,7 +819,7 @@ static s32 gd_frame(u8 *g, s32 map, u32 t)
         gs_cam(g, &GSHOT[0], 0);
         GS.st = 1; GS.t = 0; GS.at = -1; GS.cue = 0; GS.lastcue = 0; GS.shot = 0; GS.act = -1; GS.waited = 0;
         GS.bow = 0; GS.eyes = 0; GS.white = 0; GS.face = -1; GS.ground = 0;
-        gs_face(2);                                             /* her own table is the Postman slot's: no blinking */
+        /* gq9: her own face (the user found the gq8 set overdone); only lines the JSON names get another */
         gq_scene_req = 0;
         event_start(EVMGR, GQ_SCENE_EVENT, 0, 0);
         return 1;
@@ -850,22 +852,23 @@ static s32 gd_frame(u8 *g, s32 map, u32 t)
             GS.lastcue = GS.cue;
         }
         {   s32 f = gs_get(g, GQ_C_FACE);                       /* the script's face for this line */
-            if (f > 0 && f < 9 && f != GS.eyes) { GS.eyes = f; gs_face(f); }
+            if (f > 0 && f <= 9 && f != GS.eyes) { GS.eyes = f; gs_face(f); }
         }
         sh = &GSHOT[GS.shot];
         if (GS.act >= 2 && GS.at >= 0) {                       /* rising / sinking */
             float k = smooth((float)GS.at / (float)(sh->actf > 0 ? sh->actf : 1));
             S.pos.y = GS.surf - GD_SINK * (GS.act == 2 ? 1.0f - k : k);
-            if (GS_END_WHITE && GS.act == 3 && GS.cue >= 32 && GS.at == 20 && !GS.white) {   /* white while she goes */
-                gs_fade(0xFFFFFF00u, 0xFFFFFFFFu, 0.6f); GS.white = 1;
-            }
             if (GS.at >= sh->actf) {
-                if (GS.act == 3) actor_hide(S.actor);
+                if (GS.act == 3) {
+                    actor_hide(S.actor);
+                    if (GS_END_WHITE && GS.cue >= 32) { gs_fade(0xFFFFFF00u, 0xFFFFFFFFu, 0.6f); GS.white = 1; }   /* gq9: after the sink */
+                }
                 GS.act = -1;
                 if (GS.cue >= 32 && !GS.white) cn[GQ_C_DONE] = GS.cue;
             } else GS.at++;
         }
-        if (GS.white && ++GS.white > 40 && GS.act < 0) cn[GQ_C_DONE] = GS.cue;   /* white: the script ends */
+        if (GS.white && ++GS.white > 36) cn[GQ_C_DONE] = GS.cue;   /* fully white: the script ends at once (gq8: the white
+                                                                    cleared before the end and showed the sink again) */
         if (GS.bow && --GS.bow == 0) joe_motion(0);                      /* one bow, then idle */
         if (GS.cue > 0 && GS.cue < 32 && GS.t >= sh->hold && (GS.act < 2 || sh->after)) cn[GQ_C_DONE] = GS.cue;
         actor_setpos(S.actor, &S.pos); actor_setdir(S.actor, &S.dir);
@@ -953,6 +956,14 @@ static void joe_face(s32 eye, s32 mouth)
 /* the goddess's face (gq8): the slot's expression table patched as Joe's, every entry = the face (GS_FACE) */
 static void gs_face(s32 f)
 {
+    u8 *slot;
+    if (f == 9) {                                         /* her own table back */
+        joe_expr_patch(0);
+        if (!S.actor) return;
+        slot = *(u8 **)(S.actor + 0xD4);
+        if ((u32)slot >= 0x80000000u && (u32)slot < 0x81800000u) face_set(slot + 0x124, 0);
+        return;
+    }
     if (f < 1 || f > 8) return;
     joe_face(GS_FACE[f][0], GS_FACE[f][1]);
 }

@@ -50,7 +50,7 @@ ents[-1] = ents[-1][:len(ents[-1]) - grow]
 body = mes_build(ents); new_mes = body + bytes(len(ev) - len(body)); assert len(new_mes) == len(ev)
 
 CUE, DONE, YEAR1, FACE = 26, 27, 28, 29
-FACES = {'neutral': 2, 'closed': 1, 'smile': 3, 'joy': 4, 'pout': 5, 'smug': 6, 'blush': 7, 'soft': 8}   # pm.c GS_FACE[]
+FACES = {'own': 9, 'neutral': 2, 'closed': 1, 'smile': 3, 'joy': 4, 'pout': 5, 'smug': 6, 'blush': 7, 'soft': 8}   # pm.c GS_FACE[]; 9 = her own table
 FPS = 60
 SHOTS = SCENE['shots']; ST = SCENE['settings']
 assert len(SHOTS) <= 31
@@ -80,9 +80,10 @@ def song_play(n): fx(n); a.num(3); a.sys(0x32); a.emit('pop')
 def wait_done(v):
     top = L('wait'); a.label(top); frame(); getc(DONE); a.num(v); a.emit('cmp'); a.jnz(top)
 def line(k):                                                 # her face for the line, its voice, the line
-    setc(FACE, FACES[ST.get('faces', {}).get(k, 'neutral')])
+    setc(FACE, FACES[ST.get('faces', {}).get(k, 'own')])   # gq9: her own face unless the JSON says otherwise
     if k in ST.get('voices', {}): fx(ST['voices'][k]); a.sys(0x30); a.emit('pop')     # cmd_30: SFXList sound
-    a.wait_msg(FILE, ids[k])
+    top = L('msg'); a.label(top); frame()                   # cmd_04(file, line, speaker 0x25): her name plate (gq9)
+    a.num(FILE); a.num(ids[k]); a.num(0x25); a.sys(0x04); a.num(0); a.emit('cmp'); a.jz(top)
 def say(k):
     if k == 'A9':                                            # year 1 only
         skip = L('noy1'); getc(YEAR1); a.num(1); a.emit('cmp'); a.jnz(skip); line(k); a.label(skip)

@@ -9,16 +9,7 @@
   "musicShot": 5,
   "endFade": "white",
   "faces": {
-   "A1": "closed",
-   "A2": "soft",
-   "A3": "pout",
-   "A4": "joy",
-   "A5": "neutral",
-   "A6": "smile",
-   "A7": "smug",
-   "A8": "smile",
-   "A9": "blush",
-   "A10": "smile"
+   "A1": "closed"
   },
   "voices": {
    "A2": 389

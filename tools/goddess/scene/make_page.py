@@ -29,7 +29,7 @@ S = [
  shot('Farewell', start=k(0, 3, 1.4, 1.4), end=k(0, 4.2, 2.6, .5), lines=['A10'], action='sink', actionWhen='afterLines', actionSeconds=1.5, splash=True, note='Crane up and back as she sinks; fade to white, control back.'),
 ]
 P = dict(settings=dict(letterbox=False, musicFade=True, fov=40, music='Marin Jazz', musicShot=5, endFade='white',
-         faces=dict(A1='closed', A2='soft', A3='pout', A4='joy', A5='neutral', A6='smile', A7='smug', A8='smile', A9='blush', A10='smile'),
+         faces=dict(A1='closed'),
          voices=dict(A2=389)), shots=S)
 if '--json' in sys.argv: json.dump(dict(file='spring_scene', version=1, **P), open(os.path.join(HERE, 'spring_scene.json'), 'w'), indent=1); sys.exit()
 out = T.replace('__THREE__', three).replace('__LINES__', json.dumps(lines)).replace('__PROPOSAL__', json.dumps(P, indent=1))

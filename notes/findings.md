@@ -3942,4 +3942,19 @@ so, door fades are timed there, possibly per frame. Not traced yet.
 - Jiggle: hg files from build_jiggle (jiggle test 6, 49 nodes, never tried in game before): make_hg.py --jiggle,
   hg_0.arc f6af6157, hg_0.anm.arc c0c522d6 (clip lengths unchanged).
 - spring.c: SFX 306 with the summoning throw. pm gqtest 91354f45, test 539a2c3b, normal 34b68161; Common.arc 280644e6.
+- gq8 test (user): the faces were overdone / mismatched (gq7's were better); after the sink the screen went white and
+  then showed her still sinking; the three odd shots (A8-A10) remain; wants her name plate and hearts like Joe's.
+
+### 7.68 The first summoning, pass 4 (gq9)
+- Faces: her own table again; only A1 has her eyes closed (settings.faces = {A1: closed}; FACES 'own' = 9 restores
+  the table and re-applies it). GS_FACE kept for later.
+- End: the white starts once the sink is over (0.6 s), "done" 36 frames later (the gq8 fade ran during the sink,
+  cleared, and the sink showed again).
+- Odd shots: the camera clamp did not change them, so the look-at pointer is taken to have been re-pointed: gs_cam
+  now writes +0xC = +0x10 every frame (GS.camok counts the retakes; 'GSCN' 0x8037EFAC in the gqtest build) instead of
+  skipping. A dump during A8 tells if not.
+- Name plate: her lines are cmd_04(file, line, 0x25) (talk window, speaker 37 = her slot). Message.arc people.mes 37
+  "DUMMY" -> "Goddess" + 02 12 (80 D6) x5 17 (five red hearts, the hearts code's own colour codes; that code finds no
+  record for 37 and draws the name as is). tools/goddess/quest/build_gq_people.py; Message.arc f47f8849.
+- pm gqtest 2791eda1, test 526168e5, normal d1187c84; Common.arc c8bdb02f; hg jiggle files as gq8.
 
