@@ -119,6 +119,14 @@ static const float pm_size[3] = { 0.95f, 1.58f, 1.2f };
 static const char gd_model[] = "gd/gd_0.arc";
 static const char gd_anims[] = "gd/gd_0.anm.arc";
 static const float gd_size[3] = { 0.95f, 1.96f, 1.2f };
+/* the Harvest Goddess (gq5): her own disc files (tools/goddess/build gd_0.* under new names: gd/ is Joe's now);
+   Celia's skeleton and Celia's 10 animations (0 idle, 1 walk, 2 holding, 3 put away, 4 explain, 5 run, 6 plead,
+   7 dizzy, 8 crouch, 9 kitchen work) */
+static const char hg_model[] = "hg/hg_0.arc";
+static const char hg_anims[] = "hg/hg_0.anm.arc";
+static const float hg_size[3] = { 0.95f, 1.70f, 1.2f };
+#define HG_ANIMS 10
+#define WHO_HG   3
 #define GD_X 270.3f                       /* Pool B, the goddess pond (centre) */
 #define GD_Z 139.0f
 #define GD_AHEAD 2.4f                     /* test spawn: this far in front of the player */
@@ -314,8 +322,9 @@ static void setup_model(void)
     }
     S.orig_model = MODEL74_NAME; S.orig_anims = SET71_NAME;
     S.orig_size[0] = MODEL74_SIZE[0]; S.orig_size[1] = MODEL74_SIZE[1]; S.orig_size[2] = MODEL74_SIZE[2];
-    {   const float *sz = S.who ? gd_size : pm_size;
-        MODEL74_NAME = S.who ? gd_model : pm_model; SET71_NAME = S.who ? gd_anims : pm_anims;
+    {   const float *sz = S.who == WHO_HG ? hg_size : S.who ? gd_size : pm_size;
+        MODEL74_NAME = S.who == WHO_HG ? hg_model : S.who ? gd_model : pm_model;
+        SET71_NAME = S.who == WHO_HG ? hg_anims : S.who ? gd_anims : pm_anims;
         MODEL74_SIZE[0] = sz[0]; MODEL74_SIZE[1] = sz[1]; MODEL74_SIZE[2] = sz[2];
     }
     {   u8 *cur = (u8 *)SET71_DATA[0]; s32 ours = cur && (cur == S.own_anims || cur == S.last_anims);
@@ -325,12 +334,12 @@ static void setup_model(void)
     S.orig_mot2 = MOT2_WORD; MOT2_WORD = MOT2_JOG;
     S.orig_list = SET71_LIST;
     if (S.who) {                              /* the goddess: motion n = Celia's animation n */
-        for (i = 0; i < GD_ANIMS; i++) {
-            gd_mot[i][0] = 0x8E000400u | (u32)(i == 12 ? 7 : i); gd_mot[i][2] = 0;
+        for (i = 0; i < (S.who == WHO_HG ? HG_ANIMS : GD_ANIMS); i++) {
+            gd_mot[i][0] = 0x8E000400u | (u32)(i == 12 && S.who != WHO_HG ? 7 : i); gd_mot[i][2] = 0;
             /* word 1 bits 6-10 = cross-fade frames into this motion (31 = the default 10, func_8017DB28).
                Joe's sitting loop (7) starts with no fade: it begins right as he turns 180 degrees, and a
                fade from the sit down's pose under the new facing looked like a second sit down. */
-            gd_mot[i][1] = i == 7 ? 0x07FBF83Fu : 0x07FBFFFFu;
+            gd_mot[i][1] = i == 7 && S.who != WHO_HG ? 0x07FBF83Fu : 0x07FBFFFFu;
             gd_mot[i][3] = 0xFFFFFFFFu; gd_mot[i][4] = 0xFFFFFFFFu; gd_mot[i][5] = 0;
             gd_list[i] = gd_mot[i];
         }
@@ -686,6 +695,107 @@ static void joe_motion(s32 m)               /* start a clip once (sit down / sta
     if (S.motion == m) return;
     S.motion = m;
     actor_motion(S.actor, m);
+}
+
+/* ---- The Harvest Goddess's first summoning (gq5; tools/goddess/quest/build_gq_scene.py = event GQ_SCENE_EVENT).
+   spring.c sets gq_scene_req when the Mermaid Fossil lands with all 15 offerings made. With slot 37 free (no Postman /
+   Joe out), she is loaded as its third tenant (WHO_HG), placed 1.8 under Pool B's surface, facing the player, and the
+   event starts. Cues from the script (counter 26): 1 rise (0.9 s; then counter 27 = 1), 2 close-up, 3 side two-shot,
+   4 a little bow (plead clip), 5 talking (explain), 6 sink (counter 27 = 2, hidden). Counters 20-25 = the shot's eye
+   / target x128, worked out here every frame from where she and the player stand. Counter 28 = 1 in year 1. When the
+   event has ended she is let go of and slot 37 is free again. gq_scene_req: 1 asked, 0 done, -1 busy (spring.c says
+   so and tries again on the next toss). */
+#include "gq_scene.h"
+s32 gq_scene_req;
+s32 gq_slot_busy(void) { return S.actor != 0 && S.who != WHO_HG; }
+struct { u32 magic; s32 st, t, cue, lastcue, rose, sunk, waited; float surf; } GS;   /* 'GSCN' (dump) */
+#define GD_SINK 1.8f
+static float smooth(float x) { return x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x); }
+static void gs_cam(u8 *g, s32 cue)
+{
+    s32 *c = (s32 *)(g + 0x12194 + 20 * 4);
+    float *p = (float *)(g + 0x29C78), dx = p[0] - S.pos.x, dz = p[2] - S.pos.z, l2 = dx * dx + dz * dz, inv, sx, sz;
+    float ex, ey, ez, tx, ty, tz, mx, mz, by = GS.surf;
+    if (l2 < 0.0001f) { dx = 0; dz = 1; l2 = 1; }
+    inv = rsqrt(l2); dx *= inv; dz *= inv; sx = -dz; sz = dx;          /* d: her -> player; s: to the side */
+    mx = (p[0] + S.pos.x) * 0.5f; mz = (p[2] + S.pos.z) * 0.5f;
+    switch (cue) {
+    case 1:  ex = p[0] + dx * 1.4f + sx * 0.7f; ey = p[1] + 0.9f; ez = p[2] + dz * 1.4f + sz * 0.7f;   /* low, over his shoulder */
+             tx = S.pos.x; ty = by + 1.2f; tz = S.pos.z; break;
+    case 2: case 4:
+             ex = S.pos.x + dx * 2.3f; ey = by + 1.55f; ez = S.pos.z + dz * 2.3f;                   /* close on her */
+             tx = S.pos.x; ty = by + 1.4f; tz = S.pos.z; break;
+    case 6:  ex = p[0] + dx * 3.2f; ey = p[1] + 2.4f; ez = p[2] + dz * 3.2f;                         /* wide: she sinks */
+             tx = S.pos.x; ty = by + 0.5f; tz = S.pos.z; break;
+    default: ex = mx + sx * 4.2f; ey = by + 1.7f; ez = mz + sz * 4.2f;                               /* side two-shot */
+             tx = mx; ty = by + 1.1f; tz = mz; break;
+    }
+    c[0] = (s32)(ex * 128.0f); c[1] = (s32)(ey * 128.0f); c[2] = (s32)(ez * 128.0f);
+    c[3] = (s32)(tx * 128.0f); c[4] = (s32)(ty * 128.0f); c[5] = (s32)(tz * 128.0f);
+}
+static s32 gs_get(u8 *g, s32 i) { s32 v = *(s32 *)(g + 0x12194 + i * 4); if (v >= 128 && !(v & 127)) v >>= 7; return v; }
+static s32 gd_frame(u8 *g, s32 map, u32 t)
+{
+    s32 *cn = (s32 *)(g + 0x12194);
+    GS.magic = 0x4753434Eu;
+    if (!GS.st) {
+        Vec v;
+        float *p = (float *)(g + 0x29C78);
+        if (gq_scene_req != 1) return 0;
+        if (map != VALLEY || !no_event()) return 0;            /* (after the toss's own state has ended) */
+        if (S.actor) { gq_scene_req = -1; return 0; }          /* the Postman / Joe is out: not now */
+        if (S.loaded) release_model();
+        S.who = WHO_HG;
+        setup_model();
+        spawn();
+        if (!S.actor) { release_model(); S.who = 0; gq_scene_req = -1; return 0; }
+        v.x = GD_X; v.y = 40.0f; v.z = GD_Z; GS.surf = ground_y(COLLMAP, &v);
+        if (GS.surf != GS.surf || GS.surf < p[1] - 3.0f || GS.surf > p[1] + 1.0f) GS.surf = p[1] - 0.4f;
+        S.pos.x = GD_X; S.pos.z = GD_Z; S.pos.y = GS.surf - GD_SINK;
+        {   float dx = p[0] - GD_X, dz = p[2] - GD_Z, l2 = dx * dx + dz * dz, inv = l2 > 0.0001f ? rsqrt(l2) : 0;
+            S.dir.x = dx * inv; S.dir.y = 0; S.dir.z = l2 > 0.0001f ? dz * inv : 1;
+            {   float *pd = (float *)(g + 0x29F84); pd[0] = -S.dir.x; pd[1] = 0; pd[2] = -S.dir.z; }   /* he faces her */
+        }
+        actor_setpos(S.actor, &S.pos); actor_setdir(S.actor, &S.dir);
+        joe_motion(0);
+        cn[GQ_C_CUE] = 0; cn[GQ_C_DONE] = 0;
+        cn[GQ_C_YEAR1] = t / (T_DAY * 40u) == 0;                /* 4 seasons x 10 days */
+        gs_cam(g, 1);
+        GS.st = 1; GS.t = 0; GS.cue = 0; GS.lastcue = 0; GS.rose = GS.sunk = 0; GS.waited = 0;
+        gq_scene_req = 0;
+        event_start(EVMGR, GQ_SCENE_EVENT, 0, 0);
+        return 1;
+    }
+    if (GS.st == 1) {                                           /* the event is running */
+        if (no_event()) { if (++GS.waited > 30 && GS.t > 30) GS.st = 2; }   /* (it starts a frame or more later) */
+        else GS.waited = 0;
+        GS.t++;
+        GS.cue = gs_get(g, GQ_C_CUE);
+        if (!S.actor) { GS.st = 2; return 1; }
+        if (GS.cue != GS.lastcue) {                             /* her motion for the cue */
+            GS.lastcue = GS.cue; GS.t = 0;
+            joe_motion(GS.cue == 4 ? 6 : GS.cue == 3 || GS.cue == 5 ? 4 : 0);
+        }
+        if (GS.cue == 1 && !GS.rose) {                          /* rising out of the water */
+            float k = smooth((float)GS.t / 54.0f);
+            S.pos.y = GS.surf - GD_SINK * (1.0f - k);
+            if (GS.t >= 54) { GS.rose = 1; cn[GQ_C_DONE] = 1; }
+        } else if (GS.cue == 6) {                               /* and back down */
+            float k = smooth((float)GS.t / 60.0f);
+            S.pos.y = GS.surf - GD_SINK * k;
+            if (GS.t >= 60 && !GS.sunk) { GS.sunk = 1; actor_hide(S.actor); cn[GQ_C_DONE] = 2; }
+        } else if (GS.rose) S.pos.y = GS.surf;
+        actor_setpos(S.actor, &S.pos); actor_setdir(S.actor, &S.dir);
+        gs_cam(g, GS.cue ? GS.cue : 1);
+        return 1;
+    }
+    if (no_event()) {                                           /* over: give slot 37 back */
+        if (S.actor) despawn();
+        if (S.loaded) release_model();
+        S.who = 0; GS.st = 0;
+        return 0;
+    }
+    return 1;
 }
 static void joe_place(float s)
 {
@@ -1095,6 +1205,7 @@ void pm_frame(void)
             }
         }
     }
+    if (gd_frame(g, map, t)) return;           /* the goddess's scene owns slot 37 (spring.c asks for it) */
     if (S.who != 1 && joe_frame(g, map, t)) return;   /* Joe's visit owns slot 37 today */
     if (day != 7 && !S.forced && flag_get(g + 0x12078, FLAG_MET)) flag_clear(g + 0x12078, FLAG_MET);
     if (day != 7 && !S.forced && flag_get(g + 0x12078, FLAG_FED)) flag_clear(g + 0x12078, FLAG_FED);

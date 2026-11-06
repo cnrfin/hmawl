@@ -3849,3 +3849,21 @@ so, door fades are timed there, possibly per frame. Not traced yet.
   (test / normal unchanged from lv1: 332739a3 / 1f4045aa).
 - gq3 (user: only 4 crops given): the shortcut now fills every free rucksack slot (18 slots at game+0x58, {item u16, count, ff}; the user had 8 free) with offerings not yet made and not already carried; with all 15 made, the fossil. pm gqtest b68e9894.
 - gq3 test (user, dump 562a17fc: counter 51 = 0x37FFF, summoned): the 3-line GLOW / NOTYET lines were cut off as the description was; the white-in / hold / white-out read as two flashes. gq4: every quest line <= 2 lines (debug.mes 88a72147); one flash (white -> clear 1.6 s), the line after 100 frames. pm gqtest bcbd1ce2, test b5700250, normal a6ce535d.
+
+### 7.64 The goddess's first summoning (gq5)
+- User: the summoning is a cutscene; she is then summoned every day by A at the spring (step 2) and is a marriage
+  candidate (kept beside all three brides; married-to-her plays as Nami's wife role, Nami leaving the valley). Her
+  affection is FULL from the summoning (the 15 offerings take until late winter; the Blue Feather must be possible
+  in year 1): counter 51 bits 24-31 = 0xFF.
+- Character 37 now has three tenants: the Postman (who 0, the 8th 9:00-11:00), Joe (who 2, his days 6:20-20:24, files
+  gd/gd_0.* = Joe's model) and the goddess (WHO_HG 3, own files hg/hg_0.arc / hg_0.anm.arc = tools/goddess/build gd_0.*
+  with every 'gd_0' renamed 'hg_0' - the archive's names and the act / gpl name strings, tools/goddess/scripts/make_hg.py;
+  Celia's 10 animations, motion list built like Joe's). gd_frame runs before joe_frame.
+- Event 412 (tools/goddess/quest/build_gq_scene.py, Common.arc node 112; lines A1-A10 = the user's batch 1 in debug.mes
+  0x23-0x2C, BUSY 0x2D): cue counter 26 (1 rise, 2 close-up, 3 side two-shot, 4 bow = plead clip, 5 talking = explain
+  clip, 6 sink), 27 done (1 risen, 2 sunk), 28 year 1 (A9), camera 20-25 x128 from pm.c (gs_cam: over the player's
+  shoulder, close on her, side two-shot, wide) as Joe's trade. She starts 1.8 under Pool B's surface (ground_y from
+  y 40 at the pool centre), rises in 54 frames, sinks in 60, hidden, then slot 37 is let go.
+- spring.c: the fossil with all 15 made -> SUMMONED + affection full + gq_scene_req; while the Postman / Joe is out the
+  fossil is not thrown ("The water is restless. / Come back later."). GQ_TEST: Z + D-Down after the summoning resets it
+  (replay). pm gqtest a576b649, test 2def01f4, normal ca2a7cd8; Common.arc dead3d1f, debug.mes f22a02da.

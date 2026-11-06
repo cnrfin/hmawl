@@ -62,6 +62,10 @@ extern u8 *pm_player;
    all 15 done: she is summoned (placeholder: fade to white and back, a line); before that the water pushes it back
    (no throw, so it is never lost). */
 #include "gq_mes.h"
+#include "gq_scene.h"
+extern s32 gq_scene_req;                 /* pm.c gd_frame: the first summoning (1 asked, 0 done, -1 busy) */
+s32 gq_slot_busy(void);
+#define GQ_HEARTS(c)  (((u32)(c) >> 24) & 0xFF)   /* her affection, bits 24-31 (gq5: full at the summoning, user) */
 #define CNT(g, i)     (*(s32 *)((g) + 0x12194 + 4 * (i)))
 #define GQ            51
 #define GQ_ALL        0x7FFF
@@ -198,7 +202,8 @@ static void offering(u8 *g, s32 item)
     W.last[W.n++ & 7] = item;
     if (item == FOSSIL && (c & GQ_ALL) == GQ_ALL && !(c & GQ_SUMMONED)) {   /* the summoning */
         u8 *fd = FADER;
-        CNT(g, GQ) = c | GQ_SUMMONED;
+        CNT(g, GQ) = (c | GQ_SUMMONED | 0xFF000000u);         /* gq5: her affection starts full (a year of offerings) */
+        gq_scene_req = 1;                                        /* pm.c raises her and runs event GQ_SCENE_EVENT */
         if (OK(fd)) { u32 from = 0xFFFFFFFFu, to = 0xFFFFFF00u; fade_to(fd, &from, &to, 0, 0, 1.6f); }   /* gq4: one flash (white -> clear;
                                                            gq1-3's white-in, hold, white-out read as two) */
         GQD.sum = 1; GQD.t = 0;
@@ -231,6 +236,7 @@ void spring_frame(u8 *g, s32 map, u32 pad_held, u32 pad_press)
                 for (have = 0, j = 0; j < 18; j++) if ((s32)(*(u32 *)(g + 0x58 + 4 * j) >> 16) == need[k]) have = 1;
                 if (!have) { rucksack_add(g + 0x50, need[k], 1, -1); n++; }
             }
+            if ((c & GQ_SUMMONED) && room) CNT(g, GQ) = c & ~(GQ_SUMMONED | 0xFF000000u);   /* gq5: replay the scene */
             if ((c & GQ_ALL) == GQ_ALL && room) rucksack_add(g + 0x50, FOSSIL, 1, -1);
             sfx_play(*(u8 **)0x803491E4, 261, 0);       /* the pick-up sound */
         }
@@ -239,7 +245,7 @@ void spring_frame(u8 *g, s32 map, u32 pad_held, u32 pad_press)
     if (GQD.sum) {                                       /* placeholder summon: white, hold, back */
         u8 *fd = FADER;
         (void)fd;
-        if (++GQD.t >= 100) { GQD.sum = 0; GQD.msg = GQ_MSG_SUMMON; }
+        if (++GQD.t >= 100) GQD.sum = 0;                        /* gq5: the scene follows the flash (no line) */
     }
     if (GQD.msg && !W.item && *(s32 *)(pl + 0x1364) == ST_FIELD && CONTROL == 1) {
         *(s32 *)(pl + 0x14C0) = MES_DEBUG; *(s32 *)(pl + 0x14C4) = GQD.msg; GQD.msg = 0;
@@ -248,9 +254,10 @@ void spring_frame(u8 *g, s32 map, u32 pad_held, u32 pad_press)
     }
 
     if ((pad_press & 0x100) && !(pad_held & 0x10) && CONTROL == 1 && !W.item && !GQD.sum && can_toss(g, pl, pt) &&
-        HELD(g) == FOSSIL && (CNT(g, GQ) & GQ_ALL) != GQ_ALL && !(CNT(g, GQ) & GQ_SUMMONED)) {
-        PAD_PRESS_W &= ~0x100u;                          /* not time yet: no throw, it stays in hand */
-        *(s32 *)(pl + 0x14C0) = MES_DEBUG; *(s32 *)(pl + 0x14C4) = GQ_MSG_NOTYET;
+        HELD(g) == FOSSIL && !(CNT(g, GQ) & GQ_SUMMONED) && ((CNT(g, GQ) & GQ_ALL) != GQ_ALL || gq_slot_busy())) {
+        PAD_PRESS_W &= ~0x100u;                          /* not time yet (or the Postman / Joe is out): no throw */
+        *(s32 *)(pl + 0x14C0) = MES_DEBUG;
+        *(s32 *)(pl + 0x14C4) = (CNT(g, GQ) & GQ_ALL) != GQ_ALL ? GQ_MSG_NOTYET : GQ_MSG_BUSY;
         pl_state(pl, ST_MESSAGE);
         return;
     }
