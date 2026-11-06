@@ -3986,3 +3986,19 @@ so, door fades are timed there, possibly per frame. Not traced yet.
   shot (as the Postman's event); his direction (game + 0x29F84) is also set each frame.
 - pm gqtest 5c76cc62 ('GSCN' 0x8037F32C), test 675fb83c, normal 7fab75ba; Common.arc f7348314.
 - gq11: user OK, the first summoning counts as finished for now. Letterbox left out (no HUD in events).
+
+### 7.71 Level reset after the bed, again; slow second level-up menu; turtle flip (lv2)
+- User (gq5-era test): Lv / EXP back to 1 after sleeping in the bed despite lv1; with two levels at once the Lv 3 menu
+  came 8-10 s after the Lv 2 answer; the flipped turtle sank through the floor.
+- The day change's "count up non-zero counters 32..61" call (func_8010C078(obj, 0x1F, 0x3E, 0)) exists twice:
+  func_8010BF58 (0x8010BF8C, patched by lv1; called from main.dol 0x80013B50) and func_8010BEB0 (0x8010BEE4; called
+  from a REL at +0x405C4 - the bed). lv2 patches both (li r5, 0x2D). Until now a bed night also added 1 to every
+  non-zero counter 45-53 (Joe met / gifts / last gift, goddess quest 51, $JOE market).
+- stats.c: a drifted marker 'ST01' + k (k days) is taken back (k subtracted from the non-zero stat counters) instead
+  of starting over (ST.drift).
+- The level-up menu's end waited for EVMGR + 0x58C == 0 as well as + 0x680 == -1; +0x58C stayed set 8-10 s after the
+  menu. The end and the next menu now need only + 0x680 == -1, CONTROL 1 and no box (menu_free).
+- Turtle: root pivot at its feet (bone 0 rest t = 0, dump ceb0de6f), shell dome 1.52 above (kame.gpl vertices), x2
+  drawn: the roll about the root sank the shell ~3 into the ground under a 0.30 lift. TU_FLIP_LIFT 2.9.
+- pm normal d4150cff, test ab031f45, gqtest 6e446a82.
+

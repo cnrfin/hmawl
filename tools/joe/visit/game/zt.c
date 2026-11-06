@@ -109,6 +109,7 @@ static const u8 AIP_PRESS[5] = { 4, 4, 4, 4, 4 };      /* hits within the pressu
                                                            a hit that STARTS a combo is countered, so a full 3-hit combo lands */
 #define TU_SHELL_T  60                                   /* ai1 turtle: tucked in 1 s, then bursts out spinning */
 #define TU_SHELL_CD 300                                  /* at most once per 5 s */
+#define TU_FLIP_LIFT 2.9f                                /* lv2: on its back, the shell dome on the ground */
 #define TU_FLIP_T   120                                  /* 3 knocks on the shell: on its back 2 s, 1.5x damage */
 #define AI_HIT_KB  18                                    /* hit 3: knocked back, quick recovery (user) */
 #define AI_HIT_FL  10                                    /* hits 1-2: a flinch */
@@ -1413,7 +1414,10 @@ static void pose_apply(s32 n, PCX *c)
             p_rot(c, 1, 0.30f * smooth01((float)(t - (len - 24)) / 10.0f) * zsin((float)t * 1.4f));
         if (st == AI_FLIP) {                                  /* ai1: flipped onto its back, rocking; rights itself at the end */
             float f = smooth01((float)t / 8.0f) * (1.0f - smooth01((float)(t - (len - 12)) / 12.0f));
-            if (n == 0) { p_mov(c, 0.0f, 0.30f * f, 0.0f); p_rot(c, 2, 3.14159274f * f + 0.12f * zsin((float)t * 0.25f) * f); }
+            /* lv2 (user: it went through the floor): the root pivot is at the turtle's feet (y 0, dump ceb0de6f) and the shell
+               dome stands 1.5 above it (kame.gpl), x2 drawn - a roll about the root sinks the shell ~3 into the ground; lift it
+               so the dome rests on the ground (2 x 1.45, less the settle above) */
+            if (n == 0) { p_mov(c, 0.0f, TU_FLIP_LIFT * f, 0.0f); p_rot(c, 2, 3.14159274f * f + 0.12f * zsin((float)t * 0.25f) * f); }
             if (n == 16 || n == 20 || n == 24 || n == 28) p_rot(c, 0, 0.5f * zsin((float)t * 0.9f + (float)n) * f);   /* legs paddle */
         }
         if (!PZ.atk && st == AI_RECOVER && n == 0) p_rot(c, 2, 0.18f * zsin((float)t * 0.5f) * (1.0f - u));   /* dizzy */

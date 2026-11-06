@@ -28,7 +28,7 @@ enum { C_MAGIC = 54, C_EXP, C_LV, C_HP, C_PWR, C_END, C_LCK, C_ANS, C_PTS };
 void skill_levelup(void);
 #define SH_DATA
 #include "stat_hud.h"
-struct { u32 magic; s32 ignore, acc, last, lastfull, menu, cool, gained, refund, wait, fish_set, r_exp, r_gold, r_wait, r_open, tl_seen, tl[2], tacc[2], twin, pend, page, lastmap; } ST;   /* 'STAT' (dump) */
+struct { u32 magic; s32 ignore, acc, last, lastfull, menu, cool, gained, refund, wait, fish_set, r_exp, r_gold, r_wait, r_open, tl_seen, tl[2], tacc[2], twin, pend, page, lastmap, drift; } ST;   /* 'STAT' (dump) */
 
 static s32 need(s32 lv) { return 500 + 1250 * (lv - 1); }   /* stats3: 500, 1750, 3000 ... (farming EXP x3); stats2: 500, 1250, 2000 ... (was 1500 + 500 lv: Lv 2 took 2000) */
 static s32 ready(u8 *g) { return OK(g) && CNT(g, C_MAGIC) == (s32)ST_MAGIC; }
@@ -61,6 +61,11 @@ void stats_reward(s32 exp, s32 gold)
     if (exp > 0) ST.r_exp += exp;
     if (gold > 0) ST.r_gold += gold;
     ST.r_wait = REWARD_WAIT;
+}
+static s32 menu_free(void)                              /* lv2: event_free without +0x58C, for the next level's menu */
+{
+    u8 *ev = EVMGR, *mm = MSGMGR;
+    return OK(ev) && *(s32 *)(ev + 0x680) == -1 && CONTROL == 1 && !(OK(mm) && *(s32 *)(mm + 0x48));
 }
 static s32 event_free(void)
 {
@@ -197,8 +202,24 @@ void stats_frame(u8 *g, s32 map, volatile u32 *held, volatile u32 *press, s32 bu
            became 'ST02' and the stats started over. The game itself uses only 32..34 there; ours are 40-62 (Joe 45-47,
            goddess quest 51, $JOE market 52 / 53, these stats 54-62). Now it counts 32..44 only (li r5, 0x3E -> 0x2D at
            0x8010BF8C). */
-        u32 *ip = (u32 *)0x8010BF8C;
-        if (*ip == 0x38A0003Eu) { *ip = 0x38A0002Du; __asm__ volatile("dcbst 0,%0\n\tsync\n\ticbi 0,%0\n\tisync" :: "r"(ip) : "memory"); }
+        /* lv2 (user: reset again after sleeping in the bed): the same call is also in func_8010BEB0 at 0x8010BEE4 (the
+           bed's sleep, from a REL), which lv1 missed. Both now. */
+        static u32 *const IP[2] = { (u32 *)0x8010BF8C, (u32 *)0x8010BEE4 };
+        s32 k;
+        for (k = 0; k < 2; k++) {
+            u32 *ip = IP[k];
+            if (*ip == 0x38A0003Eu) { *ip = 0x38A0002Du; __asm__ volatile("dcbst 0,%0\n\tsync\n\ticbi 0,%0\n\tisync" :: "r"(ip) : "memory"); }
+        }
+    }
+    {   /* lv2: a save the old day change already touched: 'ST01' + k after k days, and every non-zero stat counter + k too
+           (zero ones stay zero). Take the k days back instead of starting over. */
+        u32 m = (u32)CNT(g, C_MAGIC);
+        if (m > ST_MAGIC && m - ST_MAGIC < 2000u) {
+            s32 i, dk = (s32)(m - ST_MAGIC);
+            for (i = C_EXP; i <= C_PTS; i++) if (CNT(g, i) > 0) { CNT(g, i) -= dk; if (CNT(g, i) < 0) CNT(g, i) = 0; }
+            if (CNT(g, C_LV) < 1) CNT(g, C_LV) = 1;
+            CNT(g, C_MAGIC) = (s32)ST_MAGIC; ST.drift = dk;
+        }
     }
     if (CNT(g, C_MAGIC) != (s32)ST_MAGIC) {                  /* a save without stats: start at Lv 1 */
         s32 i; for (i = C_EXP; i <= C_PTS; i++) CNT(g, i) = 0;
@@ -298,7 +319,8 @@ void stats_frame(u8 *g, s32 map, volatile u32 *held, volatile u32 *press, s32 bu
     }
     if (ST.menu == 2) {
         u8 *ev = EVMGR;
-        if (OK(ev) && *(s32 *)(ev + 0x680) == -1 && !*(s32 *)(ev + 0x58C)) {   /* the event has ended */
+        if (OK(ev) && *(s32 *)(ev + 0x680) == -1) {         /* the event has ended (lv2: not +0x58C too - it stayed set
+                                                               for 8-10 s after the menu, which held the next level's menu back) */
             s32 v = CNT(g, C_ANS), k = v > 4 ? v / 128 : v, *st = 0;
             if (k >= 1 && k <= 4) {
                 st = &CNT(g, C_HP + k - 1);
@@ -313,7 +335,7 @@ void stats_frame(u8 *g, s32 map, volatile u32 *held, volatile u32 *press, s32 bu
         if (k >= 1 && k <= 4 && CNT(g, C_HP + k - 1) < STAT_MAX) { CNT(g, C_HP + k - 1)++; (*pts)--; }
         CNT(g, C_ANS) = 0;
     }
-    if (*pts > 0 && !busy && !ST.cool && map >= 0 && event_free()) {
+    if (*pts > 0 && !busy && !ST.cool && map >= 0 && menu_free()) {
         u8 *mm = MSGMGR;
         if (CNT(g, C_HP) >= STAT_MAX && CNT(g, C_PWR) >= STAT_MAX && CNT(g, C_END) >= STAT_MAX && CNT(g, C_LCK) >= STAT_MAX) { *pts = 0; return; }
         if (OK(mm)) msg_num(mm, 0, CNT(g, C_LV) - *pts + 1);   /* lv1: two levels at once = 'Lvl 2', then 'Lvl 3' (was 3 twice) */
