@@ -3803,3 +3803,28 @@ so, door fades are timed there, possibly per frame. Not traced yet.
   shell flip it (AI_FLIP, 120 frames: root rolled pi about z and raised 0.3, legs paddling, rights itself over the last
   12; 1.5x damage, no flinch, no knockback); no shell bite; normal bite wind-up 12. Whip wind-up 12, post-poof 14,
   chihuahua retreat 35 % (10 frames; counter skitter 8). pm normal ecbd0c38, test 54b6da1a.
+
+### 7.62 Goddess quest: offerings and the Mermaid Fossil (gq1, user design)
+- Design (user): 15 offerings tossed into Pool B (8 basic crops any quality: Tomato 0x1F-21, Watermelon 0x22-24,
+  Strawberry 0x25-27, Melon 0x28-2A, Turnip 0x2B-2D, Potato 0x2E-30, Carrot 0x31-33, Sweet Potato 0x34-36; flowers
+  Goddess Drop 0x43E, Mist Moon 0x43B, Trick Blue 0x43C, Amorous 0x43D; any milk 0x07-0x18, any egg 0x1C-1E, any wool
+  0x19-1B), then the summoning item. Lore (user): not Big Arna but a Mermaid Fossil fished up at Pond A and returned to
+  her pond - Carter's dig found "picture writing depicting mermaids" (carter.mes 0x0F), Flora "webbing" (flora 0x22):
+  the goddess descends from the valley's ancient mermaid people.
+- Fishing chain (main.dol): func_80173414 (fishing manager *0x80349164) picks kind func_8017346C(fm, water fm+0x68)
+  -> fm+0x64, index func_80173504 -> fm+0x60 (2 x kind + 0 big / 1 small), hooked fish model func_8016FAFC. On landing
+  the player code (0x80048360..): record bit (1 << index) into game+0x299FC, func_8004FDA0 stows the held item, held
+  item ctrl+0x144 = func_80173A0C (table 0x802C9238[index] +0 item), func_80031010 / func_8007C934 bind and attach its
+  model (any item), func_801739A4 = "You caught <item>!" (func_80102310 slot 0 item; func_801020E4(mgr, 1, 0x33,
+  0xE1, -1, 0x70, 0, 0)).
+- gq1: the three calls (0x8017343C, 0x800483A0, 0x800483F4) go to spring.c gq_fish_size / gq_fish_item / gq_fish_msg
+  (poked when they hold the original bl). At Pond A, until she is summoned, 1.2 % x (1 + Lck / 20) of catches are the
+  fossil: the line shows a Snelt (index 7), the catch is item 0x448 with its own model and name, the Snelt record bit is
+  put back. Dig table row 0x448 weight (0x80292916, 0xC8) -> 0. Text (tools/goddess/quest/build_gq_text.py on the
+  disc's files): item.mes (Message.arc + loose) 0x448 "Mermaid Fossil", itemdoc03 0x5B description, debug.mes free
+  entries 0x1F-0x22 (shimmer / glow / not yet / summon). State: event counter 45 (bits 0-14 offerings, 16 summoned,
+  17 fished). Toss: a new offering -> "The water shimmers...", the 15th -> "The spring glows softly..."; the fossil
+  before all 15: no throw, "pushes it back"; with all 15: fade to white 1.2 s, hold, back, "A warm light rises..."
+  (placeholder for her scene). GQ_TEST build: Z + D-Down = all 15, fossil on half of Pond A catches. pm gqtest
+  7c9c32b2, test 5a3db1a8, normal 6e6ad342.
+- Still to do: her appearance scene and dialogue, year-1 flag + Blue Feather marriage route.

@@ -53,6 +53,93 @@ typedef unsigned char u8;
 
 extern u8 *pm_player;
 
+/* ---- the goddess quest (gq1, user design; notes/findings 7.62) ----
+   Saved in event counter 45 (game+0x12194 + 4 x 45; unused by the game): bits 0-14 the 15 offerings made, bit 16 the
+   goddess summoned, bit 17 a Mermaid Fossil was ever fished up (debug). Offerings: the 8 basic crops (any quality),
+   Goddess Drop / Mist Moon / Trick Blue / Amorous, any milk, any egg, any wool; a new one: "The water shimmers...", the
+   15th: "The spring glows softly...". The Mermaid Fossil (item 0x448, the dig table's Strange Fossil renamed; off the dig
+   table now) is fished up at Pond A (water 2), ~1.2 % of catches (x(1 + Lck / 20)), until she is summoned. Tossed with
+   all 15 done: she is summoned (placeholder: fade to white and back, a line); before that the water pushes it back
+   (no throw, so it is never lost). */
+#include "gq_mes.h"
+#define CNT(g, i)     (*(s32 *)((g) + 0x12194 + 4 * (i)))
+#define GQ            45
+#define GQ_ALL        0x7FFF
+#define GQ_SUMMONED   0x10000
+#define GQ_FISHED     0x20000
+#define FOSSIL        0x448
+#define MES_DEBUG     0x32
+#define ST_MESSAGE    0x2A
+#define POND_A        2
+#define OK(p)         ((u32)(p) >= 0x80000000u && (u32)(p) < 0x81800000u)
+#define rand_         F(0x8017D3E8, u32, (void))
+#define fade_to       F(0x80189128, void, (u8 *, u32 *, u32 *, s32, s32, float))
+#define FADER         (*(u8 **)0x803491B8)
+#define MSGMGR        (*(u8 **)0x803491C4)
+#define fish_size     F(0x80173504, s32, (u8 *, s32))       /* fish index (2 x kind + 0 big / 1 small) */
+#define fish_item     F(0x80173A0C, s32, (u8 *))            /* the caught item: table 0x802C9238[index] */
+#define fish_msg      F(0x801739A4, void, (u8 *))           /* "You caught <item>!" (system.mes 0xE1) */
+#define msg_item      F(0x80102310, void, (u8 *, s32, s32))
+#define msg_open      F(0x801020E4, void, (u8 *, s32, s32, s32, s32, s32, s32, s32))
+static s32 gq_bit(s32 i)
+{
+    if (i >= 0x1F && i <= 0x36) return 1 << ((i - 0x1F) / 3);          /* Tomato .. Sweet Potato, 3 qualities each */
+    if (i == 0x43E) return 1 << 8;                                      /* Goddess Drop (spring) */
+    if (i >= 0x43B && i <= 0x43D) return 1 << (9 + i - 0x43B);           /* Mist Moon, Trick Blue, Amorous */
+    if (i >= 0x007 && i <= 0x018) return 1 << 12;                       /* any cow / goat milk */
+    if (i >= 0x01C && i <= 0x01E) return 1 << 13;                       /* any egg */
+    if (i >= 0x019 && i <= 0x01B) return 1 << 14;                       /* any wool */
+    return 0;
+}
+struct { u32 magic; s32 pending, bitwas, rolls, hits, msg, sum, t; } GQD;   /* 'GQST' (dump) */
+s32 gq_fish_size(u8 *fm, s32 kind)                    /* replaces the call at 0x8017343C */
+{
+    s32 idx = fish_size(fm, kind), lck = 0;
+    u8 *g = GAME;
+    GQD.magic = 0x47515354u; GQD.pending = 0; GQD.rolls++;
+    if (!OK(g) || kind < 0 || kind > 7 || *(s32 *)(fm + 0x68) != POND_A || (CNT(g, GQ) & GQ_SUMMONED)) return idx;
+    if (CNT(g, 54) == 0x53543031) lck = CNT(g, 60);   /* stats.c Lck */
+#ifdef GQ_TEST
+    lck = 1640;                                        /* test: half the Pond A catches */
+#endif
+    if ((s32)(rand_() % 10000u) < 120 * (20 + lck) / 20) {
+        GQD.pending = 1; GQD.hits++; idx = 7;          /* on the line it is the smallest fish (Snelt) */
+        GQD.bitwas = (*(u32 *)(g + 0x299FC) >> 7) & 1; /* its fishing-record bit, put back when caught */
+    }
+    return idx;
+}
+s32 gq_fish_item(u8 *fm)                              /* replaces the call at 0x800483A0 */
+{
+    s32 it = fish_item(fm);
+    u8 *g = GAME;
+    if (!GQD.pending || !OK(g)) return it;
+    if (!GQD.bitwas) *(u32 *)(g + 0x299FC) &= ~(1u << 7);
+    CNT(g, GQ) |= GQ_FISHED;
+    return FOSSIL;
+}
+void gq_fish_msg(u8 *fm)                              /* replaces the call at 0x800483F4 */
+{
+    if (!GQD.pending) { fish_msg(fm); return; }
+    GQD.pending = 0;
+    msg_item(MSGMGR, 0, FOSSIL);
+    msg_open(MSGMGR, 1, 0x33, 0xE1, -1, 0x70, 0, 0);
+}
+static void poke(u32 a, u32 want, u32 other)
+{
+    u32 *p = (u32 *)a;
+    if (*p != other) return;
+    *p = want;
+    __asm__ volatile("dcbst 0,%0\n\tsync\n\ticbi 0,%0\n\tisync" :: "r"(p) : "memory");
+}
+#define BL(at, to)  (0x48000001u | (((u32)(to) - (u32)(at)) & 0x03FFFFFCu))
+static void gq_hooks(void)
+{
+    poke(0x8017343C, BL(0x8017343C, gq_fish_size), BL(0x8017343C, 0x80173504));
+    poke(0x800483A0, BL(0x800483A0, gq_fish_item), BL(0x800483A0, 0x80173A0C));
+    poke(0x800483F4, BL(0x800483F4, gq_fish_msg), BL(0x800483F4, 0x801739A4));
+    if (*(volatile unsigned short *)0x80292916 == 0xC8) *(volatile unsigned short *)0x80292916 = 0;   /* dig table: no Strange Fossil */
+}
+
 static struct {
     s32 item;                    /* in flight (0 = none) */
     s32 fly, frames;             /* frames flown, frames of the arc */
@@ -106,7 +193,16 @@ s32 spring_label(s32 action, u8 *pl)
 
 static void offering(u8 *g, s32 item)
 {
+    s32 b = gq_bit(item), c = CNT(g, GQ);
     W.last[W.n++ & 7] = item;
+    if (item == FOSSIL && (c & GQ_ALL) == GQ_ALL && !(c & GQ_SUMMONED)) {   /* the summoning */
+        u8 *fd = FADER;
+        CNT(g, GQ) = c | GQ_SUMMONED;
+        if (OK(fd)) { u32 from = 0xFFFFFF00u, to = 0xFFFFFFFFu; fade_to(fd, &from, &to, 0, 0, 1.2f); }
+        GQD.sum = 1; GQD.t = 0;
+        return;
+    }
+    if (b && !(c & b)) { CNT(g, GQ) = c | b; GQD.msg = ((c | b) & GQ_ALL) == GQ_ALL ? GQ_MSG_GLOW : GQ_MSG_SHIMMER; }
 }
 
 void spring_release(void)
@@ -118,9 +214,30 @@ void spring_frame(u8 *g, s32 map, u32 pad_held, u32 pad_press)
 {
     u8 *pl = pm_player;
     float pt[3];
+    gq_hooks();
     if (map != VALLEY || !pl) { W.item = 0; return; }
+#ifdef GQ_TEST
+    if ((pad_held & 0x10) && (pad_press & 0x4)) { CNT(g, GQ) = (CNT(g, GQ) & ~GQ_SUMMONED) | GQ_ALL; sfx_play(*(u8 **)0x803491E4, 216, 0); }   /* test: Z + D-Down = all 15 offerings */
+#endif
+    if (GQD.sum) {                                       /* placeholder summon: white, hold, back */
+        u8 *fd = FADER;
+        if (++GQD.t == 110 && OK(fd)) { u32 from = 0xFFFFFFFFu, to = 0xFFFFFF00u; fade_to(fd, &from, &to, 0, 0, 1.2f); }
+        if (GQD.t >= 190) { GQD.sum = 0; GQD.msg = GQ_MSG_SUMMON; }
+    }
+    if (GQD.msg && !W.item && *(s32 *)(pl + 0x1364) == ST_FIELD && CONTROL == 1) {
+        *(s32 *)(pl + 0x14C0) = MES_DEBUG; *(s32 *)(pl + 0x14C4) = GQD.msg; GQD.msg = 0;
+        pl_state(pl, ST_MESSAGE);
+        return;
+    }
 
-    if ((pad_press & 0x100) && !(pad_held & 0x10) && CONTROL == 1 && !W.item && can_toss(g, pl, pt)) {
+    if ((pad_press & 0x100) && !(pad_held & 0x10) && CONTROL == 1 && !W.item && !GQD.sum && can_toss(g, pl, pt) &&
+        HELD(g) == FOSSIL && (CNT(g, GQ) & GQ_ALL) != GQ_ALL && !(CNT(g, GQ) & GQ_SUMMONED)) {
+        PAD_PRESS_W &= ~0x100u;                          /* not time yet: no throw, it stays in hand */
+        *(s32 *)(pl + 0x14C0) = MES_DEBUG; *(s32 *)(pl + 0x14C4) = GQ_MSG_NOTYET;
+        pl_state(pl, ST_MESSAGE);
+        return;
+    }
+    if ((pad_press & 0x100) && !(pad_held & 0x10) && CONTROL == 1 && !W.item && !GQD.sum && can_toss(g, pl, pt)) {
         float *p = (float *)(g + 0x29C78), *pr = (float *)(pl + 0x1460), st[3], dx, dz, l2, r, dist;
         PAD_PRESS_W &= ~0x100u;                          /* the A handler does nothing else */
         st[0] = p[0]; st[1] = p[1] + START_UP; st[2] = p[2];

@@ -21,7 +21,7 @@ a session's temporary folder; the ones still only there are marked.
 | Postman NPC (8th, 9:00-11:00, milk event 406, Cursed Axe gift) | pm.c, route.h | Common.arc event 406 |
 | Choppable logs (appear the day after rain) | logs.c | snow mapc build |
 | Tool skill on the HUD (gems, "Field/Animal up" chime; row hidden since hud1, levels replace it) | skill.c, skill_hud.h | level every 500 points |
-| Goddess pond offerings | spring.c | |
+| Goddess pond offerings: Toss into Pool B; 15 offerings tracked (crops, 4 flowers, milk / egg / wool) with "The water shimmers..."; Mermaid Fossil (Strange Fossil renamed) fished up at Pond A, rare, Luck helps; tossed after all 15 = placeholder summon (gq1, untested) | spring.c, tools/goddess/quest | findings 7.35, 7.62 |
 | $JOE Coin Daily on TV channel 3; per-save market (joeseed test 1): each new game picks a random seed on day 1, kept in event counter 52 (saved); older saves keep seed 1890 | joetv.c (HOOK8, mseed / joe_seed_frame from pm_frame) | price = f(seed, day), tools/joecoin; Joe's visit days stay on 1890 |
 | $JOE coin: villagers hate it (HOOK9), never a wanted gift (HOOK10) | joetv.c | |
 | $JOE dig-site share 10 % halving per chapter; x2 at full Joe friendship | joetv.c joe_dig_frame | |
