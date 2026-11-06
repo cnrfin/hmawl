@@ -192,6 +192,13 @@ void stats_frame(u8 *g, s32 map, volatile u32 *held, volatile u32 *press, s32 bu
     s32 cur, d, *pts;
     ST.magic = 0x53544154u;
     if (!OK(g)) return;
+    {   /* lv1 (user: Lv / EXP back to 1 after sleeping): the day change (func_8010BF58) clears event counters 32..61
+           (func_8010C078(obj, 0x1F, 0x3E, 0); the game's dev list: 31..62 __COUNTER_COUNTUP_DAY); the game itself uses only
+           32..34 there, ours are 40-61 (Joe 45-47, $JOE market 52 / 53, these stats 54-61, the goddess quest 51). Now it
+           clears 32..44 only (li r5, 0x3E -> 0x2D at 0x8010BF8C). */
+        u32 *ip = (u32 *)0x8010BF8C;
+        if (*ip == 0x38A0003Eu) { *ip = 0x38A0002Du; __asm__ volatile("dcbst 0,%0\n\tsync\n\ticbi 0,%0\n\tisync" :: "r"(ip) : "memory"); }
+    }
     if (CNT(g, C_MAGIC) != (s32)ST_MAGIC) {                  /* a save without stats: start at Lv 1 */
         s32 i; for (i = C_EXP; i <= C_PTS; i++) CNT(g, i) = 0;
         CNT(g, C_LV) = 1; CNT(g, C_MAGIC) = (s32)ST_MAGIC; ST.last = -1; ST.lastfull = -1;
@@ -308,7 +315,7 @@ void stats_frame(u8 *g, s32 map, volatile u32 *held, volatile u32 *press, s32 bu
     if (*pts > 0 && !busy && !ST.cool && map >= 0 && event_free()) {
         u8 *mm = MSGMGR;
         if (CNT(g, C_HP) >= STAT_MAX && CNT(g, C_PWR) >= STAT_MAX && CNT(g, C_END) >= STAT_MAX && CNT(g, C_LCK) >= STAT_MAX) { *pts = 0; return; }
-        if (OK(mm)) msg_num(mm, 0, CNT(g, C_LV));
+        if (OK(mm)) msg_num(mm, 0, CNT(g, C_LV) - *pts + 1);   /* lv1: two levels at once = 'Lvl 2', then 'Lvl 3' (was 3 twice) */
         CNT(g, C_ANS) = 0; ST.menu = 1; ST.wait = 0;
         event_start(EVMGR, EV_LVUP, 0, 0);
         return;

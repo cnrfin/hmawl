@@ -3822,9 +3822,20 @@ so, door fades are timed there, possibly per frame. Not traced yet.
   fossil: the line shows a Snelt (index 7), the catch is item 0x448 with its own model and name, the Snelt record bit is
   put back. Dig table row 0x448 weight (0x80292916, 0xC8) -> 0. Text (tools/goddess/quest/build_gq_text.py on the
   disc's files): item.mes (Message.arc + loose) 0x448 "Mermaid Fossil", itemdoc03 0x5B description, debug.mes free
-  entries 0x1F-0x22 (shimmer / glow / not yet / summon). State: event counter 45 (bits 0-14 offerings, 16 summoned,
+  entries 0x1F-0x22 (shimmer / glow / not yet / summon). State: event counter 51 (lv1; gq1 had 45) (bits 0-14 offerings, 16 summoned,
   17 fished). Toss: a new offering -> "The water shimmers...", the 15th -> "The spring glows softly..."; the fossil
   before all 15: no throw, "pushes it back"; with all 15: fade to white 1.2 s, hold, back, "A warm light rises..."
   (placeholder for her scene). GQ_TEST build: Z + D-Down = all 15, fossil on half of Pond A catches. pm gqtest
   7c9c32b2, test 5a3db1a8, normal 6e6ad342.
 - Still to do: her appearance scene and dialogue, year-1 flag + Blue Feather marriage route.
+
+### 7.63 Daily counter reset wiped the stats (lv1)
+- User (ai1 dump 5838ff10): after sleeping, Lv 1 0/500. Counters 30-53 all 0, 54 'ST01', 56 = 1: stats.c re-initialised.
+  The day change (0x80013B50) calls func_8010BF58(game+0x12078): func_8010C078(obj, -1, 0x1E, 1) counts 0..29 up,
+  func_8010C078(obj, 0x1F, 0x3E, 0) CLEARS 32..61, func_8010C000 clears flags 0..157 (daily), 159..190 (month),
+  191..222 (year). Dev lists (test/text EventCounter / EventFlag): counters 31..62 __COUNTER_COUNTUP_DAY, 63..71 NO;
+  flags 287..322 RESET_NO (all named). The game uses only counters 32..34 in the day range; ours: 40-44 / 48-50 event
+  scratch, 45-47 Joe (met / gifts = friendship / last gift day), 52 / 53 $JOE market, 54-62 stats - so Joe's
+  friendship and the market were wiped daily too. Fix (stats.c, every frame): li r5, 0x3E -> 0x2D at 0x8010BF8C (only
+  32..44 cleared). Goddess quest moved 45 -> 51 (45 = Joe's 'met'). Level-up menu with 2+ points: slot n0 = Lv - points
+  + 1 (was the current Lv each time). pm gqtest ee544270, test 332739a3, normal 1f4045aa.

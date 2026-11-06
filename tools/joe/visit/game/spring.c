@@ -54,7 +54,7 @@ typedef unsigned char u8;
 extern u8 *pm_player;
 
 /* ---- the goddess quest (gq1, user design; notes/findings 7.62) ----
-   Saved in event counter 45 (game+0x12194 + 4 x 45; unused by the game): bits 0-14 the 15 offerings made, bit 16 the
+   Saved in event counter 51 (game+0x12194 + 4 x 51; unused by the game; gq1 had 45 = Joe's 'met' counter): bits 0-14 the 15 offerings made, bit 16 the
    goddess summoned, bit 17 a Mermaid Fossil was ever fished up (debug). Offerings: the 8 basic crops (any quality),
    Goddess Drop / Mist Moon / Trick Blue / Amorous, any milk, any egg, any wool; a new one: "The water shimmers...", the
    15th: "The spring glows softly...". The Mermaid Fossil (item 0x448, the dig table's Strange Fossil renamed; off the dig
@@ -63,7 +63,7 @@ extern u8 *pm_player;
    (no throw, so it is never lost). */
 #include "gq_mes.h"
 #define CNT(g, i)     (*(s32 *)((g) + 0x12194 + 4 * (i)))
-#define GQ            45
+#define GQ            51
 #define GQ_ALL        0x7FFF
 #define GQ_SUMMONED   0x10000
 #define GQ_FISHED     0x20000
