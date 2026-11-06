@@ -3831,11 +3831,13 @@ so, door fades are timed there, possibly per frame. Not traced yet.
 
 ### 7.63 Daily counter reset wiped the stats (lv1)
 - User (ai1 dump 5838ff10): after sleeping, Lv 1 0/500. Counters 30-53 all 0, 54 'ST01', 56 = 1: stats.c re-initialised.
-  The day change (0x80013B50) calls func_8010BF58(game+0x12078): func_8010C078(obj, -1, 0x1E, 1) counts 0..29 up,
-  func_8010C078(obj, 0x1F, 0x3E, 0) CLEARS 32..61, func_8010C000 clears flags 0..157 (daily), 159..190 (month),
-  191..222 (year). Dev lists (test/text EventCounter / EventFlag): counters 31..62 __COUNTER_COUNTUP_DAY, 63..71 NO;
-  flags 287..322 RESET_NO (all named). The game uses only counters 32..34 in the day range; ours: 40-44 / 48-50 event
-  scratch, 45-47 Joe (met / gifts = friendship / last gift day), 52 / 53 $JOE market, 54-62 stats - so Joe's
-  friendship and the market were wiped daily too. Fix (stats.c, every frame): li r5, 0x3E -> 0x2D at 0x8010BF8C (only
+  The day change (0x80013B50) calls func_8010BF58(game+0x12078): func_8010C078(obj, -1, 0x1E, 1) adds 1 to counters
+  0..29, func_8010C078(obj, 0x1F, 0x3E, 0) adds 1 to each NON-ZERO counter 32..61 ("days since"), func_8010C000 clears
+  flags 0..157 (daily), 159..190 (month), 191..222 (year). Dev lists (test/text EventCounter / EventFlag): counters
+  31..62 __COUNTER_COUNTUP_DAY, 63..71 NO; flags 287..322 RESET_NO (all named). So 'ST01' became 'ST02' and stats.c
+  re-initialised; Joe's gifts (46) rose by 1 a day by themselves and his last-gift day (47) crept, so the next day's
+  first gift often counted as a repeat; the $JOE market had already dodged it (seed in the high halves of 52 / 53).
+  The game uses only counters 32..34 in that range; ours: 40-44 / 48-50 event scratch, 45-47 Joe, 51 goddess quest,
+  52 / 53 market, 54-62 stats. Fix (stats.c, every frame): li r5, 0x3E -> 0x2D at 0x8010BF8C (only
   32..44 cleared). Goddess quest moved 45 -> 51 (45 = Joe's 'met'). Level-up menu with 2+ points: slot n0 = Lv - points
   + 1 (was the current Lv each time). pm gqtest ee544270, test 332739a3, normal 1f4045aa.

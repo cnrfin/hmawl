@@ -192,10 +192,11 @@ void stats_frame(u8 *g, s32 map, volatile u32 *held, volatile u32 *press, s32 bu
     s32 cur, d, *pts;
     ST.magic = 0x53544154u;
     if (!OK(g)) return;
-    {   /* lv1 (user: Lv / EXP back to 1 after sleeping): the day change (func_8010BF58) clears event counters 32..61
-           (func_8010C078(obj, 0x1F, 0x3E, 0); the game's dev list: 31..62 __COUNTER_COUNTUP_DAY); the game itself uses only
-           32..34 there, ours are 40-61 (Joe 45-47, $JOE market 52 / 53, these stats 54-61, the goddess quest 51). Now it
-           clears 32..44 only (li r5, 0x3E -> 0x2D at 0x8010BF8C). */
+    {   /* lv1 (user: Lv / EXP back to 1 after sleeping): the day change (func_8010BF58) adds 1 to every non-zero event
+           counter 32..61 (func_8010C078(obj, 0x1F, 0x3E, 0); the game's dev list: 31..62 __COUNTER_COUNTUP_DAY), so 'ST01'
+           became 'ST02' and the stats started over. The game itself uses only 32..34 there; ours are 40-62 (Joe 45-47,
+           goddess quest 51, $JOE market 52 / 53, these stats 54-62). Now it counts 32..44 only (li r5, 0x3E -> 0x2D at
+           0x8010BF8C). */
         u32 *ip = (u32 *)0x8010BF8C;
         if (*ip == 0x38A0003Eu) { *ip = 0x38A0002Du; __asm__ volatile("dcbst 0,%0\n\tsync\n\ticbi 0,%0\n\tisync" :: "r"(ip) : "memory"); }
     }
