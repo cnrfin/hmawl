@@ -62,10 +62,15 @@ void stats_reward(s32 exp, s32 gold)
     if (gold > 0) ST.r_gold += gold;
     ST.r_wait = REWARD_WAIT;
 }
+static s32 ev_running(void)                             /* lv4: a script event is on: +0x680 (talk events) or +0x58C (ours) */
+{
+    u8 *ev = EVMGR;
+    return OK(ev) && (*(s32 *)(ev + 0x680) != -1 || *(s32 *)(ev + 0x58C));
+}
 static s32 menu_free(void)                              /* lv2: event_free without +0x58C, for the next level's menu */
 {
-    u8 *ev = EVMGR, *mm = MSGMGR;
-    return OK(ev) && *(s32 *)(ev + 0x680) == -1 && CONTROL == 1 && !(OK(mm) && *(s32 *)(mm + 0x48));
+    u8 *mm = MSGMGR;
+    return !ev_running() && CONTROL == 1 && !(OK(mm) && *(s32 *)(mm + 0x48));
 }
 static s32 event_free(void)
 {
@@ -312,13 +317,11 @@ void stats_frame(u8 *g, s32 map, volatile u32 *held, volatile u32 *press, s32 bu
     if (ST.menu == 1) {                                     /* stats5: wait until it is really running (it starts a frame or more
                                                                later; stats4 took that for 'ended', so the answer was lost and the
                                                                menu came back for ever) */
-        u8 *ev = EVMGR;
-        if (OK(ev) && *(s32 *)(ev + 0x680) != -1) ST.menu = 2;
+        if (ev_running() || CNT(g, C_ANS)) ST.menu = 2;   /* lv4: our events show as +0x58C, not +0x680 (lv2/lv3 timed out here: 5 s) */
         else if (++ST.wait > 300) { ST.menu = 0; ST.wait = 0; }   /* never started: try again later */
         return;
     }
     if (ST.menu == 2) {
-        u8 *ev = EVMGR;
         if (CNT(g, C_ANS)) {                                /* lv3: the menu loops in one event (patch_lvup_loop.py): apply
                                                                each answer now, set 61 back to 0 and the next level's number */
             s32 v = CNT(g, C_ANS), k = v > 4 ? v / 128 : v;
@@ -327,8 +330,7 @@ void stats_frame(u8 *g, s32 map, volatile u32 *held, volatile u32 *press, s32 bu
             if (*pts > 0) { u8 *mm = MSGMGR; if (OK(mm)) msg_num(mm, 0, CNT(g, C_LV) - *pts + 1); }
             CNT(g, C_ANS) = 0;
         }
-        if (OK(ev) && *(s32 *)(ev + 0x680) == -1) {         /* the event has ended (lv2: not +0x58C too - it stayed set
-                                                               for 8-10 s after the menu, which held the next level's menu back) */
+        if (!ev_running() && !CNT(g, C_ANS)) {              /* the event has ended */
             s32 v = CNT(g, C_ANS), k = v > 4 ? v / 128 : v, *st = 0;
             if (k >= 1 && k <= 4) {
                 st = &CNT(g, C_HP + k - 1);

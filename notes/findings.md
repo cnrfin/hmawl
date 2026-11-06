@@ -4013,4 +4013,9 @@ so, door fades are timed there, possibly per frame. Not traced yet.
 - Turtle: 3 knocks on the shell no longer flip it; it bursts out at once in a spin that always chains a second one
   (AI.mad), then its usual dizzy. AI_FLIP / TU_FLIP_LIFT left unused.
 - pm normal b1473370, test 3046e315, gqtest db50f995.
-
+- lv3 test (user, dump 8984454d): frozen 4-5 s after choosing the stat (one level). Cause (and of every gap since
+  stats5): stats.c took EVMGR + 0x680 != -1 for "our event is running"; events started with event_start show only as
+  + 0x58C != 0 (+0x680 stays -1), so menu 1 timed out after 300 frames (5 s) and the answer was applied by the
+  stored-answer path - lv3's looping script waited on it, frozen. lv4: ev_running() = +0x680 != -1 || +0x58C; menu 1
+  -> 2 on that or on an answer; the menu ends when neither and no answer is pending; the next menu needs !ev_running.
+  pm normal 875facf3, test 0c39d6af, gqtest 9ae80fe7 (Common.arc as lv3).
