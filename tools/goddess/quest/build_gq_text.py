@@ -12,10 +12,10 @@ from add_weapon_text import enc, mes_read, mes_write, u8_replace, u8_get
 FOSSIL = 0x448
 NAME = "Mermaid Fossil"
 DESC = "Webbed hands and a\nnear-human face..."   # gq2: two short lines (three scrolled away in the R box)
-LINES = {   # name: text (01 = new line; 30 = wait for A)
+LINES = {   # gq4: at most 2 lines of ~20 characters (the box shows 2; a third scrolled away); 30 = wait for A
     'SHIMMER': "The water shimmers...",
-    'GLOW':    "The spring glows softly.\nIt seems to be waiting\nfor something...",
-    'NOTYET':  "The water ripples and\npushes it back.\nIt isn't time yet...",
+    'GLOW':    "The spring glows.\nSomething is missing.",
+    'NOTYET':  "The water pushes it\nback. Not yet...",
     'SUMMON':  "A warm light rises\nfrom the spring...",
 }
 def pad4(b):

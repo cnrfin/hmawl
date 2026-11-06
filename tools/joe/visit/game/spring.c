@@ -199,7 +199,8 @@ static void offering(u8 *g, s32 item)
     if (item == FOSSIL && (c & GQ_ALL) == GQ_ALL && !(c & GQ_SUMMONED)) {   /* the summoning */
         u8 *fd = FADER;
         CNT(g, GQ) = c | GQ_SUMMONED;
-        if (OK(fd)) { u32 from = 0xFFFFFF00u, to = 0xFFFFFFFFu; fade_to(fd, &from, &to, 0, 0, 1.2f); }
+        if (OK(fd)) { u32 from = 0xFFFFFFFFu, to = 0xFFFFFF00u; fade_to(fd, &from, &to, 0, 0, 1.6f); }   /* gq4: one flash (white -> clear;
+                                                           gq1-3's white-in, hold, white-out read as two) */
         GQD.sum = 1; GQD.t = 0;
         return;
     }
@@ -237,8 +238,8 @@ void spring_frame(u8 *g, s32 map, u32 pad_held, u32 pad_press)
 #endif
     if (GQD.sum) {                                       /* placeholder summon: white, hold, back */
         u8 *fd = FADER;
-        if (++GQD.t == 110 && OK(fd)) { u32 from = 0xFFFFFFFFu, to = 0xFFFFFF00u; fade_to(fd, &from, &to, 0, 0, 1.2f); }
-        if (GQD.t >= 190) { GQD.sum = 0; GQD.msg = GQ_MSG_SUMMON; }
+        (void)fd;
+        if (++GQD.t >= 100) { GQD.sum = 0; GQD.msg = GQ_MSG_SUMMON; }
     }
     if (GQD.msg && !W.item && *(s32 *)(pl + 0x1364) == ST_FIELD && CONTROL == 1) {
         *(s32 *)(pl + 0x14C0) = MES_DEBUG; *(s32 *)(pl + 0x14C4) = GQD.msg; GQD.msg = 0;

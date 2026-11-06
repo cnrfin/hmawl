@@ -3848,3 +3848,4 @@ so, door fades are timed there, possibly per frame. Not traced yet.
   offerings not yet made into the rucksack (func_8004FDA0), with all 15 made the Mermaid Fossil. pm gqtest 9c4dde34
   (test / normal unchanged from lv1: 332739a3 / 1f4045aa).
 - gq3 (user: only 4 crops given): the shortcut now fills every free rucksack slot (18 slots at game+0x58, {item u16, count, ff}; the user had 8 free) with offerings not yet made and not already carried; with all 15 made, the fossil. pm gqtest b68e9894.
+- gq3 test (user, dump 562a17fc: counter 51 = 0x37FFF, summoned): the 3-line GLOW / NOTYET lines were cut off as the description was; the white-in / hold / white-out read as two flashes. gq4: every quest line <= 2 lines (debug.mes 88a72147); one flash (white -> clear 1.6 s), the line after 100 frames. pm gqtest bcbd1ce2, test b5700250, normal a6ce535d.
