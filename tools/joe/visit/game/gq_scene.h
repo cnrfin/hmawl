@@ -4,25 +4,26 @@
 #define GQ_C_CUE  26
 #define GQ_C_DONE 27
 #define GQ_C_YEAR1 28
-#define GS_N 13
+#define GS_N 12
 #define GS_LETTERBOX 1
 #define GS_MUSIC_FADE 1
 #define GS_MUSIC_SHOT 5
-#define GS_MUSIC_ITEM 0x514   /* the "Marin Jazz" record: song 1, group RECORD05 */
+#define GS_END_WHITE 1
 /* subject, look (0 her, 1 him, 2 midpoint), smooth, motion, action (0 under, 1 stand, 2 rise, 3 sink), after the lines,
-   splash, glide frames, hold frames (pm.c sets "done" then), action frames; start yaw dist height aim, end ... */
-static const struct gshot { signed char subj, look, smooth, motion, act, after, splash; short glide, hold, actf; float k[8]; } GSHOT[GS_N] = {
-    { 1, 0, 1, 0, 0, 0, 0, 180, 180, 0, { 0.0f, 6.0f, 3.5f, 0.3f, 0.0f, 4.0f, 2.6f, 0.3f } },   /* 1 The spring */
-    { 0, 0, 1, 0, 0, 0, 0, 120, 120, 0, { 25.0f, 4.5f, 0.4f, 0.2f, 10.0f, 3.5f, 0.6f, 0.2f } },   /* 2 Glow */
-    { 0, 0, 1, 0, 2, 0, 1, 240, 240, 210, { 10.0f, 3.2f, 0.5f, 0.6f, 0.0f, 3.0f, 1.0f, 1.4f } },   /* 3 The rise */
-    { 0, 0, 1, 0, 1, 0, 0, 152, 60, 0, { 0.0f, 2.2f, 1.5f, 1.45f, 0.0f, 1.8f, 1.5f, 1.45f } },   /* 4 Silence */
-    { 0, 0, 1, 0, 1, 0, 0, 154, 0, 0, { 0.0f, 1.8f, 1.5f, 1.45f, 0.0f, 1.8f, 1.5f, 1.45f } },   /* 5 Eyes open */
-    { 0, 1, 1, 0, 1, 0, 0, 227, 0, 0, { 160.0f, 1.6f, 1.6f, 1.0f, 160.0f, 1.6f, 1.6f, 1.0f } },   /* 6 Over the shoulder */
-    { 0, 0, 1, 0, 1, 0, 0, 178, 0, 0, { -20.0f, 3.0f, 1.3f, 1.3f, -20.0f, 3.0f, 1.3f, 1.3f } },   /* 7 Medium */
-    { 0, 0, 0, 4, 1, 0, 0, 622, 0, 0, { -40.0f, 3.4f, 1.2f, 1.3f, 40.0f, 3.4f, 1.6f, 1.3f } },   /* 8 Lore orbit */
-    { 0, 0, 1, 0, 1, 0, 0, 292, 0, 0, { 5.0f, 2.4f, 1.5f, 1.45f, 5.0f, 1.9f, 1.5f, 1.45f } },   /* 9 Push-in */
-    { 0, 0, 1, 6, 1, 0, 0, 405, 0, 0, { 15.0f, 2.6f, 0.5f, 1.5f, 15.0f, 2.6f, 0.5f, 1.5f } },   /* 10 Hero low angle */
-    { 2, 2, 1, 4, 1, 0, 0, 665, 0, 0, { 90.0f, 5.0f, 1.6f, 1.0f, 90.0f, 4.5f, 1.6f, 1.0f } },   /* 11 Two-shot */
-    { 0, 0, 1, 0, 3, 1, 1, 298, 0, 180, { 0.0f, 3.0f, 1.4f, 1.4f, 0.0f, 7.0f, 4.5f, 0.4f } },   /* 12 Farewell */
-    { 1, 0, 1, 0, 0, 0, 0, 120, 120, 0, { 0.0f, 5.0f, 3.0f, 0.2f, 0.0f, 5.5f, 3.2f, 0.2f } },   /* 13 Quiet */
+   fx (1 splash, 2 white flash at the start, 4 eyes closed), glide frames, hold frames (pm.c sets "done" then), action frames; start yaw dist height aim, end ... */
+#ifdef GQ_SHOTS
+static const struct gshot { signed char subj, look, smooth, motion, act, after, fx; short glide, hold, actf; float k[8]; } GSHOT[GS_N] = {
+    { 1, 0, 1, 0, 0, 0, 0, 180, 180, 0, { 0.0f, 6.0f, 2.45f, 0.21f, 0.0f, 4.0f, 1.82f, 0.21f } },   /* 1 The spring */
+    { 0, 0, 1, 0, 0, 0, 0, 120, 120, 0, { 25.0f, 4.5f, 0.28f, 0.14f, 10.0f, 3.5f, 0.42f, 0.14f } },   /* 2 Glow */
+    { 0, 0, 1, 0, 2, 0, 7, 240, 240, 210, { 10.0f, 3.2f, 0.35f, 0.42f, 0.0f, 3.0f, 0.7f, 0.98f } },   /* 3 The rise */
+    { 0, 0, 1, 0, 1, 0, 4, 152, 60, 0, { 0.0f, 2.2f, 1.05f, 1.01f, 0.0f, 1.8f, 1.05f, 1.01f } },   /* 4 Silence */
+    { 0, 0, 1, 0, 1, 0, 0, 154, 0, 0, { 0.0f, 1.8f, 1.05f, 1.01f, 0.0f, 1.8f, 1.05f, 1.01f } },   /* 5 Eyes open */
+    { 0, 1, 1, 0, 1, 0, 0, 227, 0, 0, { 160.0f, 1.6f, 1.12f, 0.7f, 160.0f, 1.6f, 1.12f, 0.7f } },   /* 6 Over the shoulder */
+    { 0, 0, 1, 0, 1, 0, 0, 178, 0, 0, { -20.0f, 3.0f, 0.91f, 0.91f, -20.0f, 3.0f, 0.91f, 0.91f } },   /* 7 Medium */
+    { 0, 0, 0, 4, 1, 0, 0, 622, 0, 0, { -40.0f, 3.4f, 0.84f, 0.91f, 40.0f, 3.4f, 1.12f, 0.91f } },   /* 8 Lore orbit */
+    { 0, 0, 1, 0, 1, 0, 0, 292, 0, 0, { 5.0f, 2.4f, 1.05f, 1.01f, 5.0f, 1.9f, 1.05f, 1.01f } },   /* 9 Push-in */
+    { 0, 0, 1, 6, 1, 0, 0, 405, 0, 0, { 15.0f, 2.6f, 0.35f, 1.05f, 15.0f, 2.6f, 0.35f, 1.05f } },   /* 10 Hero low angle */
+    { 2, 2, 1, 4, 1, 0, 0, 665, 0, 0, { 90.0f, 5.0f, 1.12f, 0.7f, 90.0f, 4.5f, 1.12f, 0.7f } },   /* 11 Two-shot */
+    { 0, 0, 1, 0, 3, 1, 1, 298, 0, 180, { 0.0f, 3.0f, 0.98f, 0.98f, 0.0f, 6.0f, 2.38f, 0.35f } },   /* 12 Farewell */
 };
+#endif

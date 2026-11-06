@@ -6,7 +6,8 @@
   "musicFade": true,
   "fov": 40,
   "music": "Marin Jazz",
-  "musicShot": 5
+  "musicShot": 5,
+  "endFade": "white"
  },
  "shots": [
   {
@@ -16,14 +17,14 @@
    "start": {
     "yaw": 0,
     "dist": 6,
-    "height": 3.5,
-    "aim": 0.3
+    "height": 2.45,
+    "aim": 0.21
    },
    "end": {
     "yaw": 0,
     "dist": 4,
-    "height": 2.6,
-    "aim": 0.3
+    "height": 1.82,
+    "aim": 0.21
    },
    "ease": "inout",
    "seconds": 3,
@@ -33,9 +34,10 @@
    "actionWhen": "start",
    "actionSeconds": 3,
    "motion": "idle",
-   "flash": true,
+   "flash": false,
    "splash": false,
-   "note": "Fade in from the white flash behind the farmer, high up."
+   "note": "Fade in from the summoning flash behind the farmer, high up.",
+   "eyes": "open"
   },
   {
    "name": "Glow",
@@ -44,14 +46,14 @@
    "start": {
     "yaw": 25,
     "dist": 4.5,
-    "height": 0.4,
-    "aim": 0.2
+    "height": 0.28,
+    "aim": 0.14
    },
    "end": {
     "yaw": 10,
     "dist": 3.5,
-    "height": 0.6,
-    "aim": 0.2
+    "height": 0.42,
+    "aim": 0.14
    },
    "ease": "inout",
    "seconds": 2,
@@ -63,7 +65,8 @@
    "motion": "idle",
    "flash": false,
    "splash": false,
-   "note": "Low over the water; light gathers."
+   "note": "Low over the water; light gathers.",
+   "eyes": "open"
   },
   {
    "name": "The rise",
@@ -72,14 +75,14 @@
    "start": {
     "yaw": 10,
     "dist": 3.2,
-    "height": 0.5,
-    "aim": 0.6
+    "height": 0.35,
+    "aim": 0.42
    },
    "end": {
     "yaw": 0,
     "dist": 3.0,
-    "height": 1.0,
-    "aim": 1.4
+    "height": 0.7,
+    "aim": 0.98
    },
    "ease": "inout",
    "seconds": 4,
@@ -89,9 +92,10 @@
    "actionWhen": "start",
    "actionSeconds": 3.5,
    "motion": "idle",
-   "flash": false,
+   "flash": true,
    "splash": true,
-   "note": "Camera tilts up with her."
+   "note": "White flash, then she rises; camera tilts up with her.",
+   "eyes": "closed"
   },
   {
    "name": "Silence",
@@ -100,14 +104,14 @@
    "start": {
     "yaw": 0,
     "dist": 2.2,
-    "height": 1.5,
-    "aim": 1.45
+    "height": 1.05,
+    "aim": 1.01
    },
    "end": {
     "yaw": 0,
     "dist": 1.8,
-    "height": 1.5,
-    "aim": 1.45
+    "height": 1.05,
+    "aim": 1.01
    },
    "ease": "inout",
    "seconds": 0,
@@ -121,7 +125,8 @@
    "motion": "idle",
    "flash": false,
    "splash": false,
-   "note": "Eyes closed. Hold before she speaks."
+   "note": "Eyes closed. Hold before she speaks.",
+   "eyes": "closed"
   },
   {
    "name": "Eyes open",
@@ -130,14 +135,14 @@
    "start": {
     "yaw": 0,
     "dist": 1.8,
-    "height": 1.5,
-    "aim": 1.45
+    "height": 1.05,
+    "aim": 1.01
    },
    "end": {
     "yaw": 0,
     "dist": 1.8,
-    "height": 1.5,
-    "aim": 1.45
+    "height": 1.05,
+    "aim": 1.01
    },
    "ease": "inout",
    "seconds": 0,
@@ -151,7 +156,8 @@
    "motion": "idle",
    "flash": false,
    "splash": false,
-   "note": ""
+   "note": "Marin Jazz starts here.",
+   "eyes": "open"
   },
   {
    "name": "Over the shoulder",
@@ -160,14 +166,14 @@
    "start": {
     "yaw": 160,
     "dist": 1.6,
-    "height": 1.6,
-    "aim": 1.0
+    "height": 1.12,
+    "aim": 0.7
    },
    "end": {
     "yaw": 160,
     "dist": 1.6,
-    "height": 1.6,
-    "aim": 1.0
+    "height": 1.12,
+    "aim": 0.7
    },
    "ease": "inout",
    "seconds": 0,
@@ -181,7 +187,8 @@
    "motion": "idle",
    "flash": false,
    "splash": false,
-   "note": "Behind her, looking at the farmer."
+   "note": "Behind her, looking at the farmer.",
+   "eyes": "open"
   },
   {
    "name": "Medium",
@@ -190,14 +197,14 @@
    "start": {
     "yaw": -20,
     "dist": 3.0,
-    "height": 1.3,
-    "aim": 1.3
+    "height": 0.91,
+    "aim": 0.91
    },
    "end": {
     "yaw": -20,
     "dist": 3.0,
-    "height": 1.3,
-    "aim": 1.3
+    "height": 0.91,
+    "aim": 0.91
    },
    "ease": "inout",
    "seconds": 0,
@@ -211,7 +218,8 @@
    "motion": "idle",
    "flash": false,
    "splash": false,
-   "note": ""
+   "note": "",
+   "eyes": "open"
   },
   {
    "name": "Lore orbit",
@@ -220,14 +228,14 @@
    "start": {
     "yaw": -40,
     "dist": 3.4,
-    "height": 1.2,
-    "aim": 1.3
+    "height": 0.84,
+    "aim": 0.91
    },
    "end": {
     "yaw": 40,
     "dist": 3.4,
-    "height": 1.6,
-    "aim": 1.3
+    "height": 1.12,
+    "aim": 0.91
    },
    "ease": "linear",
    "seconds": 0,
@@ -241,7 +249,8 @@
    "motion": "explain",
    "flash": false,
    "splash": false,
-   "note": "Slow orbit while she tells the story."
+   "note": "Slow orbit while she tells the story.",
+   "eyes": "open"
   },
   {
    "name": "Push-in",
@@ -250,14 +259,14 @@
    "start": {
     "yaw": 5,
     "dist": 2.4,
-    "height": 1.5,
-    "aim": 1.45
+    "height": 1.05,
+    "aim": 1.01
    },
    "end": {
     "yaw": 5,
     "dist": 1.9,
-    "height": 1.5,
-    "aim": 1.45
+    "height": 1.05,
+    "aim": 1.01
    },
    "ease": "inout",
    "seconds": 0,
@@ -271,7 +280,8 @@
    "motion": "idle",
    "flash": false,
    "splash": false,
-   "note": ""
+   "note": "",
+   "eyes": "open"
   },
   {
    "name": "Hero low angle",
@@ -280,14 +290,14 @@
    "start": {
     "yaw": 15,
     "dist": 2.6,
-    "height": 0.5,
-    "aim": 1.5
+    "height": 0.35,
+    "aim": 1.05
    },
    "end": {
     "yaw": 15,
     "dist": 2.6,
-    "height": 0.5,
-    "aim": 1.5
+    "height": 0.35,
+    "aim": 1.05
    },
    "ease": "inout",
    "seconds": 0,
@@ -301,7 +311,8 @@
    "motion": "plead (bow)",
    "flash": false,
    "splash": false,
-   "note": "\"I am the Harvest Goddess.\" Looking up at her."
+   "note": "\"I am the Harvest Goddess.\" One bow, then idle.",
+   "eyes": "open"
   },
   {
    "name": "Two-shot",
@@ -310,14 +321,14 @@
    "start": {
     "yaw": 90,
     "dist": 5.0,
-    "height": 1.6,
-    "aim": 1.0
+    "height": 1.12,
+    "aim": 0.7
    },
    "end": {
     "yaw": 90,
     "dist": 4.5,
-    "height": 1.6,
-    "aim": 1.0
+    "height": 1.12,
+    "aim": 0.7
    },
    "ease": "inout",
    "seconds": 0,
@@ -332,7 +343,8 @@
    "motion": "explain",
    "flash": false,
    "splash": false,
-   "note": "A9 plays only in year 1."
+   "note": "A9 plays only in year 1.",
+   "eyes": "open"
   },
   {
    "name": "Farewell",
@@ -341,14 +353,14 @@
    "start": {
     "yaw": 0,
     "dist": 3,
-    "height": 1.4,
-    "aim": 1.4
+    "height": 0.98,
+    "aim": 0.98
    },
    "end": {
     "yaw": 0,
-    "dist": 7,
-    "height": 4.5,
-    "aim": 0.4
+    "dist": 6,
+    "height": 2.38,
+    "aim": 0.35
    },
    "ease": "inout",
    "seconds": 0,
@@ -362,35 +374,8 @@
    "motion": "idle",
    "flash": false,
    "splash": true,
-   "note": "Crane up and back as she sinks."
-  },
-  {
-   "name": "Quiet",
-   "subject": "farmer",
-   "look": "goddess",
-   "start": {
-    "yaw": 0,
-    "dist": 5,
-    "height": 3,
-    "aim": 0.2
-   },
-   "end": {
-    "yaw": 0,
-    "dist": 5.5,
-    "height": 3.2,
-    "aim": 0.2
-   },
-   "ease": "inout",
-   "seconds": 2,
-   "pause": 0,
-   "lines": [],
-   "action": "under",
-   "actionWhen": "start",
-   "actionSeconds": 3,
-   "motion": "idle",
-   "flash": false,
-   "splash": false,
-   "note": "The empty pool; music returns."
+   "note": "Crane up and back as she sinks; fade to white, control back.",
+   "eyes": "open"
   }
  ]
 }

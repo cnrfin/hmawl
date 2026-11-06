@@ -3901,3 +3901,23 @@ so, door fades are timed there, possibly per frame. Not traced yet.
 - Untested: whether element 7 (the HUD) shows in events (bars), whether the director switches songs at once, the
   event camera taking our eye / target every frame. pm gqtest eb04d374, test 91e597f1, normal 37f8a84c (140 KB);
   Common.arc 6c3b1a5d (debug.mes unchanged, f22a02da).
+- gq6 test (user, screenshots): camera too high (her face is ~1.0 above the water, not ~1.45), eyes open from the
+  start, no music (Pool B has no field music, and the record player only drives the FARM's music - "Breeze" is the
+  farm record), wanted: a white flash as she rises, no closing "Quiet" shot (fade to white, control back), the
+  plead / bow once then idle; the letterbox flickered as control came back.
+
+### 7.66 The first summoning, pass 2 (gq7)
+- Event music the vanilla way (Common 375 / 389 / 393): cmd_41(slot, vol 0..127 '#', seconds '#') fades a music
+  slot (0 field, 1, 3 event); cmd_2F(#song) loads the song's group (DvdFile, sync), cmd_32(#song, 3) plays it on
+  slot 3 (func_8012A5D8), both return a value (popped). Ours: slot 0 -> 0 over 1.2 s, slot 3 -> 0, load song 1; on
+  "Eyes open" play song 1 + slot 3 -> 127 over 0.5 s; the sink: slot 3 -> 0 over 2.5 s; the end: slot 0 -> 127
+  over 2 s. pm.c's record-player switch is gone.
+- Heights / aims x 0.7 (the editor's goddess stand-in is 1.3 tall now); "Quiet" removed (12 shots); "The rise" gets
+  a white flash (fader white -> clear 1.2 s); shots 3-4 have her eyes closed: expression table patched as Joe's
+  (eye frame 2 = Muffy's blink frame, face_frames_lavender: 0 open, 2 / 30 closed; her own mouth), her own table back
+  on "Eyes open". Plead plays once (func_80080294(actor, 6, 0) = cmd_6D without loop; clip 60 frames at 30 / s),
+  idle after 120 frames. After the sink: fader clear -> white 0.8 s, "done" 54 frames later, the event ends; then
+  bars off at once (under the white) and white -> clear 1 s. hg_0.anm.arc clip lengths (+8 float): 119, 25, 60, 120,
+  105, 36, 60, 90, 59, 100.
+- pm gqtest f96b34b4, test 8f182acc, normal 9dd44074; Common.arc 4cbd6295 (debug.mes unchanged); 'GSCN' 0x8037EEEC.
+

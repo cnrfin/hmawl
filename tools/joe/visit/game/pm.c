@@ -707,25 +707,29 @@ static void joe_motion(s32 m)               /* start a clip once (sit down / sta
    look-at pointer +0xC -> own target +0x10, target offset +0x1C, func_80108BEC works out distance / angles) gets the
    shot's eye / target, eased from its start to its end over the shot's glide frames. Placement is the editor's: the
    axis runs from her to the player, yaw turns it, the eye sits dist along it from the subject, height / aim are above
-   the water. Music: the field song fades out (MusyX music master) at the start; on GS_MUSIC_SHOT the record player
-   (the valley's own music runs through it: record "Breeze") is switched to "Marin Jazz" (song 1) and the music comes
-   back up; the sink fades it out, and at the end the old record comes back. Letterbox bars: zt.c draws gq_lbox
-   (HUD quads). Counter 28 = 1 in year 1. gq_scene_req: 1 asked, 0 done, -1 busy (spring.c tries again on the next toss). */
+   the water. Music is the script's (vanilla cmd_2F / cmd_32 / cmd_41:
+   Marin Jazz on slot 3). Shot fx: a white flash at its start, her eyes closed (frame 2) while it shows. The plead
+   clip (the bow) plays once (func_80080294, no loop), then idle. After the sink: fade to white, then (event over)
+   bars off and white -> clear. Letterbox bars: zt.c draws gq_lbox (HUD quads). Counter 28 = 1 in year 1. gq_scene_req: 1 asked, 0 done, -1 busy (spring.c tries again on the next toss). */
 #define GQ_SHOTS
 #include "gq_scene.h"
 s32 gq_scene_req;
 s32 gq_lbox;                                 /* letterbox bar height (HUD px), zt.c draws it */
 s32 gq_slot_busy(void) { return S.actor != 0 && S.who != WHO_HG; }
-struct { u32 magic; s32 st, t, at, cue, lastcue, shot, act, waited, camok, rec_old, rec_flag, music; float surf;
+struct { u32 magic; s32 st, t, at, cue, lastcue, shot, act, waited, camok, bow, eyes, white; float surf;
          float eye[3], tgt[3]; } GS;      /* 'GSCN' (dump) */
 #define GD_SINK 1.8f
 #define GS_CAM       (EVMGR + 0x5FC)
 #define cam_update   F(0x80108BEC, void, (u8 *))
-#define music_vol    F(0x80189DD8, void, (u8 *, u32, u32))          /* music master: vol 0..127, ms */
-#define RECMGR       (*(u8 **)0x803491D8)                           /* the record player */
-#define rec_set      F(0x80146458, s32, (u8 *, s32))                /* (mgr, record item) -> the old record's item */
-#define rec_on       F(0x8014641C, void, (u8 *))                    /* playing on + its bank loaded */
-#define rec_off      F(0x80146448, void, (u8 *))
+#define motion_once  F(0x80080294, void, (u8 *, s32, s32))           /* (actor, clip, loop) - cmd_6D */
+#define GS_BOW_FRAMES 120                                           /* plead = 60 clip frames at 30 / s */
+static void gs_eyes(s32 closed);
+static void gs_fade(u32 from, u32 to, float secs) { u8 *fd = FADER; if (fd) fade_start(fd, &from, &to, 0, 0, secs); }
+static void gs_motion(s32 m)
+{
+    if (m == 6) { S.motion = 6; motion_once(S.actor, 6, 0); GS.bow = GS_BOW_FRAMES; }
+    else { GS.bow = 0; joe_motion(m); }
+}
 #define SE_WATER     300
 static float smooth(float x) { return x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x); }
 static float gsin(float x)                   /* radians */
@@ -765,20 +769,6 @@ static void gs_cam(u8 *g, const struct gshot *sh, float f)
     cam_update(cam);
 }
 static s32 gs_get(u8 *g, s32 i) { s32 v = *(s32 *)(g + 0x12194 + i * 4); if (v >= 128 && !(v & 127)) v >>= 7; return v; }
-static void gs_music(s32 on)                 /* 1: Marin Jazz in; 0: the old record back */
-{
-    u8 *m = RECMGR, *au = *(u8 **)0x803491E4;
-    if (!m || !au) return;
-    if (on) {
-        GS.rec_flag = *(*(u8 **)m + 8);
-        GS.rec_old = rec_set(m, GS_MUSIC_ITEM); rec_on(m); GS.music = 1;
-        music_vol(*(u8 **)(au + 0x4C), 127, 400);
-    } else if (GS.music) {
-        rec_set(m, GS.rec_old ? GS.rec_old : 0x51A);
-        if (GS.rec_flag) rec_on(m); else rec_off(m);
-        GS.music = 0;
-    }
-}
 static s32 gd_frame(u8 *g, s32 map, u32 t)
 {
     s32 *cn = (s32 *)(g + 0x12194);
@@ -787,7 +777,6 @@ static s32 gd_frame(u8 *g, s32 map, u32 t)
     if (!GS.st) {
         Vec v;
         float *p = (float *)(g + 0x29C78);
-        if (gq_lbox > 0) gq_lbox -= 2;                         /* bars out after a scene */
         if (gq_scene_req != 1) return 0;
         if (map != VALLEY || !no_event()) return 0;            /* (after the toss's own state has ended) */
         if (S.actor) { gq_scene_req = -1; return 0; }          /* the Postman / Joe is out: not now */
@@ -808,8 +797,8 @@ static s32 gd_frame(u8 *g, s32 map, u32 t)
         cn[GQ_C_CUE] = 0; cn[GQ_C_DONE] = 0;
         cn[GQ_C_YEAR1] = t / (T_DAY * 40u) == 0;                /* 4 seasons x 10 days */
         gs_cam(g, &GSHOT[0], 0);
-        GS.st = 1; GS.t = 0; GS.at = -1; GS.cue = 0; GS.lastcue = 0; GS.shot = 0; GS.act = -1; GS.waited = 0; GS.music = 0;
-        if (GS_MUSIC_FADE && au) music_vol(*(u8 **)(au + 0x4C), 0, 1200);
+        GS.st = 1; GS.t = 0; GS.at = -1; GS.cue = 0; GS.lastcue = 0; GS.shot = 0; GS.act = -1; GS.waited = 0;
+        GS.bow = 0; GS.eyes = 0; GS.white = 0;
         gq_scene_req = 0;
         event_start(EVMGR, GQ_SCENE_EVENT, 0, 0);
         return 1;
@@ -827,16 +816,16 @@ static s32 gd_frame(u8 *g, s32 map, u32 t)
                 sh = &GSHOT[n - 1];
                 if (GS.cue < 32) {                              /* shot n starts */
                     GS.shot = n - 1; GS.t = 0;
-                    joe_motion(sh->motion);
+                    gs_motion(sh->motion);
+                    if ((sh->fx & 4) != GS.eyes) { GS.eyes = sh->fx & 4; gs_eyes(GS.eyes); }
+                    if (sh->fx & 2) gs_fade(0xFFFFFFFFu, 0xFFFFFF00u, 1.2f);      /* white flash */
                     if (sh->act == 0) { S.pos.y = GS.surf - GD_SINK; actor_hide(S.actor); GS.act = -1; }
                     else if (sh->act == 1) { if (S.pos.y < GS.surf) S.pos.y = GS.surf; actor_show(S.actor); GS.act = -1; }
                     else if (!sh->after) { GS.act = sh->act; GS.at = 0; }
-                    if (n == GS_MUSIC_SHOT && !GS.music) gs_music(1);
                 } else { GS.act = sh->act; GS.at = 0; }          /* the after-the-lines action */
                 if (GS.act >= 2) {
                     actor_show(S.actor);
-                    if (sh->splash) sfx_play(au, SE_WATER, 0);
-                    if (GS.act == 3 && GS_MUSIC_FADE && au) music_vol(*(u8 **)(au + 0x4C), 0, 2500);
+                    if (sh->fx & 1) sfx_play(au, SE_WATER, 0);
                 }
             }
             GS.lastcue = GS.cue;
@@ -846,11 +835,16 @@ static s32 gd_frame(u8 *g, s32 map, u32 t)
             float k = smooth((float)GS.at / (float)(sh->actf > 0 ? sh->actf : 1));
             S.pos.y = GS.surf - GD_SINK * (GS.act == 2 ? 1.0f - k : k);
             if (GS.at >= sh->actf) {
-                if (GS.act == 3) actor_hide(S.actor);
+                if (GS.act == 3) {
+                    actor_hide(S.actor);
+                    if (GS_END_WHITE && GS.cue >= 32) { gs_fade(0xFFFFFF00u, 0xFFFFFFFFu, 0.8f); GS.white = 1; }
+                }
                 GS.act = -1;
-                if (GS.cue >= 32) cn[GQ_C_DONE] = GS.cue;
+                if (GS.cue >= 32 && !GS.white) cn[GQ_C_DONE] = GS.cue;
             } else GS.at++;
         }
+        if (GS.white && ++GS.white > 54) { cn[GQ_C_DONE] = GS.cue; }   /* the screen is white: the script ends */
+        if (GS.bow && --GS.bow == 0) joe_motion(0);                      /* one bow, then idle */
         if (GS.cue > 0 && GS.cue < 32 && GS.t >= sh->hold && (GS.act < 2 || sh->after)) cn[GQ_C_DONE] = GS.cue;
         actor_setpos(S.actor, &S.pos); actor_setdir(S.actor, &S.dir);
         gs_cam(g, sh, sh->glide > 0 ? (float)GS.t / (float)sh->glide : 1.0f);
@@ -861,8 +855,10 @@ static s32 gd_frame(u8 *g, s32 map, u32 t)
         if (S.actor) despawn();
         if (S.loaded) release_model();
         S.who = 0; GS.st = 0;
-        if (GS.music) { gs_music(0); if (au) music_vol(*(u8 **)(au + 0x4C), 127, 2000); }
-        else if (GS_MUSIC_FADE && au) music_vol(*(u8 **)(au + 0x4C), 127, 2000);
+        if (GS.eyes) { GS.eyes = 0; gs_eyes(0); }
+        joe_expr_patch(0);
+        gq_lbox = 0;                                            /* (under the white) */
+        if (GS.white) { GS.white = 0; gs_fade(0xFFFFFFFFu, 0xFFFFFF00u, 1.0f); }
         return 0;
     }
     return 1;
@@ -932,6 +928,20 @@ static void joe_face(s32 eye, s32 mouth)
     joe_expr_patch(1);
     for (k = 0; k < 11; k++) { joe_expr[k][0] = (u32)eye; joe_expr[k][1] = (u32)mouth; }
     face_set(slot + 0x124, 0);             /* applies only what changed (restarts the blink / flap there) */
+}
+/* the goddess's eyes (gq6): closed = eye frame 2 (her blink frame) with her own mouth; open = her own table back */
+static void gs_eyes(s32 closed)
+{
+    u8 *slot;
+    if (!S.actor) return;
+    if (closed) {
+        u32 mouth = expr_patched ? joe_expr[0][1] : EXPR_TABS[CHAR_ID * 6][1];
+        joe_face(2, (s32)mouth);
+    } else {
+        joe_expr_patch(0);
+        slot = *(u8 **)(S.actor + 0xD4);
+        if ((u32)slot >= 0x80000000u && (u32)slot < 0x81800000u) face_set(slot + 0x124, 0);
+    }
 }
 /* every frame Joe is out; in_event: our talk (1) or trade (2) event is running */
 static void joe_talk_frame(u8 *g, s32 in_event)
