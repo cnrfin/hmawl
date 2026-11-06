@@ -11,7 +11,7 @@ sys.path.insert(0, os.path.join(HERE, '..', '..', 'weapons'))
 from add_weapon_text import enc, mes_read, mes_write, u8_replace, u8_get
 FOSSIL = 0x448
 NAME = "Mermaid Fossil"
-DESC = "A small curled fossil.\nIts face looks almost\nhuman. Webbed hands..."
+DESC = "Webbed hands and a\nnear-human face..."   # gq2: two short lines (three scrolled away in the R box)
 LINES = {   # name: text (01 = new line; 30 = wait for A)
     'SHIMMER': "The water shimmers...",
     'GLOW':    "The spring glows softly.\nIt seems to be waiting\nfor something...",

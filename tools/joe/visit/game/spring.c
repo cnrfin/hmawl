@@ -73,6 +73,7 @@ extern u8 *pm_player;
 #define POND_A        2
 #define OK(p)         ((u32)(p) >= 0x80000000u && (u32)(p) < 0x81800000u)
 #define rand_         F(0x8017D3E8, u32, (void))
+#define rucksack_add  F(0x8004FDA0, s32, (u8 *, s32, s32, s32))
 #define fade_to       F(0x80189128, void, (u8 *, u32 *, u32 *, s32, s32, float))
 #define FADER         (*(u8 **)0x803491B8)
 #define MSGMGR        (*(u8 **)0x803491C4)
@@ -217,7 +218,16 @@ void spring_frame(u8 *g, s32 map, u32 pad_held, u32 pad_press)
     gq_hooks();
     if (map != VALLEY || !pl) { W.item = 0; return; }
 #ifdef GQ_TEST
-    if ((pad_held & 0x10) && (pad_press & 0x4)) { CNT(g, GQ) = (CNT(g, GQ) & ~GQ_SUMMONED) | GQ_ALL; sfx_play(*(u8 **)0x803491E4, 216, 0); }   /* test: Z + D-Down = all 15 offerings */
+    {   /* test (gq2): Z + D-Down gives the next 4 offerings not yet made, into the rucksack; with all 15 made, the
+           Mermaid Fossil. Z from the pad's own record (zt.c takes Z out of the held word before we see it). */
+        static const short need[15] = { 0x1F, 0x22, 0x25, 0x28, 0x2B, 0x2E, 0x31, 0x34, 0x43E, 0x43B, 0x43C, 0x43D, 0x07, 0x1C, 0x19 };
+        if ((*(volatile u32 *)0x80341464 & 0x10) && (pad_press & 0x4)) {
+            s32 k, n = 0, c = CNT(g, GQ);
+            for (k = 0; k < 15 && n < 4; k++) if (!(c & (1 << k))) { rucksack_add(g + 0x50, need[k], 1, -1); n++; }
+            if (!n) rucksack_add(g + 0x50, FOSSIL, 1, -1);
+            sfx_play(*(u8 **)0x803491E4, 261, 0);       /* the pick-up sound */
+        }
+    }
 #endif
     if (GQD.sum) {                                       /* placeholder summon: white, hold, back */
         u8 *fd = FADER;

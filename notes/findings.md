@@ -3841,3 +3841,9 @@ so, door fades are timed there, possibly per frame. Not traced yet.
   52 / 53 market, 54-62 stats. Fix (stats.c, every frame): li r5, 0x3E -> 0x2D at 0x8010BF8C (only
   32..44 cleared). Goddess quest moved 45 -> 51 (45 = Joe's 'met'). Level-up menu with 2+ points: slot n0 = Lv - points
   + 1 (was the current Lv each time). pm gqtest ee544270, test 332739a3, normal 1f4045aa.
+- gq1 test (user): Goddess Drop -> "The water shimmers..." OK; the fossil's R description (3 lines) scrolled away and
+  went blank: the box takes 2 short lines (as the weapons) -> "Webbed hands and a / near-human face..." (itemdoc03
+  24ccb96d). Z + D-Down did nothing: zt.c strips Z from the held word before spring_frame runs (stats.c's Z + D-Up
+  runs inside zt_frame) -> Z read from the pad record 0x80341464. gq2 test shortcut: Z + D-Down puts the next 4
+  offerings not yet made into the rucksack (func_8004FDA0), with all 15 made the Mermaid Fossil. pm gqtest 9c4dde34
+  (test / normal unchanged from lv1: 332739a3 / 1f4045aa).
