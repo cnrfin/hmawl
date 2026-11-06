@@ -3789,3 +3789,17 @@ so, door fades are timed there, possibly per frame. Not traced yet.
   track is freshly patched); night_dbg ('NITE': patch count, track pointers) for a dump check. pm normal f9831c47,
   test cdbd5eaf. If the dump shows the tracks patched but the field still bright, the terrain is not lit by the
   channel lighting (vertex colours / baked) and needs another route.
+
+### 7.61 Enemy AI pass (ai1, user audit)
+- User: the turtle hid after 2-3 hits every time (1/4 damage, a bite if you kept hitting) and with 3000 HP you waited
+  for it. Audit: the turtle was armoured in the shell, from frame 6 of every spin wind-up through the spin to recovery
+  frame 6, chaining 3 spins; shell on 2 hits of pressure or 50 % after a flinch, 150 frames; shell bite wind-up 3. All
+  animals: the pressure counter (2-3 hits) always fired by the combo's 3rd hit, so the finisher never landed; HP 1000 /
+  300 / 500 / 3000 against weapon damage 10-40 (~43 / 13 / 21 / 128 Farmer's Sword hits); whip wind-up 6 (4 as a
+  counter), post-poof wind-up 8; the chihuahua retreated after 70 % of hits.
+- ai1: HP 450 / 150 / 250 / 800. Pressure threshold 4 and only a hit that starts a combo (EN.lasth 0) is countered.
+  Turtle: armour only in the shell and the spin; shell at most once per 5 s (AI.shcd), 25 % after a flinch, 1 s tucked
+  (rocks harder for the last 24 frames), then one spin at the player (no chain) and the dizzy recovery; 3 knocks on the
+  shell flip it (AI_FLIP, 120 frames: root rolled pi about z and raised 0.3, legs paddling, rights itself over the last
+  12; 1.5x damage, no flinch, no knockback); no shell bite; normal bite wind-up 12. Whip wind-up 12, post-poof 14,
+  chihuahua retreat 35 % (10 frames; counter skitter 8). pm normal ecbd0c38, test 54b6da1a.

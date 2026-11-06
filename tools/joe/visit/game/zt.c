@@ -83,7 +83,7 @@ u8 *en_ctl;                                              /* the animal our battl
    obj+0xD8 = its clip n (motion table per species family = species - 0x2C; findings 7.46), with the play state
    obj+0xE0 = 0 (loop; 1 = once, 3 = stopped); idle 0; the moving clips per species: ai_go / ai_dash.
    Facing: +0xF0 sin / +0xF8 cos (copied to +0x58 / +0x60 every update). No damage to the player yet. */
-enum { AI_CIRCLE, AI_WINDUP, AI_LUNGE, AI_RECOVER, AI_HIT, AI_RETREAT, AI_POOF, AI_SHELL, AI_HOME = 100 };
+enum { AI_CIRCLE, AI_WINDUP, AI_LUNGE, AI_RECOVER, AI_HIT, AI_RETREAT, AI_POOF, AI_SHELL, AI_FLIP, AI_HOME = 100 };
 enum { ATK_LUNGE, ATK_BITE, ATK_WHIP, ATK_FEINT, ATK_POOF };
 #define AI_R       3.5f                                 /* circling distance */
 #define AI_TAN     0.09f                                /* circling speed (per frame) */
@@ -93,19 +93,23 @@ enum { ATK_LUNGE, ATK_BITE, ATK_WHIP, ATK_FEINT, ATK_POOF };
 #define AI_REC     30
 #define AI_AGAIN   35                                   /* % chance of a second lunge straight after */
 #define MOT_IDLE   0
-struct { u32 magic; s32 st, t, len, dir; float lx, lz; s32 atk, kb, hseen, again, zz, hidden, press, pdecay, shits, struck; } AI;   /* 'ENAI' (dump) */
+struct { u32 magic; s32 st, t, len, dir; float lx, lz; s32 atk, kb, hseen, again, zz, hidden, press, pdecay, shits, struck, shcd; } AI;   /* 'ENAI' (dump) */
 /* Mini bosses (battle13, user design): per species {HP, circle radius, circle speed, circle min / extra frames,
    wind-up, lunge, recover frames, % chain, max chain, lunge speed, push radius}. Below half HP they enrage: 1.3x
    speed, 0.7x wind-up / recover, 0.6x circling time. Chihuahua easy and twitchy; tanuki the all-rounder with feints
    and a smoke-puff vanish; lizard strong and fast with a tail whip up close; turtle the 3000 HP tank: chained shell
    spins, armoured while tucked in (1/4 damage, a clink), full damage while dizzy afterwards. */
 static const struct { s16 hp; u8 cmin, cvar, wind, lunge, rec, again, chain; float r, tan, spd, push; } AIP[5] = {
-    { 1000, 25, 30, 16, 18, 22, 50, 2, 2.8f, 0.10f, 0.48f, 1.00f },   /* lizard */
-    {  300, 30, 30, 12, 10, 16, 70, 3, 2.6f, 0.12f, 0.50f, 0.55f },   /* chihuahua */
-    {  500, 40, 40, 26, 20, 26, 25, 1, 3.2f, 0.08f, 0.36f, 0.65f },   /* tanuki */
-    { 3000, 50, 40, 24, 36, 40, 60, 3, 3.5f, 0.05f, 0.30f, 1.30f },   /* turtle */
+    {  450, 25, 30, 16, 18, 22, 50, 2, 2.8f, 0.10f, 0.48f, 1.00f },   /* lizard (ai1: HP / 2.2, user audit) */
+    {  150, 30, 30, 12, 10, 16, 70, 3, 2.6f, 0.12f, 0.50f, 0.55f },   /* chihuahua */
+    {  250, 40, 40, 26, 20, 26, 25, 1, 3.2f, 0.08f, 0.36f, 0.65f },   /* tanuki */
+    {  800, 50, 40, 24, 36, 40, 60, 3, 3.5f, 0.05f, 0.30f, 1.30f },   /* turtle */
     {  500, 40, 50, 18, 16, 30, 35, 2, 3.5f, 0.09f, 0.42f, 0.60f } }; /* owl */
-static const u8 AIP_PRESS[5] = { 3, 2, 3, 2, 3 };      /* hits within the pressure window before a counter (battle17) */
+static const u8 AIP_PRESS[5] = { 4, 4, 4, 4, 4 };      /* hits within the pressure window before a counter (battle17); ai1: only
+                                                           a hit that STARTS a combo is countered, so a full 3-hit combo lands */
+#define TU_SHELL_T  60                                   /* ai1 turtle: tucked in 1 s, then bursts out spinning */
+#define TU_SHELL_CD 300                                  /* at most once per 5 s */
+#define TU_FLIP_T   120                                  /* 3 knocks on the shell: on its back 2 s, 1.5x damage */
 #define AI_HIT_KB  18                                    /* hit 3: knocked back, quick recovery (user) */
 #define AI_HIT_FL  10                                    /* hits 1-2: a flinch */
 struct { u32 magic; s32 sp, st, t, len, atk, kb; u32 clk; } PZ;   /* 'POSE': what the bone layer draws (dump) */
@@ -707,15 +711,16 @@ static void en_hit(s32 h, float dx, float dz)
     dmg = dmg * (100 + 5 * stats_pwr()) / 100;               /* step 2: Pwr +5 % per point */
     {   u8 *a = wild_obj();                                  /* the turtle tucked in its shell: 1/4 damage, a clink */
         EN.armour = a && en_ctl == a && *(s32 *)(a + 0x128) == 0x2F && AI.atk == ATK_LUNGE &&
-                    (AI.st == AI_SHELL || (AI.st == AI_WINDUP && AI.t > 5) || AI.st == AI_LUNGE || (AI.st == AI_RECOVER && AI.t < 6));
+                    (AI.st == AI_SHELL || AI.st == AI_LUNGE);   /* ai1: shell and spin only (wind-up / dizzy open) */
         if (EN.armour) { dmg = dmg / 4; if (dmg < 1) dmg = 1; EN.clinks++; if (SE_CLINK >= 0) sfx_play(*(u8 **)0x803491E4, SE_CLINK, 0); }
+        else if (a && en_ctl == a && AI.st == AI_FLIP) dmg = dmg * 3 / 2;   /* ai1: on its back */
     }
     EN.magic = 0x454E4D59u; EN.hits++; EN.last_dmg = dmg; EN.hp -= dmg;
     EN.flash = EN_FLASH;
     EN.lasth = h;
     k = d2 > 0.0001f ? (h == 2 ? 0.9f : 0.35f) * rsq(d2) : 0.0f;   /* knock back 0.35 (hit 3: 0.9) away from the player, over 4 frames */
     EN.kx = dx * k / 4.0f; EN.kz = dz * k / 4.0f;
-    if (EN.armour) EN.kx = EN.kz = 0.0f;                    /* the shell does not budge */
+    if (EN.armour || AI.st == AI_FLIP) EN.kx = EN.kz = 0.0f;   /* the shell does not budge (nor does a turtle on its back) */
     if (EN.hp <= 0) {
         u8 *a = wild_obj();
         EN.hp = 0; EN.state = 1; EN.t = 0;
@@ -929,18 +934,22 @@ static void ai_frame(u8 *g, u8 *a)
     if (EN.hits != AI.hseen) {                               /* a new hit */
         AI.hseen = EN.hits; AI.press++; AI.pdecay = 0;
         if (AI.st == AI_SHELL) AI.shits++;                    /* the turtle counts the knocks on its shell */
-        else if (AI.press >= AIP_PRESS[sp] && AI.st != AI_POOF) {   /* battle17: pressed too hard - counter (no stun lock) */
+        else if (AI.st == AI_FLIP) AI.press = 0;              /* ai1: on its back - just takes it */
+        else if (AI.press >= AIP_PRESS[sp] && EN.lasth == 0 && AI.st != AI_POOF) {   /* battle17: pressed too hard - counter
+                                                               (ai1: only on a combo's first hit, so a full combo lands) */
             AI.press = 0; AI.again = 0;
-            if (sp == 0) { AI.st = AI_WINDUP; AI.t = 0; AI.atk = ATK_WHIP; AI.len = 4; }
-            else if (sp == 1) { AI.st = AI_RETREAT; AI.t = 0; AI.len = 10; AI.atk = ATK_LUNGE; }
+            if (sp == 0) { AI.st = AI_WINDUP; AI.t = 0; AI.atk = ATK_WHIP; AI.len = 12; }   /* ai1: 12-frame tells */
+            else if (sp == 1) { AI.st = AI_RETREAT; AI.t = 0; AI.len = 8; AI.atk = ATK_LUNGE; }
             else if (sp == 2) { AI.st = AI_POOF; AI.t = 0; AI.len = 16; AI.atk = ATK_POOF; }
-            else if (sp == 3) { AI.st = AI_SHELL; AI.t = 0; AI.len = 150; AI.shits = 0; AI.atk = ATK_LUNGE; }
+            else if (sp == 3 && !AI.shcd) { AI.st = AI_SHELL; AI.t = 0; AI.len = TU_SHELL_T; AI.shits = 0; AI.atk = ATK_LUNGE; AI.shcd = TU_SHELL_CD; }
+            else if (sp == 3) { AI.st = AI_WINDUP; AI.t = 0; AI.atk = ATK_LUNGE; AI.len = AIP[3].wind; }
             else { AI.st = AI_WINDUP; AI.t = 0; AI.atk = ATK_LUNGE; AI.len = 6; }
         } else if (!EN.armour && AI.st != AI_POOF) {         /* flinch, or knocked back on hit 3 (the shell shrugs it off) */
             AI.kb = EN.lasth == 2;
             AI.st = AI_HIT; AI.t = 0; AI.len = AI.kb ? AI_HIT_KB : AI_HIT_FL;
         }
     }
+    if (AI.shcd > 0) AI.shcd--;
     ai_strike(g, sp, d, ux, uz);                            /* battle21: its attacks can hurt the player */
     switch (AI.st) {
     case AI_CIRCLE: {
@@ -952,14 +961,14 @@ static void ai_frame(u8 *g, u8 *a)
         ai_face(a, ux * rad - uz * tan, uz * rad + ux * tan);   /* runs the way it goes (user); the head tracks you */
         ai_mot(a, ai_go(a));
         if (sp == 0 && d < 2.2f && ai_rand(100) < 5) {       /* lizard: you came close - tail whip */
-            AI.st = AI_WINDUP; AI.t = 0; AI.atk = ATK_WHIP; AI.len = 6; AI.again = 0; break;
+            AI.st = AI_WINDUP; AI.t = 0; AI.atk = ATK_WHIP; AI.len = 12; AI.again = 0; break;
         }
         if (AI.t >= AI.len) {
             AI.st = AI_WINDUP; AI.t = 0; AI.again = 0; AI.atk = ATK_LUNGE;
             if (sp == 3 && d < 4.0f && ai_rand(100) < 40) AI.atk = ATK_BITE;
             if (sp == 2) { u32 r = ai_rand(100); if (r < 25 && d > 1.5f) AI.atk = ATK_POOF; else if (r < 50) AI.atk = ATK_FEINT; }
             if (AI.atk == ATK_POOF) { AI.st = AI_POOF; AI.len = 16; }
-            else AI.len = AI.atk == ATK_BITE ? 10 : ai_k(AIP[sp].wind, ft);
+            else AI.len = AI.atk == ATK_BITE ? 12 : ai_k(AIP[sp].wind, ft);
         }
         break; }
     case AI_WINDUP:
@@ -995,24 +1004,32 @@ static void ai_frame(u8 *g, u8 *a)
             ai_face(a, p[0] - nx, p[2] - nz);
             poof_fx(nx, *(float *)(a + 0x50), nz); AI.hidden = 0;
         }
-        if (AI.t >= AI.len) { AI.st = AI_WINDUP; AI.t = 0; AI.atk = ATK_LUNGE; AI.len = 8; }
+        if (AI.t >= AI.len) { AI.st = AI_WINDUP; AI.t = 0; AI.atk = ATK_LUNGE; AI.len = 14; }   /* ai1: 14 (was 8: from behind) */
         break;
     case AI_RETREAT:                                         /* chihuahua: hit, it skitters away - then darts back in */
         if (!ai_move(a, x - ux * 0.2f * fs, z - uz * 0.2f * fs)) AI.t = AI.len;   /* back to a wall */
         ai_face(a, dx, dz); ai_mot(a, ai_go(a));
         if (AI.t >= AI.len) { AI.st = AI_WINDUP; AI.t = 0; AI.atk = ATK_LUNGE; AI.again = 0; AI.len = 6; }
         break;
-    case AI_SHELL:                                           /* turtle: hides (armoured); 3 knocks -> the head pops out, bites */
+    case AI_SHELL:                                           /* turtle (ai1): tucked in 1 s (armoured, rocking near the end),
+                                                               then bursts out in one spin at you; 3 knocks flip it over */
         ai_face(a, dx, dz); ai_mot(a, MOT_IDLE);
-        if (AI.shits >= 3 && d < 3.5f) { AI.st = AI_WINDUP; AI.t = 0; AI.atk = ATK_BITE; AI.len = 3; AI.again = 0; AI.shits = 0; break; }
-        if (AI.t >= AI.len) { AI.st = AI_RECOVER; AI.t = 6; AI.atk = ATK_LUNGE; AI.len = 18; }   /* left alone: comes out */
+        if (AI.shits >= 3) { AI.st = AI_FLIP; AI.t = 0; AI.len = TU_FLIP_T; AI.shits = 0; AI.atk = ATK_LUNGE; break; }
+        if (AI.t >= AI.len) {
+            AI.st = AI_LUNGE; AI.t = 0; AI.lx = ux; AI.lz = uz; AI.struck = 0; AI.atk = ATK_LUNGE;
+            AI.len = AIP[sp].lunge; AI.again = AIP[sp].chain;   /* one spin, no chain, then dizzy */
+        }
+        break;
+    case AI_FLIP:                                            /* turtle: on its back, legs waving - open to hits */
+        ai_mot(a, MOT_IDLE);
+        if (AI.t >= AI.len) { AI.st = AI_RECOVER; AI.t = 0; AI.atk = ATK_LUNGE; AI.len = 24; AI.press = 0; }
         break;
     default:                                                 /* recover / hit */
         ai_mot(a, MOT_IDLE);
         if (AI.t >= AI.len) {
             s32 wasHit = AI.st == AI_HIT;
-            if (wasHit && sp == 1 && ai_rand(100) < 70) { AI.st = AI_RETREAT; AI.t = 0; AI.len = 14; break; }
-            if (wasHit && sp == 3 && ai_rand(100) < 50) { AI.st = AI_SHELL; AI.t = 0; AI.len = 150; AI.shits = 0; break; }
+            if (wasHit && sp == 1 && ai_rand(100) < 35) { AI.st = AI_RETREAT; AI.t = 0; AI.len = 10; break; }   /* ai1: 35 % (was 70) */
+            if (wasHit && sp == 3 && !AI.shcd && ai_rand(100) < 25) { AI.st = AI_SHELL; AI.t = 0; AI.len = TU_SHELL_T; AI.shits = 0; AI.shcd = TU_SHELL_CD; break; }
             AI.st = AI_CIRCLE; AI.t = 0; AI.atk = ATK_LUNGE;
             AI.len = ai_k(AIP[sp].cmin + (s32)ai_rand(AIP[sp].cvar), rage ? 0.6f : 1.0f);
             if (wasHit) AI.len = 12 + (s32)ai_rand(14);       /* battle17: after a hit it attacks soon (no free circling) */
@@ -1373,6 +1390,7 @@ static void pose_apply(s32 n, PCX *c)
             if (st == AI_WINDUP) kr = smooth01((float)t / 10.0f);
             else if (st == AI_LUNGE) kr = 1.0f;
             else if (st == AI_SHELL) kr = smooth01((float)t / 5.0f);   /* hiding */
+            else if (st == AI_FLIP) kr = 0.45f;                           /* on its back: legs half out */
             else if (st == AI_RECOVER) kr = 1.0f - smooth01((float)t / 12.0f);
         }
         if (kr > 0.0f) {
@@ -1382,6 +1400,13 @@ static void pose_apply(s32 n, PCX *c)
             if (n == 0) p_mov(c, 0.0f, -0.30f * kr, 0.0f);   /* the shell settles on the ground */
         }
         if (!PZ.atk && st == AI_LUNGE && n == 0) p_rot(c, 1, (float)t * 1.1f);    /* spinning shell (battle13: twice as fast, user) */
+        if (st == AI_SHELL && n == 0 && t > len - 24)          /* ai1: the tell - the shell rocks harder before it bursts out */
+            p_rot(c, 1, 0.30f * smooth01((float)(t - (len - 24)) / 10.0f) * zsin((float)t * 1.4f));
+        if (st == AI_FLIP) {                                  /* ai1: flipped onto its back, rocking; rights itself at the end */
+            float f = smooth01((float)t / 8.0f) * (1.0f - smooth01((float)(t - (len - 12)) / 12.0f));
+            if (n == 0) { p_mov(c, 0.0f, 0.30f * f, 0.0f); p_rot(c, 2, 3.14159274f * f + 0.12f * zsin((float)t * 0.25f) * f); }
+            if (n == 16 || n == 20 || n == 24 || n == 28) p_rot(c, 0, 0.5f * zsin((float)t * 0.9f + (float)n) * f);   /* legs paddle */
+        }
         if (!PZ.atk && st == AI_RECOVER && n == 0) p_rot(c, 2, 0.18f * zsin((float)t * 0.5f) * (1.0f - u));   /* dizzy */
         if (PZ.atk && n == 2) {                         /* bite: neck back, then out */
             if (st == AI_WINDUP) p_mov(c, 0.0f, 0.0f, -0.08f * smooth01((float)t / 6.0f));
