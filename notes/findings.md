@@ -4002,3 +4002,15 @@ so, door fades are timed there, possibly per frame. Not traced yet.
   drawn: the roll about the root sank the shell ~3 into the ground under a 0.30 lift. TU_FLIP_LIFT 2.9.
 - pm normal d4150cff, test ab031f45, gqtest 6e446a82.
 
+### 7.72 lv3: one level-up event for every level; turtle flip removed
+- lv2 test (user, dump 6632cc6a): Lv / EXP kept over the bed night; Lv 1 -> 4 still had long gaps between the menus;
+  the turtle's flip looked wrong (a roll of the whole model) and made it too easy. Dump: all applied (Lv 4, HP 3,
+  points 0, menu 0); gained 6000 in one go.
+- Gaps: a new event_start waits on the game's after-event state (EVMGR + 0x58C), seconds after the previous menu.
+  tools/stats/patch_lvup_loop.py rewrites event 410 (node 110) in place: menu -> counter 61 = answer -> wait for 61 = 0
+  -> again while counter 62 (points) != 0. stats.c applies each answer while the event runs (menu 2), sets the menu's
+  level number for the next one, and clears 61. Common.arc (gq11 + this) ec319303.
+- Turtle: 3 knocks on the shell no longer flip it; it bursts out at once in a spin that always chains a second one
+  (AI.mad), then its usual dizzy. AI_FLIP / TU_FLIP_LIFT left unused.
+- pm normal b1473370, test 3046e315, gqtest db50f995.
+

@@ -319,6 +319,14 @@ void stats_frame(u8 *g, s32 map, volatile u32 *held, volatile u32 *press, s32 bu
     }
     if (ST.menu == 2) {
         u8 *ev = EVMGR;
+        if (CNT(g, C_ANS)) {                                /* lv3: the menu loops in one event (patch_lvup_loop.py): apply
+                                                               each answer now, set 61 back to 0 and the next level's number */
+            s32 v = CNT(g, C_ANS), k = v > 4 ? v / 128 : v;
+            if (k >= 1 && k <= 4 && CNT(g, C_HP + k - 1) < STAT_MAX && *pts > 0) { CNT(g, C_HP + k - 1)++; (*pts)--; }
+            if (CNT(g, C_HP) >= STAT_MAX && CNT(g, C_PWR) >= STAT_MAX && CNT(g, C_END) >= STAT_MAX && CNT(g, C_LCK) >= STAT_MAX) *pts = 0;
+            if (*pts > 0) { u8 *mm = MSGMGR; if (OK(mm)) msg_num(mm, 0, CNT(g, C_LV) - *pts + 1); }
+            CNT(g, C_ANS) = 0;
+        }
         if (OK(ev) && *(s32 *)(ev + 0x680) == -1) {         /* the event has ended (lv2: not +0x58C too - it stayed set
                                                                for 8-10 s after the menu, which held the next level's menu back) */
             s32 v = CNT(g, C_ANS), k = v > 4 ? v / 128 : v, *st = 0;

@@ -93,7 +93,7 @@ enum { ATK_LUNGE, ATK_BITE, ATK_WHIP, ATK_FEINT, ATK_POOF };
 #define AI_REC     30
 #define AI_AGAIN   35                                   /* % chance of a second lunge straight after */
 #define MOT_IDLE   0
-struct { u32 magic; s32 st, t, len, dir; float lx, lz; s32 atk, kb, hseen, again, zz, hidden, press, pdecay, shits, struck, shcd; } AI;   /* 'ENAI' (dump) */
+struct { u32 magic; s32 st, t, len, dir; float lx, lz; s32 atk, kb, hseen, again, zz, hidden, press, pdecay, shits, struck, shcd, mad; } AI;   /* 'ENAI' (dump) */
 /* Mini bosses (battle13, user design): per species {HP, circle radius, circle speed, circle min / extra frames,
    wind-up, lunge, recover frames, % chain, max chain, lunge speed, push radius}. Below half HP they enrage: 1.3x
    speed, 0.7x wind-up / recover, 0.6x circling time. Chihuahua easy and twitchy; tanuki the all-rounder with feints
@@ -995,7 +995,8 @@ static void ai_frame(u8 *g, u8 *a)
         if (AI.atk != ATK_WHIP) ai_face(a, AI.lx, AI.lz);
         ai_mot(a, sp <= 3 ? MOT_IDLE : ai_dash(a));
         if (AI.t >= AI.len) {
-            if (AI.atk == ATK_LUNGE && AI.again + 1 < AIP[sp].chain && ai_rand(100) < AIP[sp].again) {   /* again! */
+            if (AI.atk == ATK_LUNGE && (AI.mad || (AI.again + 1 < AIP[sp].chain && ai_rand(100) < AIP[sp].again))) {   /* again! */
+                AI.mad = 0;
                 AI.st = AI_WINDUP; AI.again++; AI.len = ai_k(AIP[sp].wind, ft); AI.t = AI.len - (sp == 3 ? 2 : 6);
             } else {
                 AI.st = AI_RECOVER; AI.t = 0;
@@ -1022,9 +1023,14 @@ static void ai_frame(u8 *g, u8 *a)
         if (AI.t >= AI.len) { AI.st = AI_WINDUP; AI.t = 0; AI.atk = ATK_LUNGE; AI.again = 0; AI.len = 6; }
         break;
     case AI_SHELL:                                           /* turtle (ai1): tucked in 1 s (armoured, rocking near the end),
-                                                               then bursts out in one spin at you; 3 knocks flip it over */
+                                                               then bursts out in one spin at you; 3 knocks: at once, two spins (lv3; the flip is gone) */
         ai_face(a, dx, dz); ai_mot(a, MOT_IDLE);
-        if (AI.shits >= 3) { AI.st = AI_FLIP; AI.t = 0; AI.len = TU_FLIP_T; AI.shits = 0; AI.atk = ATK_LUNGE; break; }
+        if (AI.shits >= 3) {                                 /* lv3 (user: the flip looked wrong and made it too easy): 3 knocks
+                                                                annoy it - it bursts out at once in a double spin */
+            AI.st = AI_LUNGE; AI.t = 0; AI.lx = ux; AI.lz = uz; AI.struck = 0; AI.atk = ATK_LUNGE; AI.shits = 0;
+            AI.len = AIP[sp].lunge; AI.again = 0; AI.mad = 1;   /* mad: the second spin is certain */
+            break;
+        }
         if (AI.t >= AI.len) {
             AI.st = AI_LUNGE; AI.t = 0; AI.lx = ux; AI.lz = uz; AI.struck = 0; AI.atk = ATK_LUNGE;
             AI.len = AIP[sp].lunge; AI.again = AIP[sp].chain;   /* one spin, no chain, then dizzy */
