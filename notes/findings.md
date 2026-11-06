@@ -3867,3 +3867,8 @@ so, door fades are timed there, possibly per frame. Not traced yet.
 - spring.c: the fossil with all 15 made -> SUMMONED + affection full + gq_scene_req; while the Postman / Joe is out the
   fossil is not thrown ("The water is restless. / Come back later."). GQ_TEST: Z + D-Down after the summoning resets it
   (replay). pm gqtest a576b649, test 2def01f4, normal ca2a7cd8; Common.arc dead3d1f, debug.mes f22a02da.
+- Cutscene music (gq6 plan): "Marin Jazz" is record item 0x514 (records 0x510-0x51B, 5th). Song table
+  test/text/SNGList.txt: song id = MusyX group id; song 1 = RECORD05 (other records: 4 RECORD02, 5 RECORD04,
+  10 RECORD01, 11 RECORD03, 12-16 RECORD06-10). Bank table 0x802544A0 {name, info} -> info 0x80254278 + 16 i,
+  +0 = group/song id (RECORD05 = bank 23, id 1). Record n -> RECORD0n is inferred from the names (the record
+  player's own mapping not traced yet); confirm by ear in game.
