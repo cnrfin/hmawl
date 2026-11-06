@@ -744,7 +744,9 @@ static const unsigned char GS_FACE[9][2] = {
     { 69, 42 },  /* 8 soft */
 };
 static void gs_face(s32 f);
-static void gs_fade(u32 from, u32 to, float secs) { u8 *fd = FADER; if (fd) fade_start(fd, &from, &to, 0, 0, secs); }
+/* hold: 1 keeps the end colour when the fade is over (fader +0x64; with 0 it resets itself to clear: gq8-gq10's white went
+   away again before the scene ended) */
+static void gs_fade(u32 from, u32 to, float secs, s32 hold) { u8 *fd = FADER; if (fd) fade_start(fd, &from, &to, hold, 0, secs); }
 static void gs_motion(s32 m)
 {
     if (m == 4 || m == 6) { S.motion = m; motion_once(S.actor, m, 0); GS.bow = GS_CLIP[m] * 2 - 6; }   /* explain / plead once */
@@ -776,6 +778,10 @@ static void gs_cam(u8 *g, const struct gshot *sh, float f)
     for (i = 0; i < 4; i++) k[i] = sh->k[i] + (sh->k[4 + i] - sh->k[i]) * e;
     if (l2 < 0.0001f) { dx = 0; dz = 1; l2 = 1; }
     inv = rsqrt(l2); dx *= inv; dz *= inv;                         /* axis: her -> him */
+    if (sh->subj == 2 || sh->look == 2) {                     /* gq11: the two-shot from as far as they really stand apart */
+        float sep = l2 * inv;                                  /* (the editor's farmer stands 5.7 from her; the dump's 6.7) */
+        if (sep > 5.7f) k[1] *= sep / 5.7f;
+    }
     a = k[0] * 0.0174532924f; sn = gsin(a); cs = gsin(a + 1.57079637f);
     ux = dx * cs - dz * sn; uz = dx * sn + dz * cs;
     gs_pt(sh->subj, p, sp); gs_pt(sh->look, p, tp);
@@ -833,6 +839,7 @@ static s32 gd_frame(u8 *g, s32 map, u32 t)
         actor_setpos(S.actor, &S.pos); actor_setdir(S.actor, &S.dir); actor_hide(S.actor);
         joe_motion(0);
         cn[GQ_C_CUE] = 0; cn[GQ_C_DONE] = 0; cn[GQ_C_FACE] = 0;
+        {   float dx = GD_X - p[0], dz = GD_Z - p[2]; s32 d = (s32)atan2_deg(dx, dz); cn[GQ_C_FACING] = d < 0 ? d + 360 : d; }
         cn[GQ_C_YEAR1] = t / (T_DAY * 40u) == 0;                /* 4 seasons x 10 days */
         gs_cam(g, &GSHOT[0], 0);
         GS.st = 1; GS.t = 0; GS.at = -1; GS.cue = 0; GS.lastcue = 0; GS.shot = 0; GS.act = -1; GS.waited = 0;
@@ -858,11 +865,14 @@ static s32 gd_frame(u8 *g, s32 map, u32 t)
                     GS.shot = n - 1; GS.t = 0;
                     gs_motion(sh->motion);
                     if (sh->fx & 4) gs_face(1);                         /* eyes closed (the rise) */
-                    if (sh->fx & 2) gs_fade(0xFFFFFFFFu, 0xFFFFFF00u, 1.2f);      /* white flash */
+                    if (sh->fx & 2) gs_fade(0xFFFFFFFFu, 0xFFFFFF00u, 1.2f, 0);   /* white flash */
                     if (sh->act == 0) { S.pos.y = GS.surf - GD_SINK; actor_hide(S.actor); GS.act = -1; }
                     else if (sh->act == 1) { if (S.pos.y < GS.surf) S.pos.y = GS.surf; actor_show(S.actor); GS.act = -1; }
                     else if (!sh->after) { GS.act = sh->act; GS.at = 0; }
-                } else { GS.act = sh->act; GS.at = 0; }          /* the after-the-lines action */
+                } else {                                         /* the after-the-lines action */
+                    GS.act = sh->act; GS.at = 0;
+                    if (GS.act == 3 && GS_END_WHITE) { gs_fade(0xFFFFFF00u, 0xFFFFFFFFu, 0.5f, 1); GS.white = 1; }   /* gq11: white as she goes, kept */
+                }
                 if (GS.act >= 2) {
                     actor_show(S.actor);
                     if (sh->fx & 1) sfx_play(au, SE_WATER, 0);
@@ -878,19 +888,20 @@ static s32 gd_frame(u8 *g, s32 map, u32 t)
             float k = smooth((float)GS.at / (float)(sh->actf > 0 ? sh->actf : 1));
             S.pos.y = GS.surf - GD_SINK * (GS.act == 2 ? 1.0f - k : k);
             if (GS.at >= sh->actf) {
-                if (GS.act == 3) {
-                    actor_hide(S.actor);
-                    if (GS_END_WHITE && GS.cue >= 32) { gs_fade(0xFFFFFF00u, 0xFFFFFFFFu, 0.6f); GS.white = 1; }   /* gq9: after the sink */
-                }
+                if (GS.act == 3) actor_hide(S.actor);
                 GS.act = -1;
                 if (GS.cue >= 32 && !GS.white) cn[GQ_C_DONE] = GS.cue;
             } else GS.at++;
         }
-        if (GS.white && ++GS.white > 36) cn[GQ_C_DONE] = GS.cue;   /* fully white: the script ends at once (gq8: the white
-                                                                    cleared before the end and showed the sink again) */
+        if (GS.white && ++GS.white > 32) { actor_hide(S.actor); cn[GQ_C_DONE] = GS.cue; }   /* fully white (held): she is gone, the script ends */
         if (GS.bow && --GS.bow == 0) joe_motion(0);                      /* one bow, then idle */
         if (GS.cue > 0 && GS.cue < 32 && GS.t >= sh->hold && (GS.act < 2 || sh->after)) cn[GQ_C_DONE] = GS.cue;
         actor_setpos(S.actor, &S.pos); actor_setdir(S.actor, &S.dir);
+        {   float *p = (float *)(g + 0x29C78), *pd = (float *)(g + 0x29F84), dx = S.pos.x - p[0], dz = S.pos.z - p[2];
+            float l2 = dx * dx + dz * dz, inv = l2 > 0.0001f ? rsqrt(l2) : 0;
+            if (inv > 0) { pd[0] = dx * inv; pd[1] = 0; pd[2] = dz * inv; }        /* gq11: he keeps facing her */
+            {   s32 d = (s32)atan2_deg(dx, dz); cn[GQ_C_FACING] = d < 0 ? d + 360 : d; }   /* for the script's cmd_59(0, deg) */
+        }
         gs_cam(g, sh, sh->glide > 0 ? (float)GS.t / (float)sh->glide : 1.0f);
         GS.t++;
         return 1;
@@ -901,7 +912,7 @@ static s32 gd_frame(u8 *g, s32 map, u32 t)
         S.who = 0; GS.st = 0;
         GS.eyes = 0; joe_expr_patch(0); gs_plate(0);
         gq_lbox = 0;
-        GS.white = 0;                                           /* (the event's end clears the white itself: gq7 flashed twice) */
+        if (GS.white) { GS.white = 0; gs_fade(0xFFFFFFFFu, 0xFFFFFF00u, 0.8f, 0); }   /* control is back: white -> clear */
         return 0;
     }
     return 1;

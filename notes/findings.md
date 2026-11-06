@@ -3969,4 +3969,20 @@ so, door fades are timed there, possibly per frame. Not traced yet.
   it by 0.25 (the eye's own point by 0.6), up to 3; GS.ground counts the lifts.
 - gs_plate: while her scene runs, the pair table's last pair (38, 38) is (37, 37); restored at the end (Tartan's
   plate is back once she's gone). pm gqtest 551cf21b ('GSCN' 0x8037F0EC), test 32e224b1, normal 9df1d89d; data as gq9.
+- gq10 test (user): plate shows (5 red hearts); A8-A10 still odd; the end still shows some of the scene after the
+  white; the farmer does not quite face her.
+- Re-read of dump ceb0de6f: the two-shot's eye was not occluded (ground lift 0 there): the farmer stood 6.7 from her
+  (the editor assumed 5.7), so from 3.6 off the midpoint each was ~45-55 degrees off-axis, outside the game's
+  ~30-degree view - an empty frame of grass and cliff.
+- Fader (func_80189128(fader, from, to, hold, flag, s); update 0x80188DA4): when a fade ends, hold (+0x64) != 0 keeps
+  it at the end colour (state 2); hold 0 resets it to clear (vtable +0xC). gq8-gq10's white (hold 0) therefore
+  vanished on its own before the event ended.
+
+### 7.70 gq11
+- Two-shot distance x (separation / 5.7) when they stand further apart than the editor's.
+- End: the sink cue starts a held white (0.5 s, hold 1); 32 frames later she is hidden and "done"; once control is
+  back (no event) white -> clear 0.8 s.
+- Facing: counter 30 = degrees farmer -> her (atan2(dx, dz), 0..359); the script runs cmd_59(0, counter 30) at every
+  shot (as the Postman's event); his direction (game + 0x29F84) is also set each frame.
+- pm gqtest 5c76cc62 ('GSCN' 0x8037F32C), test 675fb83c, normal 7fab75ba; Common.arc f7348314.
 

@@ -5,6 +5,7 @@
 #define GQ_C_DONE 27
 #define GQ_C_YEAR1 28
 #define GQ_C_FACE 29
+#define GQ_C_FACING 30
 #define GS_N 12
 #define GS_LETTERBOX 0
 #define GS_MUSIC_FADE 1
