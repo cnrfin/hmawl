@@ -711,6 +711,12 @@ static void joe_motion(s32 m)               /* start a clip once (sit down / sta
    Marin Jazz on slot 3). Shot fx: a white flash at its start, her eyes closed (frame 2) while it shows. The plead
    clip (the bow) plays once (func_80080294, no loop), then idle. After the sink: fade to white, then (event over)
    bars off and white -> clear. Letterbox bars: zt.c draws gq_lbox (HUD quads). Counter 28 = 1 in year 1. gq_scene_req: 1 asked, 0 done, -1 busy (spring.c tries again on the next toss). */
+#define SPK_PAIRS ((u8 *)0x80251A90)                 /* message window: speaker -> name plate pairs (37: 1-36, 38) */
+static void gs_plate(s32 on)                         /* gq10: her plate (37) borrows Tartan's (38) last pair while she speaks */
+{
+    if (SPK_PAIRS[72] != (on ? 38 : 37)) return;
+    SPK_PAIRS[72] = SPK_PAIRS[73] = on ? 37 : 38;
+}
 #define GQ_SHOTS
 #include "gq_scene.h"
 s32 gq_scene_req;
@@ -775,9 +781,21 @@ static void gs_cam(u8 *g, const struct gshot *sh, float f)
     gs_pt(sh->subj, p, sp); gs_pt(sh->look, p, tp);
     GS.eye[0] = sp[0] + ux * k[1]; GS.eye[1] = GS.surf + k[2]; GS.eye[2] = sp[1] + uz * k[1];
     GS.tgt[0] = tp[0]; GS.tgt[1] = GS.surf + k[3]; GS.tgt[2] = tp[1];
-    {   Vec v; float gy;                                      /* never under the banks round the pool (gq7: 3 shots) */
-        v.x = GS.eye[0]; v.y = GS.eye[1] + 20.0f; v.z = GS.eye[2]; gy = ground_y(COLLMAP, &v);
-        if (gy == gy && gy > GS.eye[1] - 0.6f && gy < GS.eye[1] + 3.0f) { GS.eye[1] = gy + 0.6f; GS.ground++; }
+    {   /* gq10 (dump ceb0de6f, A8): the grass rim round the pool stands above the water and hid both of them from
+           low eyes outside it. Sample the ground along eye -> target and lift the eye until the line clears it. */
+        Vec v; float gy, up = 0, f, need;
+        s32 j;
+        for (j = 0; j <= 7; j++) {
+            f = (float)j * 0.125f;
+            v.x = GS.eye[0] + (GS.tgt[0] - GS.eye[0]) * f; v.z = GS.eye[2] + (GS.tgt[2] - GS.eye[2]) * f;
+            v.y = (GS.eye[1] > GS.tgt[1] ? GS.eye[1] : GS.tgt[1]) + 6.0f;
+            gy = ground_y(COLLMAP, &v);
+            if (gy != gy || gy > v.y - 0.01f) continue;
+            need = gy + (j ? 0.25f : 0.6f) - (GS.eye[1] + (GS.tgt[1] - GS.eye[1]) * f);
+            if (need > 0) { need /= 1.0f - f; if (need > up) up = need; }
+        }
+        if (up > 3.0f) up = 3.0f;
+        if (up > 0) { GS.eye[1] += up; GS.ground++; }
     }
     for (i = 0; i < 3; i++) { c[i] = (s32)(GS.eye[i] * 128.0f); c[3 + i] = (s32)(GS.tgt[i] * 128.0f); }
     cam = EVMGR ? GS_CAM : 0;
@@ -821,6 +839,7 @@ static s32 gd_frame(u8 *g, s32 map, u32 t)
         GS.bow = 0; GS.eyes = 0; GS.white = 0; GS.face = -1; GS.ground = 0;
         /* gq9: her own face (the user found the gq8 set overdone); only lines the JSON names get another */
         gq_scene_req = 0;
+        gs_plate(1);
         event_start(EVMGR, GQ_SCENE_EVENT, 0, 0);
         return 1;
     }
@@ -880,7 +899,7 @@ static s32 gd_frame(u8 *g, s32 map, u32 t)
         if (S.actor) despawn();
         if (S.loaded) release_model();
         S.who = 0; GS.st = 0;
-        GS.eyes = 0; joe_expr_patch(0);
+        GS.eyes = 0; joe_expr_patch(0); gs_plate(0);
         gq_lbox = 0;
         GS.white = 0;                                           /* (the event's end clears the white itself: gq7 flashed twice) */
         return 0;

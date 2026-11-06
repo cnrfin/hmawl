@@ -3957,4 +3957,16 @@ so, door fades are timed there, possibly per frame. Not traced yet.
   "DUMMY" -> "Goddess" + 02 12 (80 D6) x5 17 (five red hearts, the hearts code's own colour codes; that code finds no
   record for 37 and draws the name as is). tools/goddess/quest/build_gq_people.py; Message.arc f47f8849.
 - pm gqtest 2791eda1, test 526168e5, normal d1187c84; Common.arc c8bdb02f; hg jiggle files as gq8.
+- gq9 dumps (user): ceb0de6f (A8, the two-shot): our camera record held exactly the shot's eye (267.44, 21.94,
+  142.99) and target (the midpoint, y 21.45); look-at pointer never re-pointed (camok 0). Ground under the eye 21.34
+  (water 20.75; player at 20.54): the pool's grass rim stands above both of them and hides them from any low eye
+  outside it. da599448 (A2): no name plate.
+- Name plates: func_801020E4 maps the speaker through pairs at 0x80251A90 (37 x {speaker, plate}: 1-36 and 38; 37 is
+  missing -> -1, no plate), plate id -> func_800FED14 (jump table 0x802BC754: 37 goes the generic people.mes way).
+
+### 7.69 gq10
+- gs_cam samples the ground at 8 points along eye -> target (from 6 above) and lifts the eye until the line clears
+  it by 0.25 (the eye's own point by 0.6), up to 3; GS.ground counts the lifts.
+- gs_plate: while her scene runs, the pair table's last pair (38, 38) is (37, 37); restored at the end (Tartan's
+  plate is back once she's gone). pm gqtest 551cf21b ('GSCN' 0x8037F0EC), test 32e224b1, normal 9df1d89d; data as gq9.
 
