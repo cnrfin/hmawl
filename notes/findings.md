@@ -3847,3 +3847,4 @@ so, door fades are timed there, possibly per frame. Not traced yet.
   runs inside zt_frame) -> Z read from the pad record 0x80341464. gq2 test shortcut: Z + D-Down puts the next 4
   offerings not yet made into the rucksack (func_8004FDA0), with all 15 made the Mermaid Fossil. pm gqtest 9c4dde34
   (test / normal unchanged from lv1: 332739a3 / 1f4045aa).
+- gq3 (user: only 4 crops given): the shortcut now fills every free rucksack slot (18 slots at game+0x58, {item u16, count, ff}; the user had 8 free) with offerings not yet made and not already carried; with all 15 made, the fossil. pm gqtest b68e9894.

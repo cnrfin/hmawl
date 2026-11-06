@@ -218,13 +218,19 @@ void spring_frame(u8 *g, s32 map, u32 pad_held, u32 pad_press)
     gq_hooks();
     if (map != VALLEY || !pl) { W.item = 0; return; }
 #ifdef GQ_TEST
-    {   /* test (gq2): Z + D-Down gives the next 4 offerings not yet made, into the rucksack; with all 15 made, the
-           Mermaid Fossil. Z from the pad's own record (zt.c takes Z out of the held word before we see it). */
+    {   /* test (gq2): Z + D-Down fills the rucksack's free slots with offerings not yet made (and not already
+           carried); with all 15 made, the Mermaid Fossil. Z from the pad's own record (zt.c takes Z out of the held word before we see it). */
         static const short need[15] = { 0x1F, 0x22, 0x25, 0x28, 0x2B, 0x2E, 0x31, 0x34, 0x43E, 0x43B, 0x43C, 0x43D, 0x07, 0x1C, 0x19 };
         if ((*(volatile u32 *)0x80341464 & 0x10) && (pad_press & 0x4)) {
             s32 k, n = 0, c = CNT(g, GQ);
-            for (k = 0; k < 15 && n < 4; k++) if (!(c & (1 << k))) { rucksack_add(g + 0x50, need[k], 1, -1); n++; }
-            if (!n) rucksack_add(g + 0x50, FOSSIL, 1, -1);
+            s32 room = 0, have, j;
+            for (j = 0; j < 18; j++) if (!(*(u32 *)(g + 0x58 + 4 * j) >> 16)) room++;   /* rucksack: 18 slots {item, count, ff} */
+            for (k = 0; k < 15 && n < room; k++) {
+                if (c & (1 << k)) continue;
+                for (have = 0, j = 0; j < 18; j++) if ((s32)(*(u32 *)(g + 0x58 + 4 * j) >> 16) == need[k]) have = 1;
+                if (!have) { rucksack_add(g + 0x50, need[k], 1, -1); n++; }
+            }
+            if ((c & GQ_ALL) == GQ_ALL && room) rucksack_add(g + 0x50, FOSSIL, 1, -1);
             sfx_play(*(u8 **)0x803491E4, 261, 0);       /* the pick-up sound */
         }
     }
