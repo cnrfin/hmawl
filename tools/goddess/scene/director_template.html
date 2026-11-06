@@ -1,0 +1,365 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Spring Scene Director</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600&family=Nunito:wght@400;600;700&display=swap">
+<style>
+:root { --bg:#f2eee6; --panel:#fffbf3; --ink:#2a241c; --muted:#7b6f5f; --line:#e1d6c3; --accent:#2f8f8a; --accent-ink:#fff;
+  --sel:#e5f3f1; --warn:#b5422f; --chip:#eee3cf; --field:#fff; color-scheme: light; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg:#1b1916; --panel:#25211c; --ink:#f0e8db; --muted:#b2a48f;
+  --line:#3b3229; --accent:#58b9b0; --accent-ink:#0e1f1d; --sel:#1f3532; --warn:#ff8f7a; --chip:#342b22; --field:#1d1915; color-scheme: dark; } }
+:root[data-theme="dark"] { --bg:#1b1916; --panel:#25211c; --ink:#f0e8db; --muted:#b2a48f; --line:#3b3229; --accent:#58b9b0;
+  --accent-ink:#0e1f1d; --sel:#1f3532; --warn:#ff8f7a; --chip:#342b22; --field:#1d1915; color-scheme: dark; }
+* { box-sizing: border-box; }
+body { margin:0; background:var(--bg); color:var(--ink); font:14px/1.45 Nunito, system-ui, sans-serif; }
+header { display:flex; flex-wrap:wrap; gap:10px; align-items:center; justify-content:space-between; padding:10px max(16px, env(safe-area-inset-right,0px)) 10px max(16px, env(safe-area-inset-left,0px)); border-bottom:1px solid var(--line); }
+h1 { font-family:Fredoka, Nunito, sans-serif; font-weight:600; font-size:1.3rem; margin:0; }
+.sub { color:var(--muted); font-size:.85rem; }
+button, select { font:inherit; color:var(--ink); background:var(--panel); border:1px solid var(--line); border-radius:999px; padding:5px 12px; cursor:pointer; }
+button.primary { background:var(--accent); color:var(--accent-ink); border-color:transparent; font-weight:700; }
+button.small { padding:2px 8px; font-size:.8rem; }
+.bar { display:flex; gap:6px; flex-wrap:wrap; align-items:center; }
+main { display:grid; grid-template-columns: 270px minmax(0,1fr) 340px; gap:14px; padding:14px max(16px, env(safe-area-inset-right,0px)) 40px max(16px, env(safe-area-inset-left,0px)); }
+@media (max-width: 1150px) { main { grid-template-columns: 250px minmax(0,1fr); } #editor { grid-column: 1 / -1; } }
+@media (max-width: 760px) { main { grid-template-columns: minmax(0,1fr); } }
+.panel { background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:12px; min-width:0; }
+.shot { border:1px solid var(--line); border-radius:10px; padding:7px 9px; margin-bottom:7px; cursor:pointer; }
+.shot.sel { background:var(--sel); border-color:var(--accent); }
+.shot .t { font-weight:700; }
+.shot .m { font-size:.78rem; color:var(--muted); }
+.shot .b { display:flex; gap:4px; margin-top:4px; }
+.chip { display:inline-block; background:var(--chip); border-radius:6px; padding:0 6px; font-size:.75rem; margin-right:3px; }
+#view { position:relative; width:100%; aspect-ratio: 4 / 3; max-width:100%; background:#000; border-radius:10px; overflow:hidden; }
+#view canvas { display:block; width:100% !important; height:100% !important; }
+.lb { position:absolute; left:0; right:0; height:11%; background:#000; transition:transform .5s; pointer-events:none; }
+.lb.top { top:0; } .lb.bot { bottom:0; }
+.lb.off.top { transform:translateY(-100%); } .lb.off.bot { transform:translateY(100%); }
+#flash { position:absolute; inset:0; background:#fff; opacity:0; pointer-events:none; }
+#subs { position:absolute; left:6%; right:6%; bottom:13%; min-height:3.6em; color:#fff; font-family:Fredoka, Nunito, sans-serif; font-size:clamp(13px, 2.3vw, 22px); line-height:1.25; letter-spacing:.04em; white-space:pre; text-shadow:0 0 3px #000, 0 0 3px #000, 1px 1px 0 #000, -1px -1px 0 #000; pointer-events:none; }
+#hud { position:absolute; top:12%; left:2%; color:#fff; font-size:12px; text-shadow:0 0 3px #000; pointer-events:none; }
+.tl { display:flex; gap:8px; align-items:center; margin-top:8px; }
+.tl input[type=range] { flex:1; }
+#mini { width:100%; aspect-ratio: 1 / 1; max-width:100%; background:var(--field); border:1px solid var(--line); border-radius:10px; margin-top:10px; }
+label { display:block; font-size:.74rem; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); margin:9px 0 3px; }
+.row { display:grid; grid-template-columns: 70px minmax(0,1fr) 46px; gap:6px; align-items:center; font-size:.85rem; }
+.row input[type=range] { width:100%; }
+.row output { text-align:right; font-variant-numeric: tabular-nums; }
+input[type=text], input[type=number], textarea { font:inherit; color:var(--ink); background:var(--field); border:1px solid var(--line); border-radius:8px; padding:4px 7px; width:100%; }
+fieldset { border:1px solid var(--line); border-radius:10px; padding:6px 10px 10px; margin:8px 0; min-width:0; }
+legend { font-weight:700; font-size:.85rem; padding:0 4px; }
+.lines { display:flex; flex-wrap:wrap; gap:4px; }
+.lines label { all:unset; display:inline-flex; gap:4px; align-items:center; font-size:.82rem; background:var(--chip); border-radius:6px; padding:2px 6px; cursor:pointer; }
+.hint { font-size:.78rem; color:var(--muted); }
+.toast { position:fixed; bottom:16px; left:50%; transform:translateX(-50%); background:var(--ink); color:var(--bg); padding:7px 14px; border-radius:999px; opacity:0; transition:opacity .2s; pointer-events:none; }
+.toast.on { opacity:1; }
+#imp { display:none; margin-top:8px; }
+#imp.on { display:block; }
+</style>
+</head>
+<body>
+<header>
+  <div><h1>Spring Scene Director</h1><div class="sub">The goddess's first summoning · build the shots, preview, export, send to Claude</div></div>
+  <div class="bar">
+    <button class="primary" id="play">▶ Play scene</button>
+    <button id="playshot">▶ This shot</button>
+    <button id="exp">Export</button><button id="copy">Copy</button><button id="impbtn">Import</button>
+    <button id="reset">Reset to proposal</button><button id="theme">◐</button>
+  </div>
+</header>
+<main>
+  <section class="panel" aria-label="Shots">
+    <div class="bar" style="justify-content:space-between"><b>Shots</b><span class="sub" id="total"></span></div>
+    <div id="shots" style="margin-top:8px"></div>
+    <button id="add" style="width:100%">+ Add shot</button>
+    <fieldset><legend>Whole scene</legend>
+      <div class="lines">
+        <label><input type="checkbox" id="s_lb"> Letterbox bars</label>
+        <label><input type="checkbox" id="s_music"> Music fades out</label>
+      </div>
+      <label for="s_fov">Camera field of view (game ≈ 40°)</label>
+      <div class="row"><span>FOV</span><input type="range" id="s_fov" min="25" max="70" step="1"><output id="o_fov"></output></div>
+    </fieldset>
+    <div id="imp"><textarea id="imptext" rows="5" placeholder="Paste an exported scene here"></textarea><button id="impgo" class="small">Load it</button></div>
+  </section>
+  <section class="panel" aria-label="Preview">
+    <div id="view"><div class="lb top" id="lbt"></div><div class="lb bot" id="lbb"></div><div id="flash"></div><div id="subs"></div><div id="hud"></div></div>
+    <div class="tl"><button id="stop" class="small">■</button><input type="range" id="scrub" min="0" max="1000" value="0" aria-label="Scene time"><span id="time" class="sub">0.0 s</span></div>
+    <p class="hint">Stand-in shapes, real distances: the pool, the farmer at a typical throwing spot, the goddess (with a nose to show where she faces). Framing in game will be close, then fine-tuned there.</p>
+    <canvas id="mini" width="600" height="600" aria-label="Top view of the spring"></canvas>
+    <p class="hint">Top view: teal = the goddess, brown = the farmer. The selected shot's camera moves from ○ to ●; the line shows where it looks.</p>
+  </section>
+  <section class="panel" id="editor" aria-label="Shot editor"></section>
+</main>
+<div class="toast" id="toast"></div>
+<script>__THREE__</script>
+<script>
+const LINES = __LINES__;
+const PROPOSAL = __PROPOSAL__;
+const KEY = 'spring-scene-director-v1';
+const G = { x: 270.3, y: 20.75, z: 139.0 }, P0 = { x: 273.0, y: 20.69, z: 144.03 };
+const SINK = 1.8;
+let scene = null;
+try { scene = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) {}
+if (!scene || !scene.shots) scene = JSON.parse(JSON.stringify(PROPOSAL));
+let sel = 0;
+function save() { try { localStorage.setItem(KEY, JSON.stringify(scene)); } catch (e) {} drawList(); drawMini(); }
+function toast(m) { const t = document.getElementById('toast'); t.textContent = m; t.classList.add('on'); setTimeout(() => t.classList.remove('on'), 1800); }
+
+// ---------- timing
+function boxes(id) { return (LINES[id] || '').split(/\n\s*\n/); }
+function boxTime(b) { return 1.2 + b.replace(/\s+/g, '').length * 0.055; }
+function lineTime(id) { return boxes(id).reduce((a, b) => a + boxTime(b), 0); }
+function shotParts(s) {
+  const lt = (s.lines || []).reduce((a, id) => a + lineTime(id), 0);
+  const act = (s.action === 'rise' || s.action === 'sink') ? (+s.actionSeconds || 3) : 0;
+  const after = s.actionWhen === 'afterLines';
+  const body = (+s.pause || 0) + lt + (after ? act : 0);
+  const dur = Math.max(+s.seconds || 0, body, after ? 0 : act, 0.5);
+  return { lt, act, after, dur };
+}
+function timeline() { let t = 0; return scene.shots.map(s => { const p = shotParts(s); const r = { s, t0: t, ...p }; t += p.dur; return r; }); }
+function total() { return timeline().reduce((a, r) => a + r.dur, 0); }
+
+// ---------- camera maths (the same relative rule pm.c will use)
+function axis(P) { let dx = P.x - G.x, dz = P.z - G.z, l = Math.hypot(dx, dz) || 1; return { x: dx / l, z: dz / l }; }
+function rot(u, deg) { const a = deg * Math.PI / 180, c = Math.cos(a), s = Math.sin(a); return { x: u.x * c - u.z * s, z: u.x * s + u.z * c }; }
+function pt(name, P) { return name === 'farmer' ? P : name === 'pair' ? { x: (G.x + P.x) / 2, y: (G.y + P.y) / 2, z: (G.z + P.z) / 2 } : G; }
+function camAt(k, P) {               // k: {yaw, dist, height, aim}; subject / look from the shot
+  return k;
+}
+function cam(s, f, P) {             // f 0..1 within the shot
+  const e = s.ease === 'linear' ? f : f * f * (3 - 2 * f);
+  const L = (a, b) => a + (b - a) * e;
+  const yaw = L(s.start.yaw, s.end.yaw), dist = L(s.start.dist, s.end.dist), h = L(s.start.height, s.end.height), aim = L(s.start.aim, s.end.aim);
+  const u = rot(axis(P), yaw), S = pt(s.subject, P), T = pt(s.look === 'subject' ? s.subject : s.look, P);
+  return { eye: { x: S.x + u.x * dist, y: G.y + h, z: S.z + u.z * dist }, at: { x: T.x, y: G.y + aim, z: T.z } };
+}
+function goddessY(t) {              // her height through the whole timeline
+  let y = G.y - SINK, vis = false;
+  for (const r of timeline()) {
+    const s = r.s, st = r.t0 + (r.after ? (+s.pause || 0) + r.lt : 0);
+    if (s.action === 'under') { if (t >= r.t0) { y = G.y - SINK; vis = false; } }
+    else if (s.action === 'stand') { if (t >= r.t0) { y = G.y; vis = true; } }
+    else if (s.action === 'rise' && t >= st) { const k = Math.min(1, (t - st) / r.act); y = G.y - SINK * (1 - k * k * (3 - 2 * k)); vis = true; }
+    else if (s.action === 'sink' && t >= st) { const k = Math.min(1, (t - st) / r.act); y = G.y - SINK * k * k * (3 - 2 * k); vis = k < 1; }
+  }
+  return { y, vis };
+}
+
+// ---------- 3D
+const view = document.getElementById('view');
+const R = new THREE.WebGLRenderer({ antialias: true });
+R.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+view.prepend(R.domElement);
+const W = new THREE.Scene(); W.background = new THREE.Color(0x9fc3d9); W.fog = new THREE.Fog(0x9fc3d9, 25, 70);
+const C = new THREE.PerspectiveCamera(40, 4 / 3, 0.05, 200);
+W.add(new THREE.HemisphereLight(0xeaf4ff, 0x3d5a2a, 0.8)); W.add(new THREE.AmbientLight(0xffffff, 0.35));
+const sun = new THREE.DirectionalLight(0xfff2d8, 0.8); sun.position.set((P0.x - G.x) * 6, 12, (P0.z - G.z) * 6); W.add(sun);
+const mat = c => new THREE.MeshLambertMaterial({ color: c });
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(120, 120), mat(0x5f8f3f)); ground.rotation.x = -Math.PI / 2; ground.position.set(G.x, G.y - 0.02, G.z); W.add(ground);
+const bank = new THREE.Mesh(new THREE.CircleGeometry(1, 48), mat(0x7a6a4c)); bank.rotation.x = -Math.PI / 2; bank.scale.set(5.8, 7.0, 1); bank.position.set(G.x, G.y - 0.01, G.z); W.add(bank);
+const water = new THREE.Mesh(new THREE.CircleGeometry(1, 48), new THREE.MeshLambertMaterial({ color: 0x3f8fb0, transparent: true, opacity: 0.88 }));
+water.rotation.x = -Math.PI / 2; water.scale.set(5.0, 6.2, 1); water.position.set(G.x, G.y, G.z); W.add(water);
+// backdrop (approximate): the cliff beyond the farmer, trees and the Harvest Sprites' tree beyond her
+(function () {
+  const u = axis(P0);
+  const cl = new THREE.Mesh(new THREE.BoxGeometry(40, 9, 2), mat(0x5a4436));
+  cl.position.set(P0.x + u.x * 9, G.y + 4.5, P0.z + u.z * 9); cl.lookAt(P0.x, G.y + 4.5, P0.z); W.add(cl);
+  for (let i = -4; i <= 4; i++) {
+    const t = new THREE.Mesh(new THREE.ConeGeometry(1.6, 6, 8), mat(0x3f6e3a)); const r = rot(u, 180 + i * 16);
+    t.position.set(G.x + r.x * (12 + (i & 1) * 3), G.y + 3, G.z + r.z * (12 + (i & 1) * 3)); W.add(t);
+  }
+  const big = new THREE.Mesh(new THREE.CylinderGeometry(1.4, 2.2, 7, 12), mat(0x4f7d6b)); const r = rot(u, 200);
+  big.position.set(G.x + r.x * 10, G.y + 3.5, G.z + r.z * 10); W.add(big);
+  [[20, 7], [-30, 7.5], [60, 6.5]].forEach(([a, d]) => { const f = new THREE.Group(); const r2 = rot(u, a);
+    const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 2.4, 6), mat(0x6fc06a)); stem.position.y = 1.2; f.add(stem);
+    const bulb = new THREE.Mesh(new THREE.OctahedronGeometry(0.28), new THREE.MeshLambertMaterial({ color: 0xc8f4ff, emissive: 0x4fa8c8 })); bulb.position.y = 2.4; f.add(bulb);
+    f.position.set(G.x + r2.x * d, G.y, G.z + r2.z * d); W.add(f); });
+})();
+function figure(h, body, hair, extra) {
+  const g = new THREE.Group();
+  const b = new THREE.Mesh(new THREE.CylinderGeometry(h * 0.13, h * 0.2, h * 0.62, 12), mat(body)); b.position.y = h * 0.31; g.add(b);
+  const hd = new THREE.Mesh(new THREE.SphereGeometry(h * 0.17, 16, 12), mat(0xf1c9a5)); hd.position.y = h * 0.78; g.add(hd);
+  const hr = new THREE.Mesh(new THREE.SphereGeometry(h * 0.18, 16, 12, 0, Math.PI * 2, 0, Math.PI * 0.55), mat(hair)); hr.position.y = h * 0.8; g.add(hr);
+  const nose = new THREE.Mesh(new THREE.ConeGeometry(h * 0.04, h * 0.12, 8), mat(0xe2a983)); nose.rotation.x = Math.PI / 2; nose.position.set(0, h * 0.77, h * 0.19); g.add(nose);
+  if (extra) extra(g, h);
+  return g;
+}
+const farmer = figure(1.35, 0x3d5f9e, 0x6b4425, (g, h) => { const pk = new THREE.Mesh(new THREE.BoxGeometry(h * .28, h * .3, h * .12), mat(0x3f7a3a)); pk.position.set(0, h * .45, -h * .2); g.add(pk); });
+const goddess = figure(1.75, 0x7fc7a8, 0x4f9a7a, (g, h) => {
+  const skirt = new THREE.Mesh(new THREE.ConeGeometry(h * 0.3, h * 0.5, 16), mat(0xbfe8d6)); skirt.position.y = h * 0.2; g.add(skirt);
+  [-1, 1].forEach(s => { const bn = new THREE.Mesh(new THREE.SphereGeometry(h * 0.07, 10, 8), mat(0x4f9a7a)); bn.position.set(s * h * 0.15, h * 0.93, -h * 0.03); g.add(bn); });
+});
+W.add(farmer); W.add(goddess);
+const ring = new THREE.Mesh(new THREE.RingGeometry(0.3, 0.42, 32), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0 }));
+ring.rotation.x = -Math.PI / 2; ring.position.set(G.x, G.y + 0.03, G.z); W.add(ring);
+function placeFigures() {
+  const P = P0, u = axis(P);
+  farmer.position.set(P.x, P.y, P.z); farmer.lookAt(G.x, P.y, G.z);
+  goddess.lookAt(G.x + u.x, goddess.position.y, G.z + u.z);
+}
+function resize() { const w = view.clientWidth, h = view.clientHeight; R.setSize(w, h, false); C.aspect = w / h; C.updateProjectionMatrix(); }
+new ResizeObserver(resize).observe(view);
+
+// ---------- render at time t
+const subs = document.getElementById('subs'), flash = document.getElementById('flash'), hud = document.getElementById('hud');
+function render(t) {
+  const tl = timeline(); let r = tl[tl.length - 1];
+  for (const x of tl) if (t >= x.t0 && t < x.t0 + x.dur) { r = x; break; }
+  if (!r) return;
+  const s = r.s, f = Math.max(0, Math.min(1, (t - r.t0) / r.dur));
+  C.fov = +scene.settings.fov || 40; C.updateProjectionMatrix();
+  const c = cam(s, f, P0); C.position.set(c.eye.x, c.eye.y, c.eye.z); C.lookAt(c.at.x, c.at.y, c.at.z);
+  const gy = goddessY(t); goddess.position.set(G.x, gy.y, G.z); goddess.visible = gy.vis || gy.y > G.y - SINK + 0.05;
+  placeFigures();
+  // splash ring at a rise / sink start
+  let sp = 0;
+  for (const x of tl) { if (x.s.action === 'rise' || x.s.action === 'sink') { const st = x.t0 + (x.after ? (+x.s.pause || 0) + x.lt : 0); const k = (t - st) / 1.2; if (k >= 0 && k < 1) sp = Math.max(sp, 1 - k), ring.scale.setScalar(1 + k * 6); } }
+  ring.material.opacity = sp * 0.8;
+  // flash
+  let fl = 0; for (const x of tl) if (x.s.flash) { const k = (t - x.t0) / 1.4; if (k >= 0 && k < 1) fl = 1 - k; }
+  flash.style.opacity = fl;
+  // subtitles
+  let txt = '', tt = r.t0 + (+s.pause || 0);
+  for (const id of (s.lines || [])) for (const b of boxes(id)) { const d = boxTime(b); if (t >= tt && t < tt + d) txt = b.replace(/<name>/g, 'Pete'); tt += d; }
+  subs.textContent = txt;
+  const lb = !!scene.settings.letterbox; document.getElementById('lbt').classList.toggle('off', !lb); document.getElementById('lbb').classList.toggle('off', !lb);
+  hud.textContent = (tl.indexOf(r) + 1) + '. ' + (s.name || '') + (s.motion && gy.vis ? '  ·  ' + s.motion : '');
+  R.render(W, C);
+  document.getElementById('time').textContent = t.toFixed(1) + ' s / ' + total().toFixed(1) + ' s';
+}
+
+// ---------- playback
+let playing = false, t0 = 0, from = 0, until = 0, now = 0;
+function frame(ts) {
+  if (!playing) return;
+  now = from + (ts - t0) / 1000;
+  if (now >= until) { now = until - 0.001; playing = false; }
+  render(now); document.getElementById('scrub').value = Math.round(now / Math.max(0.01, total()) * 1000);
+  if (playing) requestAnimationFrame(frame);
+}
+function play(a, b) { from = a; until = b; playing = true; t0 = performance.now(); requestAnimationFrame(frame); }
+document.getElementById('play').onclick = () => play(0, total());
+document.getElementById('playshot').onclick = () => { const r = timeline()[sel]; if (r) play(r.t0, r.t0 + r.dur); };
+document.getElementById('stop').onclick = () => { playing = false; };
+document.getElementById('scrub').oninput = e => { playing = false; now = e.target.value / 1000 * total(); render(now); };
+
+// ---------- shot list
+const MOT = ['idle', 'explain', 'plead (bow)', 'holding', 'walk', 'crouch'];
+const LOOK = ['subject', 'goddess', 'farmer', 'pair'];
+function drawList() {
+  const el = document.getElementById('shots'); el.innerHTML = '';
+  timeline().forEach((r, i) => {
+    const s = r.s, d = document.createElement('div'); d.className = 'shot' + (i === sel ? ' sel' : '');
+    d.innerHTML = `<div class="t"></div><div class="m"></div><div class="b"></div>`;
+    d.querySelector('.t').textContent = (i + 1) + '. ' + (s.name || 'Shot');
+    d.querySelector('.m').innerHTML = r.dur.toFixed(1) + ' s · ' + s.action + (s.flash ? ' · flash' : '') + ' ' + (s.lines || []).map(x => `<span class="chip">${x}</span>`).join('');
+    const b = d.querySelector('.b');
+    [['↑', () => mv(i, -1)], ['↓', () => mv(i, 1)], ['Duplicate', () => { scene.shots.splice(i + 1, 0, JSON.parse(JSON.stringify(s))); sel = i + 1; save(); drawEditor(); }],
+     ['Delete', () => { if (scene.shots.length > 1) { scene.shots.splice(i, 1); sel = Math.max(0, i - 1); save(); drawEditor(); } }]].forEach(([t, fn]) => {
+      const x = document.createElement('button'); x.className = 'small'; x.textContent = t; x.onclick = e => { e.stopPropagation(); fn(); }; b.appendChild(x); });
+    d.onclick = () => { sel = i; drawList(); drawEditor(); const rr = timeline()[i]; playing = false; now = rr.t0 + 0.01; render(now); };
+    el.appendChild(d);
+  });
+  document.getElementById('total').textContent = total().toFixed(1) + ' s';
+}
+function mv(i, d) { const j = i + d; if (j < 0 || j >= scene.shots.length) return; const a = scene.shots; [a[i], a[j]] = [a[j], a[i]]; sel = j; save(); drawEditor(); }
+document.getElementById('add').onclick = () => { const s = JSON.parse(JSON.stringify(scene.shots[sel] || PROPOSAL.shots[0])); s.name = 'New shot'; s.lines = []; s.flash = false; scene.shots.splice(sel + 1, 0, s); sel++; save(); drawEditor(); };
+
+// ---------- shot editor
+function slider(parent, label, obj, key, min, max, step) {
+  const r = document.createElement('div'); r.className = 'row';
+  r.innerHTML = `<span>${label}</span><input type="range" min="${min}" max="${max}" step="${step}"><output></output>`;
+  const i = r.querySelector('input'), o = r.querySelector('output'); i.value = obj[key]; o.textContent = (+obj[key]).toFixed(step < 1 ? 1 : 0);
+  i.oninput = () => { obj[key] = +i.value; o.textContent = (+i.value).toFixed(step < 1 ? 1 : 0); save(); preview(); };
+  parent.appendChild(r);
+}
+function sel_(parent, label, obj, key, opts) {
+  const l = document.createElement('label'); l.textContent = label; parent.appendChild(l);
+  const s = document.createElement('select'); opts.forEach(([v, t]) => { const o = document.createElement('option'); o.value = v; o.textContent = t; s.appendChild(o); });
+  s.value = obj[key]; s.onchange = () => { obj[key] = s.value; save(); preview(); }; parent.appendChild(s);
+}
+function preview() { const r = timeline()[sel]; if (!r) return; playing = false; const f = Math.min(r.dur - 0.01, Math.max(0, now - r.t0)); const t = r.t0 + (now >= r.t0 && now < r.t0 + r.dur ? f : (r.s.flash ? Math.min(1.0, r.dur * 0.4) : 0.01)); now = t; render(t); document.getElementById('scrub').value = Math.round(t / Math.max(0.01, total()) * 1000); document.getElementById('time').textContent = t.toFixed(1) + ' s / ' + total().toFixed(1) + ' s'; }
+function drawEditor() {
+  const s = scene.shots[sel], ed = document.getElementById('editor'); ed.innerHTML = '';
+  if (!s) return;
+  const h = document.createElement('div'); h.innerHTML = `<b>Shot ${sel + 1}</b>`; ed.appendChild(h);
+  const nl = document.createElement('label'); nl.textContent = 'Name'; ed.appendChild(nl);
+  const nm = document.createElement('input'); nm.type = 'text'; nm.value = s.name || ''; nm.oninput = () => { s.name = nm.value; save(); }; ed.appendChild(nm);
+  sel_(ed, 'Camera is placed around', s, 'subject', [['goddess', 'the goddess'], ['farmer', 'the farmer'], ['pair', 'the two of them']]);
+  sel_(ed, 'and looks at', s, 'look', [['subject', 'the same'], ['goddess', 'the goddess'], ['farmer', 'the farmer'], ['pair', 'the two of them']]);
+  const hint = document.createElement('p'); hint.className = 'hint';
+  hint.textContent = 'Angle 0° = on the farmer\'s side of her (she faces it); 180° = behind her; ±90° = to the side. Distance along the ground, height above the water, aim = height of the point it looks at.';
+  ed.appendChild(hint);
+  ['start', 'end'].forEach(k => {
+    const fs = document.createElement('fieldset'); fs.innerHTML = `<legend>Camera ${k === 'start' ? 'at the start' : 'at the end'} of the shot</legend>`;
+    slider(fs, 'Angle°', s[k], 'yaw', -180, 180, 1); slider(fs, 'Distance', s[k], 'dist', 0.5, 16, 0.1); slider(fs, 'Height', s[k], 'height', 0.1, 10, 0.1); slider(fs, 'Aim ht', s[k], 'aim', 0, 3, 0.05);
+    if (k === 'end') { const b = document.createElement('button'); b.className = 'small'; b.textContent = 'Same as start (no move)'; b.onclick = () => { s.end = { ...s.start }; save(); drawEditor(); preview(); }; fs.appendChild(b); }
+    ed.appendChild(fs);
+  });
+  sel_(ed, 'Camera move', s, 'ease', [['inout', 'smooth (eases in and out)'], ['linear', 'steady']]);
+  const fs2 = document.createElement('fieldset'); fs2.innerHTML = '<legend>Timing</legend>';
+  slider(fs2, 'Min secs', s, 'seconds', 0, 12, 0.1); slider(fs2, 'Pause', s, 'pause', 0, 5, 0.1);
+  const hp = document.createElement('p'); hp.className = 'hint'; hp.textContent = 'A shot lasts at least "Min secs", and long enough for its pause, its lines (until you press A in game), and a rise / sink set to happen after them.'; fs2.appendChild(hp);
+  ed.appendChild(fs2);
+  const fs3 = document.createElement('fieldset'); fs3.innerHTML = '<legend>Lines in this shot</legend>';
+  const ln = document.createElement('div'); ln.className = 'lines';
+  Object.keys(LINES).forEach(id => { const l = document.createElement('label'); const c = document.createElement('input'); c.type = 'checkbox'; c.checked = (s.lines || []).includes(id);
+    c.onchange = () => { const set = new Set(s.lines || []); c.checked ? set.add(id) : set.delete(id); s.lines = Object.keys(LINES).filter(x => set.has(x)); save(); preview(); };
+    l.appendChild(c); l.appendChild(document.createTextNode(id + (id === 'A9' ? ' (year 1)' : ''))); l.title = LINES[id]; ln.appendChild(l); });
+  fs3.appendChild(ln); ed.appendChild(fs3);
+  const fs4 = document.createElement('fieldset'); fs4.innerHTML = '<legend>The goddess</legend>';
+  sel_(fs4, 'She', s, 'action', [['under', 'is under the water (hidden)'], ['rise', 'rises out of the water'], ['stand', 'stands on the water'], ['sink', 'sinks back down']]);
+  sel_(fs4, 'Rise / sink happens', s, 'actionWhen', [['start', 'at the start of the shot'], ['afterLines', 'after this shot\'s lines']]);
+  slider(fs4, 'Rise/sink s', s, 'actionSeconds', 0.5, 8, 0.1);
+  sel_(fs4, 'Animation', s, 'motion', MOT.map(m => [m, m]));
+  ed.appendChild(fs4);
+  const fs5 = document.createElement('fieldset'); fs5.innerHTML = '<legend>Effects</legend><div class="lines"></div>';
+  const e5 = fs5.querySelector('.lines');
+  [['flash', 'White flash at the start'], ['splash', 'Splash sound with rise / sink']].forEach(([k, t]) => { const l = document.createElement('label'); const c = document.createElement('input'); c.type = 'checkbox'; c.checked = !!s[k];
+    c.onchange = () => { s[k] = c.checked; save(); preview(); }; l.appendChild(c); l.appendChild(document.createTextNode(t)); e5.appendChild(l); });
+  const nl2 = document.createElement('label'); nl2.textContent = 'Note to Claude'; fs5.appendChild(nl2);
+  const nt = document.createElement('textarea'); nt.rows = 2; nt.value = s.note || ''; nt.placeholder = 'e.g. a slow push-in here, she looks away'; nt.oninput = () => { s.note = nt.value; save(); }; fs5.appendChild(nt);
+  ed.appendChild(fs5);
+}
+
+// ---------- top view
+function drawMini() {
+  const cv = document.getElementById('mini'), x = cv.getContext('2d'), w = cv.width, sc = w / 26, P = P0;
+  const cs = getComputedStyle(document.documentElement);
+  const tx = v => w / 2 + (v.x - (G.x + P.x) / 2) * sc, tz = v => w / 2 + (v.z - (G.z + P.z) / 2) * sc;
+  x.clearRect(0, 0, w, w);
+  x.fillStyle = '#3f8fb0'; x.beginPath(); x.ellipse(tx(G), tz(G), 5 * sc, 6.2 * sc, 0, 0, Math.PI * 2); x.fill();
+  const dot = (v, c, r) => { x.fillStyle = c; x.beginPath(); x.arc(tx(v), tz(v), r, 0, Math.PI * 2); x.fill(); };
+  dot(G, '#2f8f8a', 9); dot(P, '#8a5a2b', 8);
+  const s = scene.shots[sel]; if (!s) return;
+  const a = cam(s, 0, P), b = cam(s, 1, P);
+  x.strokeStyle = cs.getPropertyValue('--ink'); x.lineWidth = 2;
+  x.beginPath(); x.moveTo(tx(a.eye), tz(a.eye)); x.lineTo(tx(b.eye), tz(b.eye)); x.stroke();
+  x.setLineDash([5, 5]); x.beginPath(); x.moveTo(tx(b.eye), tz(b.eye)); x.lineTo(tx(b.at), tz(b.at)); x.stroke(); x.setLineDash([]);
+  x.fillStyle = cs.getPropertyValue('--panel'); x.beginPath(); x.arc(tx(a.eye), tz(a.eye), 7, 0, Math.PI * 2); x.fill(); x.stroke();
+  x.fillStyle = cs.getPropertyValue('--ink'); x.beginPath(); x.arc(tx(b.eye), tz(b.eye), 7, 0, Math.PI * 2); x.fill();
+  x.font = '600 20px Nunito, sans-serif'; x.fillText('pool', tx(G) - 20, tz(G) + 40);
+}
+
+// ---------- scene settings, export, import
+function bindSettings() {
+  const lb = document.getElementById('s_lb'), mu = document.getElementById('s_music'), fov = document.getElementById('s_fov'), o = document.getElementById('o_fov');
+  lb.checked = !!scene.settings.letterbox; mu.checked = !!scene.settings.musicFade; fov.value = scene.settings.fov; o.textContent = scene.settings.fov + '°';
+  lb.onchange = () => { scene.settings.letterbox = lb.checked; save(); preview(); };
+  mu.onchange = () => { scene.settings.musicFade = mu.checked; save(); };
+  fov.oninput = () => { scene.settings.fov = +fov.value; o.textContent = fov.value + '°'; save(); preview(); };
+}
+function exportObj() { return Object.assign({ file: 'spring_scene', version: 1, exported: new Date().toISOString(), totalSeconds: +total().toFixed(1) }, scene); }
+document.getElementById('exp').onclick = () => { const b = new Blob([JSON.stringify(exportObj(), null, 1)], { type: 'application/json' }); const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = 'spring_scene.json'; document.body.appendChild(a); a.click(); a.remove(); toast('Saved spring_scene.json - send me that file'); };
+document.getElementById('copy').onclick = async () => { const t = JSON.stringify(exportObj()); try { await navigator.clipboard.writeText(t); toast('Copied - paste it to me'); } catch (e) { toast('Copy failed - use Export'); } };
+document.getElementById('impbtn').onclick = () => document.getElementById('imp').classList.toggle('on');
+document.getElementById('impgo').onclick = () => { try { const o = JSON.parse(document.getElementById('imptext').value); if (!o.shots) throw 0; scene = { settings: o.settings, shots: o.shots }; sel = 0; save(); bindSettings(); drawEditor(); now = -1; preview(); toast('Loaded'); } catch (e) { toast('That is not an exported scene'); } };
+document.getElementById('reset').onclick = () => { scene = JSON.parse(JSON.stringify(PROPOSAL)); sel = 0; save(); bindSettings(); drawEditor(); now = -1; preview(); toast('Back to the proposal'); };
+document.getElementById('theme').onclick = () => { const cur = document.documentElement.dataset.theme || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'); document.documentElement.dataset.theme = cur === 'dark' ? 'light' : 'dark'; drawMini(); };
+resize(); bindSettings(); drawList(); drawEditor(); drawMini(); now = -1; preview();
+</script>
+</body>
+</html>

@@ -3867,8 +3867,37 @@ so, door fades are timed there, possibly per frame. Not traced yet.
 - spring.c: the fossil with all 15 made -> SUMMONED + affection full + gq_scene_req; while the Postman / Joe is out the
   fossil is not thrown ("The water is restless. / Come back later."). GQ_TEST: Z + D-Down after the summoning resets it
   (replay). pm gqtest a576b649, test 2def01f4, normal ca2a7cd8; Common.arc dead3d1f, debug.mes f22a02da.
-- Cutscene music (gq6 plan): "Marin Jazz" is record item 0x514 (records 0x510-0x51B, 5th). Song table
-  test/text/SNGList.txt: song id = MusyX group id; song 1 = RECORD05 (other records: 4 RECORD02, 5 RECORD04,
-  10 RECORD01, 11 RECORD03, 12-16 RECORD06-10). Bank table 0x802544A0 {name, info} -> info 0x80254278 + 16 i,
-  +0 = group/song id (RECORD05 = bank 23, id 1). Record n -> RECORD0n is inferred from the names (the record
-  player's own mapping not traced yet); confirm by ear in game.
+- Marin Jazz: record item 0x514. The record player's own table 0x80255168 (12 x {u16 group, u16 song, u32 item}, the
+  records 0x510-0x51B in item order) gives group / song 1 = RECORD05 (test/text/SNGList.txt: song id = MusyX group id).
+  Others: Spring Song 10, Town Spirit 4, Flower Bud Fall 11, 64 Memories 5, Butterfly 12, Summer Memories 13, Joy of
+  Fall 14, Winter HM 15, The Bride 16, Breeze 0 (BOKUJYO01), Quiet Winter 9 (BOKUJYO02). Bank name table 0x802544A0.
+- The valley's music runs through the record player: manager *(0x803491D8) -> [0] {+4 record index, +8 playing}; in
+  every dump the index is 10 (Breeze, song 0) with playing = 1, and the music director's request 0x80349440 = 0x20000
+  | song (func_8014F544 reads func_8014649C(mgr) = the record's song). func_80146458(mgr, item) sets the record (returns
+  the old item), func_8014641C(mgr) sets playing and loads its bank (func_801464D0: DvdFile read, func_8018A460),
+  func_80146448 clears playing.
+- Event camera (gq5 angle bug): the script context is EVMGR + 0x60, its camera record EVMGR + 0x5FC: eye +0, look-at
+  pointer +0xC, own target +0x10, target offset +0x1C, distance / pitch / yaw +0x28.. worked out by func_80108BEC from
+  eye - *target. cmd_14 = eye, cmd_15 = target (points +0xC at +0x10), cmd_13(n) points +0xC at character n's position
+  (offset +0x1C = 0, 1.07, 0): gq5's script ended every shot with cmd_13(0), so the camera looked at the farmer.
+
+### 7.65 The first summoning, directed (gq6)
+- tools/goddess/scene: the Spring Scene Director (director_template.html + make_page.py: three.js stand-ins at the real
+  spots, shots with start / end camera, timing, lines, her action / motion, effects; export spring_scene.json). The
+  user took the proposal as is (13 shots, ~61 s): spring_scene.json, settings letterbox, music fade, Marin Jazz on shot 5.
+- build_gq_scene.py reads spring_scene.json: event 412 = for each shot: cue n (counter 26), the first shot's
+  cmd_14 / cmd_15 (no cmd_13), wait for "done" (27 = n) when the shot has no lines or a pause, its lines (A9 year 1
+  only), then for an after-the-lines action (the sink) cue 32 + n and wait for 27 = 32 + n. gq_scene.h GSHOT[] (under
+  GQ_SHOTS): subject / look (her, him, midpoint), smooth, motion (Celia clip), action (under / stand / rise / sink),
+  after, splash, glide frames (the editor's estimate of the shot's length, 60 fps), hold frames, action frames, start /
+  end yaw, distance, height, aim.
+- pm.c gd_frame: every frame the camera record gets the shot's eye / target (editor rule: axis her -> him turned by
+  yaw, eye dist along it from the subject, height / aim above the water), eased over the glide frames, then
+  func_80108BEC; written only while +0xC points at +0x10 (GS.camok). Under = 1.8 below, hidden; rise 3.5 s, sink 3 s
+  (then hidden); splash = SFX 300 "water". Music: master to 0 over 1.2 s at the start; shot 5 -> record Marin Jazz +
+  playing, master to 127 over 0.4 s; the sink -> master to 0 over 2.5 s; at the end the old record (and its playing
+  flag) back, master to 127 over 2 s. Letterbox: gq_lbox 0 -> 36 HUD px (2 per frame), zt.c reticle() draws two black
+  bars with quads 0 / 1 while no target, back to 0 after. 'GSCN' at 0x8037EDCC in the gqtest build.
+- Untested: whether element 7 (the HUD) shows in events (bars), whether the director switches songs at once, the
+  event camera taking our eye / target every frame. pm gqtest eb04d374, test 91e597f1, normal 37f8a84c (140 KB);
+  Common.arc 6c3b1a5d (debug.mes unchanged, f22a02da).

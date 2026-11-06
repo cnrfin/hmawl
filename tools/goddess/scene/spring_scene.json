@@ -1,0 +1,396 @@
+{
+ "file": "spring_scene",
+ "version": 1,
+ "settings": {
+  "letterbox": true,
+  "musicFade": true,
+  "fov": 40,
+  "music": "Marin Jazz",
+  "musicShot": 5
+ },
+ "shots": [
+  {
+   "name": "The spring",
+   "subject": "farmer",
+   "look": "goddess",
+   "start": {
+    "yaw": 0,
+    "dist": 6,
+    "height": 3.5,
+    "aim": 0.3
+   },
+   "end": {
+    "yaw": 0,
+    "dist": 4,
+    "height": 2.6,
+    "aim": 0.3
+   },
+   "ease": "inout",
+   "seconds": 3,
+   "pause": 0,
+   "lines": [],
+   "action": "under",
+   "actionWhen": "start",
+   "actionSeconds": 3,
+   "motion": "idle",
+   "flash": true,
+   "splash": false,
+   "note": "Fade in from the white flash behind the farmer, high up."
+  },
+  {
+   "name": "Glow",
+   "subject": "goddess",
+   "look": "subject",
+   "start": {
+    "yaw": 25,
+    "dist": 4.5,
+    "height": 0.4,
+    "aim": 0.2
+   },
+   "end": {
+    "yaw": 10,
+    "dist": 3.5,
+    "height": 0.6,
+    "aim": 0.2
+   },
+   "ease": "inout",
+   "seconds": 2,
+   "pause": 0,
+   "lines": [],
+   "action": "under",
+   "actionWhen": "start",
+   "actionSeconds": 3,
+   "motion": "idle",
+   "flash": false,
+   "splash": false,
+   "note": "Low over the water; light gathers."
+  },
+  {
+   "name": "The rise",
+   "subject": "goddess",
+   "look": "subject",
+   "start": {
+    "yaw": 10,
+    "dist": 3.2,
+    "height": 0.5,
+    "aim": 0.6
+   },
+   "end": {
+    "yaw": 0,
+    "dist": 3.0,
+    "height": 1.0,
+    "aim": 1.4
+   },
+   "ease": "inout",
+   "seconds": 4,
+   "pause": 0,
+   "lines": [],
+   "action": "rise",
+   "actionWhen": "start",
+   "actionSeconds": 3.5,
+   "motion": "idle",
+   "flash": false,
+   "splash": true,
+   "note": "Camera tilts up with her."
+  },
+  {
+   "name": "Silence",
+   "subject": "goddess",
+   "look": "subject",
+   "start": {
+    "yaw": 0,
+    "dist": 2.2,
+    "height": 1.5,
+    "aim": 1.45
+   },
+   "end": {
+    "yaw": 0,
+    "dist": 1.8,
+    "height": 1.5,
+    "aim": 1.45
+   },
+   "ease": "inout",
+   "seconds": 0,
+   "pause": 1.0,
+   "lines": [
+    "A1"
+   ],
+   "action": "stand",
+   "actionWhen": "start",
+   "actionSeconds": 3,
+   "motion": "idle",
+   "flash": false,
+   "splash": false,
+   "note": "Eyes closed. Hold before she speaks."
+  },
+  {
+   "name": "Eyes open",
+   "subject": "goddess",
+   "look": "subject",
+   "start": {
+    "yaw": 0,
+    "dist": 1.8,
+    "height": 1.5,
+    "aim": 1.45
+   },
+   "end": {
+    "yaw": 0,
+    "dist": 1.8,
+    "height": 1.5,
+    "aim": 1.45
+   },
+   "ease": "inout",
+   "seconds": 0,
+   "pause": 0,
+   "lines": [
+    "A2"
+   ],
+   "action": "stand",
+   "actionWhen": "start",
+   "actionSeconds": 3,
+   "motion": "idle",
+   "flash": false,
+   "splash": false,
+   "note": ""
+  },
+  {
+   "name": "Over the shoulder",
+   "subject": "goddess",
+   "look": "farmer",
+   "start": {
+    "yaw": 160,
+    "dist": 1.6,
+    "height": 1.6,
+    "aim": 1.0
+   },
+   "end": {
+    "yaw": 160,
+    "dist": 1.6,
+    "height": 1.6,
+    "aim": 1.0
+   },
+   "ease": "inout",
+   "seconds": 0,
+   "pause": 0,
+   "lines": [
+    "A3"
+   ],
+   "action": "stand",
+   "actionWhen": "start",
+   "actionSeconds": 3,
+   "motion": "idle",
+   "flash": false,
+   "splash": false,
+   "note": "Behind her, looking at the farmer."
+  },
+  {
+   "name": "Medium",
+   "subject": "goddess",
+   "look": "subject",
+   "start": {
+    "yaw": -20,
+    "dist": 3.0,
+    "height": 1.3,
+    "aim": 1.3
+   },
+   "end": {
+    "yaw": -20,
+    "dist": 3.0,
+    "height": 1.3,
+    "aim": 1.3
+   },
+   "ease": "inout",
+   "seconds": 0,
+   "pause": 0,
+   "lines": [
+    "A4"
+   ],
+   "action": "stand",
+   "actionWhen": "start",
+   "actionSeconds": 3,
+   "motion": "idle",
+   "flash": false,
+   "splash": false,
+   "note": ""
+  },
+  {
+   "name": "Lore orbit",
+   "subject": "goddess",
+   "look": "subject",
+   "start": {
+    "yaw": -40,
+    "dist": 3.4,
+    "height": 1.2,
+    "aim": 1.3
+   },
+   "end": {
+    "yaw": 40,
+    "dist": 3.4,
+    "height": 1.6,
+    "aim": 1.3
+   },
+   "ease": "linear",
+   "seconds": 0,
+   "pause": 0,
+   "lines": [
+    "A5"
+   ],
+   "action": "stand",
+   "actionWhen": "start",
+   "actionSeconds": 3,
+   "motion": "explain",
+   "flash": false,
+   "splash": false,
+   "note": "Slow orbit while she tells the story."
+  },
+  {
+   "name": "Push-in",
+   "subject": "goddess",
+   "look": "subject",
+   "start": {
+    "yaw": 5,
+    "dist": 2.4,
+    "height": 1.5,
+    "aim": 1.45
+   },
+   "end": {
+    "yaw": 5,
+    "dist": 1.9,
+    "height": 1.5,
+    "aim": 1.45
+   },
+   "ease": "inout",
+   "seconds": 0,
+   "pause": 0,
+   "lines": [
+    "A6"
+   ],
+   "action": "stand",
+   "actionWhen": "start",
+   "actionSeconds": 3,
+   "motion": "idle",
+   "flash": false,
+   "splash": false,
+   "note": ""
+  },
+  {
+   "name": "Hero low angle",
+   "subject": "goddess",
+   "look": "subject",
+   "start": {
+    "yaw": 15,
+    "dist": 2.6,
+    "height": 0.5,
+    "aim": 1.5
+   },
+   "end": {
+    "yaw": 15,
+    "dist": 2.6,
+    "height": 0.5,
+    "aim": 1.5
+   },
+   "ease": "inout",
+   "seconds": 0,
+   "pause": 0,
+   "lines": [
+    "A7"
+   ],
+   "action": "stand",
+   "actionWhen": "start",
+   "actionSeconds": 3,
+   "motion": "plead (bow)",
+   "flash": false,
+   "splash": false,
+   "note": "\"I am the Harvest Goddess.\" Looking up at her."
+  },
+  {
+   "name": "Two-shot",
+   "subject": "pair",
+   "look": "subject",
+   "start": {
+    "yaw": 90,
+    "dist": 5.0,
+    "height": 1.6,
+    "aim": 1.0
+   },
+   "end": {
+    "yaw": 90,
+    "dist": 4.5,
+    "height": 1.6,
+    "aim": 1.0
+   },
+   "ease": "inout",
+   "seconds": 0,
+   "pause": 0,
+   "lines": [
+    "A8",
+    "A9"
+   ],
+   "action": "stand",
+   "actionWhen": "start",
+   "actionSeconds": 3,
+   "motion": "explain",
+   "flash": false,
+   "splash": false,
+   "note": "A9 plays only in year 1."
+  },
+  {
+   "name": "Farewell",
+   "subject": "goddess",
+   "look": "subject",
+   "start": {
+    "yaw": 0,
+    "dist": 3,
+    "height": 1.4,
+    "aim": 1.4
+   },
+   "end": {
+    "yaw": 0,
+    "dist": 7,
+    "height": 4.5,
+    "aim": 0.4
+   },
+   "ease": "inout",
+   "seconds": 0,
+   "pause": 0,
+   "lines": [
+    "A10"
+   ],
+   "action": "sink",
+   "actionWhen": "afterLines",
+   "actionSeconds": 3,
+   "motion": "idle",
+   "flash": false,
+   "splash": true,
+   "note": "Crane up and back as she sinks."
+  },
+  {
+   "name": "Quiet",
+   "subject": "farmer",
+   "look": "goddess",
+   "start": {
+    "yaw": 0,
+    "dist": 5,
+    "height": 3,
+    "aim": 0.2
+   },
+   "end": {
+    "yaw": 0,
+    "dist": 5.5,
+    "height": 3.2,
+    "aim": 0.2
+   },
+   "ease": "inout",
+   "seconds": 2,
+   "pause": 0,
+   "lines": [],
+   "action": "under",
+   "actionWhen": "start",
+   "actionSeconds": 3,
+   "motion": "idle",
+   "flash": false,
+   "splash": false,
+   "note": "The empty pool; music returns."
+  }
+ ]
+}

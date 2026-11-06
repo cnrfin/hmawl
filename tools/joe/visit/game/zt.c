@@ -297,6 +297,7 @@ static void ret_hide(u8 *a)
 }
 /* reticle B (chosen from four mock-ups, tools/ztarget/reticle): four flat yellow corner brackets round the
    target's body; they snap in from twice the size with a little overshoot, then pulse gently */
+extern s32 gq_lbox;
 static void reticle(u8 *g)
 {
     u8 *a = AGC, *c = CAM;
@@ -310,6 +311,14 @@ static void reticle(u8 *g)
     zt_dbg.agc_ok = 2;
     if (*(u32 *)(a + AGC_E7_COUNT) != E7_TOTAL) return;   /* our opguide.agc */
     zt_dbg.agc_ok = 3;
+    if (gq_lbox > 0 && !Z.target) {                      /* the goddess scene's letterbox bars (pm.c gq_lbox, gq6) */
+        s32 ey = *(s16 *)(a + AGC_E7_Y), k;
+        quad(a, 0, -330 - E7_X, -250 - ey, 330 - E7_X, -240 + gq_lbox - ey, UV_WHITE, 0x000000FFu);
+        quad(a, 1, -330 - E7_X, 240 - gq_lbox - ey, 330 - E7_X, 250 - ey, UV_WHITE, 0x000000FFu);
+        for (k = 2; k < 8; k++) quad(a, k, 0, 0, 0, 0, UV_WHITE, 0xFFFFFF00u);
+        bar_quad(a, 0, 0, 0, 0, 0, 0xFFFFFF00u); bar_quad(a, 1, 0, 0, 0, 0, 0xFFFFFF00u);
+        Z.alpha = 0; return;
+    }
     if (Z.target) { if (Z.alpha < 255) Z.alpha += 51; if (Z.alpha > 255) Z.alpha = 255; }
     else { Z.alpha -= 64; if (Z.alpha < 0) Z.alpha = 0; Z.r = -1; }
     if (!Z.alpha || (u32)c < 0x80000000u || (u32)c >= 0x81800000u) { ret_hide(a); return; }

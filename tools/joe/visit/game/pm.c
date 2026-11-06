@@ -697,50 +697,97 @@ static void joe_motion(s32 m)               /* start a clip once (sit down / sta
     actor_motion(S.actor, m);
 }
 
-/* ---- The Harvest Goddess's first summoning (gq5; tools/goddess/quest/build_gq_scene.py = event GQ_SCENE_EVENT).
-   spring.c sets gq_scene_req when the Mermaid Fossil lands with all 15 offerings made. With slot 37 free (no Postman /
-   Joe out), she is loaded as its third tenant (WHO_HG), placed 1.8 under Pool B's surface, facing the player, and the
-   event starts. Cues from the script (counter 26): 1 rise (0.9 s; then counter 27 = 1), 2 close-up, 3 side two-shot,
-   4 a little bow (plead clip), 5 talking (explain), 6 sink (counter 27 = 2, hidden). Counters 20-25 = the shot's eye
-   / target x128, worked out here every frame from where she and the player stand. Counter 28 = 1 in year 1. When the
-   event has ended she is let go of and slot 37 is free again. gq_scene_req: 1 asked, 0 done, -1 busy (spring.c says
-   so and tries again on the next toss). */
+/* ---- The Harvest Goddess's first summoning (gq6; tools/goddess/quest/build_gq_scene.py = event GQ_SCENE_EVENT, the
+   shots from the Spring Scene Director's spring_scene.json, GSHOT in gq_scene.h). spring.c sets gq_scene_req when the
+   Mermaid Fossil lands with all 15 offerings made. With slot 37 free (no Postman / Joe out), she is loaded as its third
+   tenant (WHO_HG), placed 1.8 under Pool B's surface (hidden), facing the player, and the event starts.
+   The script sets counter 26 to n when shot n starts and to 32 + n for shot n's after-the-lines action (the sink); we
+   set counter 27 to the cue once its timed part is over (GSHOT hold / action frames) and the script waits on that where
+   a shot has no lines or a pause. Every frame we move the event camera ourselves: its record (EVMGR + 0x5FC: eye +0,
+   look-at pointer +0xC -> own target +0x10, target offset +0x1C, func_80108BEC works out distance / angles) gets the
+   shot's eye / target, eased from its start to its end over the shot's glide frames. Placement is the editor's: the
+   axis runs from her to the player, yaw turns it, the eye sits dist along it from the subject, height / aim are above
+   the water. Music: the field song fades out (MusyX music master) at the start; on GS_MUSIC_SHOT the record player
+   (the valley's own music runs through it: record "Breeze") is switched to "Marin Jazz" (song 1) and the music comes
+   back up; the sink fades it out, and at the end the old record comes back. Letterbox bars: zt.c draws gq_lbox
+   (HUD quads). Counter 28 = 1 in year 1. gq_scene_req: 1 asked, 0 done, -1 busy (spring.c tries again on the next toss). */
+#define GQ_SHOTS
 #include "gq_scene.h"
 s32 gq_scene_req;
+s32 gq_lbox;                                 /* letterbox bar height (HUD px), zt.c draws it */
 s32 gq_slot_busy(void) { return S.actor != 0 && S.who != WHO_HG; }
-struct { u32 magic; s32 st, t, cue, lastcue, rose, sunk, waited; float surf; } GS;   /* 'GSCN' (dump) */
+struct { u32 magic; s32 st, t, at, cue, lastcue, shot, act, waited, camok, rec_old, rec_flag, music; float surf;
+         float eye[3], tgt[3]; } GS;      /* 'GSCN' (dump) */
 #define GD_SINK 1.8f
+#define GS_CAM       (EVMGR + 0x5FC)
+#define cam_update   F(0x80108BEC, void, (u8 *))
+#define music_vol    F(0x80189DD8, void, (u8 *, u32, u32))          /* music master: vol 0..127, ms */
+#define RECMGR       (*(u8 **)0x803491D8)                           /* the record player */
+#define rec_set      F(0x80146458, s32, (u8 *, s32))                /* (mgr, record item) -> the old record's item */
+#define rec_on       F(0x8014641C, void, (u8 *))                    /* playing on + its bank loaded */
+#define rec_off      F(0x80146448, void, (u8 *))
+#define SE_WATER     300
 static float smooth(float x) { return x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x); }
-static void gs_cam(u8 *g, s32 cue)
+static float gsin(float x)                   /* radians */
 {
-    s32 *c = (s32 *)(g + 0x12194 + 20 * 4);
-    float *p = (float *)(g + 0x29C78), dx = p[0] - S.pos.x, dz = p[2] - S.pos.z, l2 = dx * dx + dz * dz, inv, sx, sz;
-    float ex, ey, ez, tx, ty, tz, mx, mz, by = GS.surf;
+    float x2;
+    while (x > 3.14159274f) x -= 6.28318548f;
+    while (x < -3.14159274f) x += 6.28318548f;
+    if (x > 1.57079637f) x = 3.14159274f - x; else if (x < -1.57079637f) x = -3.14159274f - x;
+    x2 = x * x;
+    return x * (1 - x2 / 6 * (1 - x2 / 20 * (1 - x2 / 42 * (1 - x2 / 72))));
+}
+static void gs_pt(s32 who, float *p, float *o)  /* 0 her, 1 him, 2 between */
+{
+    if (who == 1) { o[0] = p[0]; o[1] = p[2]; }
+    else if (who == 2) { o[0] = (p[0] + S.pos.x) * 0.5f; o[1] = (p[2] + S.pos.z) * 0.5f; }
+    else { o[0] = S.pos.x; o[1] = S.pos.z; }
+}
+static void gs_cam(u8 *g, const struct gshot *sh, float f)
+{
+    s32 *c = (s32 *)(g + 0x12194 + 20 * 4), i;
+    float *p = (float *)(g + 0x29C78), dx = p[0] - S.pos.x, dz = p[2] - S.pos.z, l2 = dx * dx + dz * dz, inv;
+    float e = sh->smooth ? smooth(f) : (f < 0 ? 0 : f > 1 ? 1 : f), k[4], a, cs, sn, ux, uz, sp[2], tp[2];
+    u8 *cam;
+    for (i = 0; i < 4; i++) k[i] = sh->k[i] + (sh->k[4 + i] - sh->k[i]) * e;
     if (l2 < 0.0001f) { dx = 0; dz = 1; l2 = 1; }
-    inv = rsqrt(l2); dx *= inv; dz *= inv; sx = -dz; sz = dx;          /* d: her -> player; s: to the side */
-    mx = (p[0] + S.pos.x) * 0.5f; mz = (p[2] + S.pos.z) * 0.5f;
-    switch (cue) {
-    case 1:  ex = p[0] + dx * 1.4f + sx * 0.7f; ey = p[1] + 0.9f; ez = p[2] + dz * 1.4f + sz * 0.7f;   /* low, over his shoulder */
-             tx = S.pos.x; ty = by + 1.2f; tz = S.pos.z; break;
-    case 2: case 4:
-             ex = S.pos.x + dx * 2.3f; ey = by + 1.55f; ez = S.pos.z + dz * 2.3f;                   /* close on her */
-             tx = S.pos.x; ty = by + 1.4f; tz = S.pos.z; break;
-    case 6:  ex = p[0] + dx * 3.2f; ey = p[1] + 2.4f; ez = p[2] + dz * 3.2f;                         /* wide: she sinks */
-             tx = S.pos.x; ty = by + 0.5f; tz = S.pos.z; break;
-    default: ex = mx + sx * 4.2f; ey = by + 1.7f; ez = mz + sz * 4.2f;                               /* side two-shot */
-             tx = mx; ty = by + 1.1f; tz = mz; break;
-    }
-    c[0] = (s32)(ex * 128.0f); c[1] = (s32)(ey * 128.0f); c[2] = (s32)(ez * 128.0f);
-    c[3] = (s32)(tx * 128.0f); c[4] = (s32)(ty * 128.0f); c[5] = (s32)(tz * 128.0f);
+    inv = rsqrt(l2); dx *= inv; dz *= inv;                         /* axis: her -> him */
+    a = k[0] * 0.0174532924f; sn = gsin(a); cs = gsin(a + 1.57079637f);
+    ux = dx * cs - dz * sn; uz = dx * sn + dz * cs;
+    gs_pt(sh->subj, p, sp); gs_pt(sh->look, p, tp);
+    GS.eye[0] = sp[0] + ux * k[1]; GS.eye[1] = GS.surf + k[2]; GS.eye[2] = sp[1] + uz * k[1];
+    GS.tgt[0] = tp[0]; GS.tgt[1] = GS.surf + k[3]; GS.tgt[2] = tp[1];
+    for (i = 0; i < 3; i++) { c[i] = (s32)(GS.eye[i] * 128.0f); c[3 + i] = (s32)(GS.tgt[i] * 128.0f); }
+    cam = EVMGR ? GS_CAM : 0;
+    GS.camok = cam && *(u32 *)(cam + 0xC) == (u32)(cam + 0x10);    /* the script's cmd_15 has pointed it at its own target */
+    if (!GS.camok) return;
+    for (i = 0; i < 3; i++) { ((float *)cam)[i] = GS.eye[i]; ((float *)(cam + 0x10))[i] = GS.tgt[i]; ((float *)(cam + 0x1C))[i] = 0; }
+    cam_update(cam);
 }
 static s32 gs_get(u8 *g, s32 i) { s32 v = *(s32 *)(g + 0x12194 + i * 4); if (v >= 128 && !(v & 127)) v >>= 7; return v; }
+static void gs_music(s32 on)                 /* 1: Marin Jazz in; 0: the old record back */
+{
+    u8 *m = RECMGR, *au = *(u8 **)0x803491E4;
+    if (!m || !au) return;
+    if (on) {
+        GS.rec_flag = *(*(u8 **)m + 8);
+        GS.rec_old = rec_set(m, GS_MUSIC_ITEM); rec_on(m); GS.music = 1;
+        music_vol(*(u8 **)(au + 0x4C), 127, 400);
+    } else if (GS.music) {
+        rec_set(m, GS.rec_old ? GS.rec_old : 0x51A);
+        if (GS.rec_flag) rec_on(m); else rec_off(m);
+        GS.music = 0;
+    }
+}
 static s32 gd_frame(u8 *g, s32 map, u32 t)
 {
     s32 *cn = (s32 *)(g + 0x12194);
+    u8 *au = *(u8 **)0x803491E4;
     GS.magic = 0x4753434Eu;
     if (!GS.st) {
         Vec v;
         float *p = (float *)(g + 0x29C78);
+        if (gq_lbox > 0) gq_lbox -= 2;                         /* bars out after a scene */
         if (gq_scene_req != 1) return 0;
         if (map != VALLEY || !no_event()) return 0;            /* (after the toss's own state has ended) */
         if (S.actor) { gq_scene_req = -1; return 0; }          /* the Postman / Joe is out: not now */
@@ -756,43 +803,66 @@ static s32 gd_frame(u8 *g, s32 map, u32 t)
             S.dir.x = dx * inv; S.dir.y = 0; S.dir.z = l2 > 0.0001f ? dz * inv : 1;
             {   float *pd = (float *)(g + 0x29F84); pd[0] = -S.dir.x; pd[1] = 0; pd[2] = -S.dir.z; }   /* he faces her */
         }
-        actor_setpos(S.actor, &S.pos); actor_setdir(S.actor, &S.dir);
+        actor_setpos(S.actor, &S.pos); actor_setdir(S.actor, &S.dir); actor_hide(S.actor);
         joe_motion(0);
         cn[GQ_C_CUE] = 0; cn[GQ_C_DONE] = 0;
         cn[GQ_C_YEAR1] = t / (T_DAY * 40u) == 0;                /* 4 seasons x 10 days */
-        gs_cam(g, 1);
-        GS.st = 1; GS.t = 0; GS.cue = 0; GS.lastcue = 0; GS.rose = GS.sunk = 0; GS.waited = 0;
+        gs_cam(g, &GSHOT[0], 0);
+        GS.st = 1; GS.t = 0; GS.at = -1; GS.cue = 0; GS.lastcue = 0; GS.shot = 0; GS.act = -1; GS.waited = 0; GS.music = 0;
+        if (GS_MUSIC_FADE && au) music_vol(*(u8 **)(au + 0x4C), 0, 1200);
         gq_scene_req = 0;
         event_start(EVMGR, GQ_SCENE_EVENT, 0, 0);
         return 1;
     }
     if (GS.st == 1) {                                           /* the event is running */
+        const struct gshot *sh;
         if (no_event()) { if (++GS.waited > 30 && GS.t > 30) GS.st = 2; }   /* (it starts a frame or more later) */
         else GS.waited = 0;
-        GS.t++;
-        GS.cue = gs_get(g, GQ_C_CUE);
         if (!S.actor) { GS.st = 2; return 1; }
-        if (GS.cue != GS.lastcue) {                             /* her motion for the cue */
-            GS.lastcue = GS.cue; GS.t = 0;
-            joe_motion(GS.cue == 4 ? 6 : GS.cue == 3 || GS.cue == 5 ? 4 : 0);
+        if (GS_LETTERBOX && gq_lbox < 36) gq_lbox += 2;
+        GS.cue = gs_get(g, GQ_C_CUE);
+        if (GS.cue != GS.lastcue && GS.cue > 0) {
+            s32 n = GS.cue >= 32 ? GS.cue - 32 : GS.cue;
+            if (n >= 1 && n <= GS_N) {
+                sh = &GSHOT[n - 1];
+                if (GS.cue < 32) {                              /* shot n starts */
+                    GS.shot = n - 1; GS.t = 0;
+                    joe_motion(sh->motion);
+                    if (sh->act == 0) { S.pos.y = GS.surf - GD_SINK; actor_hide(S.actor); GS.act = -1; }
+                    else if (sh->act == 1) { if (S.pos.y < GS.surf) S.pos.y = GS.surf; actor_show(S.actor); GS.act = -1; }
+                    else if (!sh->after) { GS.act = sh->act; GS.at = 0; }
+                    if (n == GS_MUSIC_SHOT && !GS.music) gs_music(1);
+                } else { GS.act = sh->act; GS.at = 0; }          /* the after-the-lines action */
+                if (GS.act >= 2) {
+                    actor_show(S.actor);
+                    if (sh->splash) sfx_play(au, SE_WATER, 0);
+                    if (GS.act == 3 && GS_MUSIC_FADE && au) music_vol(*(u8 **)(au + 0x4C), 0, 2500);
+                }
+            }
+            GS.lastcue = GS.cue;
         }
-        if (GS.cue == 1 && !GS.rose) {                          /* rising out of the water */
-            float k = smooth((float)GS.t / 54.0f);
-            S.pos.y = GS.surf - GD_SINK * (1.0f - k);
-            if (GS.t >= 54) { GS.rose = 1; cn[GQ_C_DONE] = 1; }
-        } else if (GS.cue == 6) {                               /* and back down */
-            float k = smooth((float)GS.t / 60.0f);
-            S.pos.y = GS.surf - GD_SINK * k;
-            if (GS.t >= 60 && !GS.sunk) { GS.sunk = 1; actor_hide(S.actor); cn[GQ_C_DONE] = 2; }
-        } else if (GS.rose) S.pos.y = GS.surf;
+        sh = &GSHOT[GS.shot];
+        if (GS.act >= 2 && GS.at >= 0) {                       /* rising / sinking */
+            float k = smooth((float)GS.at / (float)(sh->actf > 0 ? sh->actf : 1));
+            S.pos.y = GS.surf - GD_SINK * (GS.act == 2 ? 1.0f - k : k);
+            if (GS.at >= sh->actf) {
+                if (GS.act == 3) actor_hide(S.actor);
+                GS.act = -1;
+                if (GS.cue >= 32) cn[GQ_C_DONE] = GS.cue;
+            } else GS.at++;
+        }
+        if (GS.cue > 0 && GS.cue < 32 && GS.t >= sh->hold && (GS.act < 2 || sh->after)) cn[GQ_C_DONE] = GS.cue;
         actor_setpos(S.actor, &S.pos); actor_setdir(S.actor, &S.dir);
-        gs_cam(g, GS.cue ? GS.cue : 1);
+        gs_cam(g, sh, sh->glide > 0 ? (float)GS.t / (float)sh->glide : 1.0f);
+        GS.t++;
         return 1;
     }
-    if (no_event()) {                                           /* over: give slot 37 back */
+    if (no_event()) {                                           /* over: give slot 37 back, the music too */
         if (S.actor) despawn();
         if (S.loaded) release_model();
         S.who = 0; GS.st = 0;
+        if (GS.music) { gs_music(0); if (au) music_vol(*(u8 **)(au + 0x4C), 127, 2000); }
+        else if (GS_MUSIC_FADE && au) music_vol(*(u8 **)(au + 0x4C), 127, 2000);
         return 0;
     }
     return 1;
