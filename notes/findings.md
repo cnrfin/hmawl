@@ -4079,3 +4079,6 @@ so, door fades are timed there, possibly per frame. Not traced yet.
   0.17), the sides set back (round x s^1.5) and raised (lift x s^1.5), the whole lower face back (back), the chin middle
   down (chin). Defaults 0.22 / 0.10 / 0.04 / 0.03 / 0.02; fm1's forward chin push dropped (it made the muzzle).
   build_slim/gd_0.arc f146ab63; previews/slim_face_fm2.png (front-facing views: original / fm1 / fm2).
+- Preview note: gamerender draws some back parts (the brooch and veil at her back) over the front, so front views
+  hid the chin; slim_face_fm2.png is rendered from the head's front half only (triangles with max z > -0.02).
+  Front = angle pi in gamerender (angle 0 is her back).
