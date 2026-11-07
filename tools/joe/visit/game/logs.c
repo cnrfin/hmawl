@@ -377,10 +377,12 @@ s32 pm_axe_hit(void)
 /* the field A handler's action for this frame (0x8004368C): the tool swing (0x0F) when the Cursed Axe
    faces a present log, so the A button shows the swing label */
 s32 spring_label(s32 action, u8 *pl);
+s32 gd_label(s32 action, u8 *pl);
 s32 pm_label(s32 action, u8 *pl)
 {
     u8 *g = GAME;
     action = spring_label(action, pl);                               /* Toss at the goddess pond */
+    action = gd_label(action, pl);                                   /* gd1: Talk to call / talk to the goddess */
     if ((u32)g < 0x80000000u || (u32)g >= 0x81800000u) return action;
     if (*(s32 *)(pl + 0x64) != VALLEY || log_in_front(g) < 0) return action;
     return *(s32 *)(g + 0x11CC4) == AXE ? 0x0F : ACT_LOOK;          /* swing, or "Look" without the axe */

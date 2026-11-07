@@ -1033,17 +1033,42 @@ static void gd_cam(u8 *g)                        /* the event's camera (counters
     tg[0] = S.pos.x; tg[1] = GD.surf + 1.05f; tg[2] = S.pos.z;
     for (i = 0; i < 3; i++) { c[i] = (s32)(e[i] * 128.0f); c[3 + i] = (s32)(tg[i] * 128.0f); }
 }
+/* what A would do now: 1 call her (empty hands, facing Pool B), 2 talk / give (near her, facing her), 0 nothing ours */
+static s32 gd_a_kind(u8 *g, s32 item, float *pt)
+{
+    s32 c = *(s32 *)(g + 0x12194 + GQ_C * 4);
+    if (!(c & GQ_SUMM) || GS.st) return 0;
+    if (GD.st == 0) return !item && spring_pool_point(g, pt) ? 1 : 0;      /* (a tool in hand: its own A, e.g. fishing) */
+    if (GD.st == 2 && S.actor) {
+        float *p = (float *)(g + 0x29C78), *d = (float *)(g + 0x29F84);
+        float dx = S.pos.x - p[0], dz = S.pos.z - p[2], d2 = dx * dx + dz * dz;
+        if (d2 > GD_NEAR * GD_NEAR || d2 < 0.0001f || (dx * d[0] + dz * d[2]) * rsqrt(d2) < 0.3f) return 0;
+        if (item && !spring_giftable(item)) return 0;                       /* a tool in hand: the tool's A */
+        return 2;
+    }
+    return 0;
+}
+#define ACT_TALK 0x24                             /* an A action whose HUD label is "Talk" (label 11; table 0x8024F694) */
+/* the field A label (logs.c pm_label): "Talk" where our A calls her / talks to her (that press never reaches the game) */
+s32 gd_label(s32 action, u8 *pl)
+{
+    u8 *g = GAME;
+    float pt[3];
+    if ((u32)g < 0x80000000u || (u32)g >= 0x81800000u || *(s32 *)(pl + 0x64) != VALLEY) return action;
+    return gd_a_kind(g, HELD_ITEM, pt) ? ACT_TALK : action;
+}
 /* A at the pool / near her: before spring.c sees the press (its toss) */
 static void gd_daily_input(u8 *g, s32 map, u32 t)
 {
-    s32 c = *(s32 *)(g + 0x12194 + GQ_C * 4), item = HELD_ITEM;
+    s32 item = HELD_ITEM, kind;
     float pt[3];
     GD.magic = 0x47444C59u;
-    if (map != VALLEY || !(c & GQ_SUMM) || GS.st || !(PAD_PRESS & 0x100) || (PAD_HELD & 0x10) || CONTROL != 1 ||
+    if (map != VALLEY || !(PAD_PRESS & 0x100) || (PAD_HELD & 0x10) || CONTROL != 1 ||
         !no_event() || (FADER && *(u8 *)(FADER + 0x60))) return;
-    if (GD.st == 0) {                             /* call her: empty hands, facing Pool B */
-        if (item || !spring_pool_point(g, pt)) return;                      /* (a tool in hand: its own A, e.g. fishing) */
-        PAD_PRESS &= ~0x100u; PAD_HELD &= ~0x100u;
+    kind = gd_a_kind(g, item, pt);
+    if (!kind) return;
+    PAD_PRESS &= ~0x100u; PAD_HELD &= ~0x100u;
+    if (kind == 1) {                              /* call her */
         if (S.actor && S.who != WHO_HG) { spring_say(GQ_MSG_BUSY); return; }   /* the Postman / Joe has slot 37 */
         if (!S.actor) {
             if (S.loaded && S.who != WHO_HG) release_model();
@@ -1057,7 +1082,7 @@ static void gd_daily_input(u8 *g, s32 map, u32 t)
             if (GD.surf != GD.surf || GD.surf < p[1] - 3.0f || GD.surf > p[1] + 1.0f) GD.surf = p[1] - 0.4f;
             S.pos.x = pt[0]; S.pos.z = pt[2]; S.pos.y = GD.surf - GD_SINK;
         }
-        gd_face_player(g);
+        gd_face_player(g);                        /* she comes up facing him, then keeps that way (user: no following) */
         actor_setpos(S.actor, &S.pos); actor_show(S.actor);
         joe_motion(0);
         gs_fade(0xFFFFFFFFu, 0xFFFFFF00u, 0.8f, 0);
@@ -1067,23 +1092,16 @@ static void gd_daily_input(u8 *g, s32 map, u32 t)
         GD.st = 1; GD.t = 0; GD.summons++;
         return;
     }
-    if (GD.st == 2 && S.actor) {                  /* talk / gift */
-        float *p = (float *)(g + 0x29C78), *d = (float *)(g + 0x29F84);
-        float dx = S.pos.x - p[0], dz = S.pos.z - p[2], d2 = dx * dx + dz * dz;
-        if (d2 > GD_NEAR * GD_NEAR || d2 < 0.0001f || (dx * d[0] + dz * d[2]) * rsqrt(d2) < 0.3f) return;
-        if (item && !spring_giftable(item)) return;                         /* a tool in hand: the tool's A */
-        PAD_PRESS &= ~0x100u; PAD_HELD &= ~0x100u;
-        gd_lines(g, t, item);
-        gd_hearts(g);
-        gd_cam(g);
-        {   s32 *cn = (s32 *)(g + 0x12194);
-            cn[GD_C_L1] = GD.l1; cn[GD_C_L2] = GD.l2; cn[GD_C_TAKE] = item ? 1 : 0;
-        }
-        GD.st = 3; GD.waited = 0;
-        gd_face_player(g);
-        joe_motion(0);
-        event_start(EVMGR, GD_EVENT, 0, 0);
+    gd_lines(g, t, item);                         /* talk / gift */
+    gd_hearts(g);
+    {   s32 *cn = (s32 *)(g + 0x12194);
+        cn[GD_C_L1] = GD.l1; cn[GD_C_L2] = GD.l2; cn[GD_C_TAKE] = item ? 1 : 0;
     }
+    GD.st = 3; GD.waited = 0;
+    gd_face_player(g);                            /* she turns to him for the talk (and he to her) */
+    gd_cam(g);
+    joe_motion(0);
+    event_start(EVMGR, GD_EVENT, 0, 0);
 }
 static s32 gd_daily_frame(u8 *g, s32 map)        /* while she is up: slot 37 is hers */
 {
@@ -1100,8 +1118,7 @@ static s32 gd_daily_frame(u8 *g, s32 map)        /* while she is up: slot 37 is 
         if (no_event()) { if (++GD.waited > 20) GD.st = 2; }
         else GD.waited = 0;
     }
-    gd_face_player(g);
-    actor_setpos(S.actor, &S.pos);
+    actor_setpos(S.actor, &S.pos); actor_setdir(S.actor, &S.dir);   /* (no turning to follow him: user) */
     return 1;
 }
 static void joe_place(float s)

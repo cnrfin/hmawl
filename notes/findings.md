@@ -4120,3 +4120,7 @@ so, door fades are timed there, possibly per frame. Not traced yet.
 - pm.c: gd_daily_input runs before spring_frame (takes the A); gd_frame hands slot 37 to gd_daily_frame while she is
   up (the Postman / Joe wait); pm_scene_change sends her away. 'GDLY' GD struct (0x80380C80 in gqtest). Busy slot
   (Postman / Joe out): "The water is restless" (GQ_MSG_BUSY). pm 148 KB of ~151.
+- gd1 test (user): works. gd2: the A button shows "Talk" where our A acts (gd_a_kind: 1 call her, 2 talk / give;
+  logs.c pm_label -> gd_label returns action 0x24 = label 11 "Talk"; the field label table is u8 at 0x8024F694, action ->
+  opguide label: 0x28 -> 7 Toss, 0x24 / 0x25 / 0x32 -> 11 Talk; our A press is always taken before the game sees it).
+  She no longer turns to follow the farmer (user: creepy): she faces him as she rises and at each talk only.
