@@ -12,6 +12,7 @@ talk_hook_return = 0x80117B14;
 want_hook_return = 0x80148A50;
 van_hook_return = 0x80060EFC;
 msg_open = 0x801020E4;
+msgopen_return = 0x801020E8;
 zt_hook_return = 0x800313C8;
 tilt_return1 = 0x8017B88C;
 tilt_return2 = 0x8017B8F8;

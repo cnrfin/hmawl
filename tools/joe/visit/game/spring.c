@@ -288,33 +288,30 @@ s32 gq_talk(s32 who, s32 rec, s32 *grp, s32 *msg)
     *grp = G_DEBUG; *msg = m; GHD.hit++; GHD.msg = m;
     return 1;
 }
-/* gh2: the Harvest Sprites' chat (their own talk kind in the dispatcher, files 5 david / 6 ebony / 7 flat) never asks
-   func_80117B10, so hook.s pm_msg_stub (func_80113864's bl func_801020E4) comes here first. Outside events, in year 1
-   before the summoning, a Sprite's first chat line of the day becomes a progress line (debug.mes); the speaker (name
-   plate) stays. Not the GBA-link lines (ebony 70-74). In GQ_TEST every chat line. */
-#define msg_open_r    F(0x801020E4, s32, (u8 *, s32, s32, s32, s32, s32, s32, s32))
+/* gh3: the Harvest Sprites' chat opens its box from its own caller (not func_80117B10, not func_80113864: dump
+   d7d09a2b), so hook.s pm_msgopen_stub runs this at func_801020E4's entry, for every message box. Outside events, in
+   year 1 before the summoning, a Sprite's first line of the day (files 5 david / 6 ebony / 7 flat; not the GBA-link
+   ebony 70-74) becomes a progress line (debug.mes); the speaker (name plate) stays. In GQ_TEST every line. */
 static u32 gh_sday[3];
-struct { u32 magic; s32 calls, grp, msg, hit, line; } GMD;   /* 'GMSG' (dump) */
-s32 gq_msg_open(u8 *mm, s32 mode, s32 grp, s32 msg, s32 spk, s32 a, s32 b, s32 c2)
+struct { u32 magic; s32 calls, grp, msg, hit, line; } GMD;   /* 'GMSG' (dump): the last box opened */
+void gq_msg_swap(s32 *grp, s32 *msg)
 {
     u8 *g = GAME, *ev = EVMGR_;
-    GMD.magic = 0x474D5347u; GMD.calls++; GMD.grp = grp; GMD.msg = msg;
-    if (grp >= 5 && grp <= 7 && !(grp == 6 && msg >= 70 && msg <= 74) && OK(g) && OK(ev) &&
-        *(s32 *)(ev + 0x680) == -1 && !*(s32 *)(ev + 0x58C)) {
+    s32 gr = *grp, m = *msg;
+    GMD.magic = 0x474D5347u; GMD.calls++; GMD.grp = gr; GMD.msg = m;
+    if (gr < 5 || gr > 7 || (gr == 6 && m >= 70 && m <= 74) || !OK(g) || !OK(ev) ||
+        *(s32 *)(ev + 0x680) != -1 || *(s32 *)(ev + 0x58C)) return;
+    {
         s32 c = CNT(g, GQ);
         u32 day = CLOCK_ / DAY_;
-        if (!(c & GQ_SUMMONED) && day < 40) {
+        if ((c & GQ_SUMMONED) || day >= 40) return;
 #ifndef GQ_TEST
-            if (gh_sday[grp - 5] != day + 1)
+        if (gh_sday[gr - 5] == day + 1) return;
 #endif
-            {
-                gh_sday[grp - 5] = day + 1;
-                msg = gq_sprite_line(c); grp = G_DEBUG;
-                GMD.hit++; GMD.line = msg;
-            }
-        }
+        gh_sday[gr - 5] = day + 1;
+        *msg = gq_sprite_line(c); *grp = G_DEBUG;
+        GMD.hit++; GMD.line = *msg;
     }
-    return msg_open_r(mm, mode, grp, msg, spk, a, b, c2);
 }
 static void gq_intro(u8 *g)                                 /* the Sprites' scene at the Spring, once */
 {

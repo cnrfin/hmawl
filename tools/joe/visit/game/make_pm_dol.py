@@ -75,7 +75,9 @@ HOOK28 = 0x8015A2B4                                   # wild animal update: bl f
 HOOK28_OFF = 0x42C                                    # pm_aistep_stub: skipped while our battle AI drives it
 HOOK29 = 0x8015A2BC                                   # wild animal update: bl func_8015C398 (its movement)
 HOOK29_OFF = 0x440                                    # pm_move_stub
-PREV = {0x8028DDE4: (0x02206E10,), 0x8028DE08: (0x02206F11,), 0x80113894: (0x4824B8F1,), 0x80060EF8: (0x482FE260,), 0x801B0EE4: (0x3C608036, 0x3C608037, 0x3C608038), 0x801B0EE8: (0x38636000, 0x3863A000, 0x38630000, 0x38637000, 0x3863C000), 0x801B0F28: (0x3C608037, 0x3C608038), 0x801B0F2C: (0x38636000, 0x3863A000, 0x38630000, 0x38637000, 0x3863C000)}   # earlier builds' words (update mode)
+HOOK30 = 0x801020E4                                   # func_801020E4 entry (every message box)
+HOOK30_OFF = 0x1E8                                    # pm_msg_stub's b pm_msgopen_stub
+PREV = {0x8028DDE4: (0x02206E10,), 0x8028DE08: (0x02206F11,), 0x80113894: (0x4824B8F1, 0x4824B8F1), 0x80060EF8: (0x482FE260,), 0x801B0EE4: (0x3C608036, 0x3C608037, 0x3C608038), 0x801B0EE8: (0x38636000, 0x3863A000, 0x38630000, 0x38637000, 0x3863C000), 0x801B0F28: (0x3C608037, 0x3C608038), 0x801B0F2C: (0x38636000, 0x3863A000, 0x38630000, 0x38637000, 0x3863C000)}   # earlier builds' words (update mode)
 PATCHES = [  # (RAM address, original word, new word, why)
     (0x801B0EE4, 0x80630030, 0x3C608038, 'OSInit: arena low = 0x80384000 (was BootInfo->arenaLo or __ArenaLo) ...'),
     (0x801B0EE8, 0x28030000, 0x38634000, '... + 0x4000'),
@@ -108,7 +110,8 @@ PATCHES = [  # (RAM address, original word, new word, why)
     (HOOK8, 0x9421FFE0, None, 'TV channel 3 caption (func_8008E298) -> pm_tv_stub: $JOE Coin Daily'),
     (HOOK9, 0x9421FFC0, None, 'villager talk line (func_80117B10) -> pm_talk_stub: villagers hate the $JOE coin'),
     (HOOK10, 0x9421FFD0, None, 'villager liked/wanted-item lists (func_80148A4C) -> pm_want_stub: never the $JOE coin'),
-    (HOOK12, 0x4BFEE851, 'blhook', 'talk / script message window (func_80113864) -> pm_msg_stub: Harvest Sprite progress lines (gh2)'),
+    (HOOK12, 0x4BFEE851, 0x4BFEE851, 'script message window: original bl func_801020E4 kept (gh2 hook moved to HOOK30)'),
+    (HOOK30, 0x9421FFD0, None, 'message window (func_801020E4) -> pm_msgopen_stub: Harvest Sprite progress lines (gh3)'),
     (HOOK11, 0x9421FEC0, 0x9421FEC0, 'villager daily plan: original code kept (bench-sit probe hook removed)'),
     (HOOK13, 0x806DA80C, None, 'player update after the state handler -> pm_zt_stub: face the Z-target'),
     (HOOK14, 0x80010034, None, 'camera look-at (func_8017B834) -> pm_tilt_stub: Z-target tilt up'),
@@ -196,7 +199,7 @@ def main():
     if CODE_ADDR + len(code) > ARENA_LO: die('code does not fit below the new arena start')
     entry = CODE_ADDR                                   # pm_hook is the first thing in pm.bin
     if be32(code, HOOK2_OFF) != 0x9421FFE0: die('pm.bin does not have pm_hook2 at +0x14')
-    targets = {HOOK: entry, HOOK2: entry + HOOK2_OFF, HOOK3: entry + HOOK3_OFF, HOOK4: entry + HOOK4_OFF, HOOK5: entry + HOOK5_OFF, HOOK6: entry + HOOK6_OFF, HOOK7: entry + HOOK7_OFF, HOOK8: entry + HOOK8_OFF, HOOK9: entry + HOOK9_OFF, HOOK10: entry + HOOK10_OFF, HOOK11: entry + HOOK11_OFF, HOOK12: entry + HOOK12_OFF, HOOK13: entry + HOOK13_OFF, HOOK14: entry + HOOK14_OFF, HOOK15: entry + HOOK15_OFF, HOOK16: entry + HOOK16_OFF, HOOK18: entry + HOOK18_OFF, HOOK19: entry + HOOK19_OFF, HOOK20: entry + HOOK20_OFF, HOOK21: entry + HOOK21_OFF, HOOK22: entry + HOOK22_OFF, HOOK23: entry + HOOK23_OFF, HOOK24: entry + HOOK24_OFF, HOOK25: entry + HOOK25_OFF, HOOK26: entry + HOOK26_OFF, HOOK27: entry + HOOK27_OFF, HOOK28: entry + HOOK28_OFF, HOOK29: entry + HOOK29_OFF}
+    targets = {HOOK: entry, HOOK2: entry + HOOK2_OFF, HOOK3: entry + HOOK3_OFF, HOOK4: entry + HOOK4_OFF, HOOK5: entry + HOOK5_OFF, HOOK6: entry + HOOK6_OFF, HOOK7: entry + HOOK7_OFF, HOOK8: entry + HOOK8_OFF, HOOK9: entry + HOOK9_OFF, HOOK10: entry + HOOK10_OFF, HOOK11: entry + HOOK11_OFF, HOOK12: entry + HOOK12_OFF, HOOK13: entry + HOOK13_OFF, HOOK14: entry + HOOK14_OFF, HOOK15: entry + HOOK15_OFF, HOOK16: entry + HOOK16_OFF, HOOK18: entry + HOOK18_OFF, HOOK19: entry + HOOK19_OFF, HOOK20: entry + HOOK20_OFF, HOOK21: entry + HOOK21_OFF, HOOK22: entry + HOOK22_OFF, HOOK23: entry + HOOK23_OFF, HOOK24: entry + HOOK24_OFF, HOOK25: entry + HOOK25_OFF, HOOK26: entry + HOOK26_OFF, HOOK27: entry + HOOK27_OFF, HOOK28: entry + HOOK28_OFF, HOOK29: entry + HOOK29_OFF, HOOK30: entry + HOOK30_OFF}
     for a_ in MOT_SITES: targets[a_] = entry + MOT_OFF
     if be32(code, HOOK3_OFF) >> 16 != 0x3D80: die('pm.bin does not have pm_player_stub at +0x58')
     if be32(code, HOOK4_OFF) != 0x9421FFF0: die('pm.bin does not have pm_label_stub at +0x68')

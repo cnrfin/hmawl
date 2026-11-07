@@ -4087,3 +4087,12 @@ so, door fades are timed there, possibly per frame. Not traced yet.
   outline, narrower lower down), the sides back by (x / 0.17)^2, lower face back 0.015, chin down 0.01; no lift. Weight
   0 at the eyes (1.04) -> 1 at the jaw bottom (0.925). Defaults slim 0.16, round 0.10 (0.12 and 0.20 / 0.13 also
   rendered). build_slim/gd_0.arc fm3; previews/slim_face_fm3.png (original / fm2 / fm3, front views).
+
+### 7.76 Sprite progress lines, take 3 (gh3)
+- Dump d7d09a2b (gqtest gh2, talking to all three Sprites): GMD ('GMSG' 0x803808C0) calls 14, hit 0, last group 50
+  msg 9; the box open on screen: speaker 32 (Nak), david.mes loaded, no event. So the Sprites' lines do not go through
+  func_80113864's bl func_801020E4 (0x80113894) either: another caller opens their box.
+- gh3: hook func_801020E4's entry (HOOK30, was stwu r1,-0x30(r1)) -> pm.bin +0x1E8 (pm_msg_stub's second word) ->
+  pm_msgopen_stub: saves r3-r10, spring.c gq_msg_swap(&group, &line), then the replaced stwu and b 0x801020E8. Same rule
+  as gh2 (files 5-7, not ebony 70-74, no event, year 1, not summoned, first line per Sprite per day; GQ_TEST every
+  line). HOOK12 back to the original bl (PREV takes gh2's 0x4824B8F1). pm normal / test / gqtest in gh3.zip.

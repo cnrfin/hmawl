@@ -176,18 +176,16 @@ pm_van_stub:
     stwu  r1, -0x140(r1)            # original first instruction
     b     van_hook_return           # 0x80060EFC
 
-# Talk / script messages: func_80113864 (the talk dispatcher's line for every talk kind, and script message
-# commands) opens the window through its bl func_801020E4 at 0x80113894 (HOOK12), which comes here (gh2): the
-# Harvest Sprites' chat (files 5-7) bypasses the villager line hook func_80117B10.
+# Message window (gh3): func_801020E4 (every message box) -> 0x1E8 here -> pm_msgopen_stub: spring.c gq_msg_swap(&group,
+# &line) may swap a Harvest Sprite's chat line (their talk opens the box from its own caller, not func_80117B10 or
+# func_80113864), then the original. pm_msg_stub (+0x1E4) is only the marker word make_pm_dol.py checks.
     .globl pm_msg_stub
 pm_msg_stub:
-    cmpwi r5, 0x15                  # (marker word checked by make_pm_dol.py)
-    b     gq_msg_open               # gh2: spring.c, may swap a Harvest Sprite's chat line, then func_801020E4
+    cmpwi r5, 0x15                  # marker
+    b     pm_msgopen_stub           # +0x1E8: HOOK30 (0x801020E4) lands here
     nop
     nop
 
-# Z targeting: 0x800313C4, in the player's update right after his state handler (r30 = player), before his
-# position and facing are copied into event slot 0. zt_post(player) turns him toward the lock-on target.
     .globl pm_zt_stub
 pm_zt_stub:
     stwu  r1, -0x10(r1)
@@ -428,3 +426,33 @@ pm_move_stub:
     cmpw  r12, r3
     beqlr
     b     ai_move_orig              # 0x8015C398
+
+    .globl pm_msgopen_stub
+pm_msgopen_stub:
+    stwu  r1, -0x40(r1)
+    mflr  r0
+    stw   r0, 0x44(r1)
+    stw   r3, 0x8(r1)
+    stw   r4, 0xc(r1)
+    stw   r5, 0x10(r1)
+    stw   r6, 0x14(r1)
+    stw   r7, 0x18(r1)
+    stw   r8, 0x1c(r1)
+    stw   r9, 0x20(r1)
+    stw   r10, 0x24(r1)
+    addi  r3, r1, 0x10
+    addi  r4, r1, 0x14
+    bl    gq_msg_swap
+    lwz   r3, 0x8(r1)
+    lwz   r4, 0xc(r1)
+    lwz   r5, 0x10(r1)
+    lwz   r6, 0x14(r1)
+    lwz   r7, 0x18(r1)
+    lwz   r8, 0x1c(r1)
+    lwz   r9, 0x20(r1)
+    lwz   r10, 0x24(r1)
+    lwz   r0, 0x44(r1)
+    mtlr  r0
+    addi  r1, r1, 0x40
+    stwu  r1, -0x30(r1)             # the replaced instruction
+    b     msgopen_return            # 0x801020E8
