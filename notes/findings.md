@@ -4096,3 +4096,4 @@ so, door fades are timed there, possibly per frame. Not traced yet.
   pm_msgopen_stub: saves r3-r10, spring.c gq_msg_swap(&group, &line), then the replaced stwu and b 0x801020E8. Same rule
   as gh2 (files 5-7, not ebony 70-74, no event, year 1, not summoned, first line per Sprite per day; GQ_TEST every
   line). HOOK12 back to the original bl (PREV takes gh2's 0x4824B8F1). pm normal / test / gqtest in gh3.zip.
+- gh3 confirmed in game (user screenshot: a Sprite in their tree says the P3 line with the count filled in).
