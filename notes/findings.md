@@ -4082,3 +4082,8 @@ so, door fades are timed there, possibly per frame. Not traced yet.
 - Preview note: gamerender draws some back parts (the brooch and veil at her back) over the front, so front views
   hid the chin; slim_face_fm2.png is rendered from the head's front half only (triangles with max z > -0.02).
   Front = angle pi in gamerender (angle 0 is her back).
+- fm3 (user: "the jaw in fm2 is weird"): close-ups showed a stepped jaw outline (in, out, in) - the jaw corners lifted
+  and squeezed by |x| while their neighbours were not. Rewritten: x scaled by height only (1 - slim w f; the same
+  outline, narrower lower down), the sides back by (x / 0.17)^2, lower face back 0.015, chin down 0.01; no lift. Weight
+  0 at the eyes (1.04) -> 1 at the jaw bottom (0.925). Defaults slim 0.16, round 0.10 (0.12 and 0.20 / 0.13 also
+  rendered). build_slim/gd_0.arc fm3; previews/slim_face_fm3.png (original / fm2 / fm3, front views).

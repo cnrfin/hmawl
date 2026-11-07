@@ -4,41 +4,39 @@ jaw and a slightly more pointed chin, like Flora's), and recolour her eye frames
 eyeshadow on the upper lid.
 Geometry: one smooth warp of model-space positions (+Y up, +Z forward, x 0 = the face's centre line), applied to every
 head-bone skin source vertex (.skn group 1 sources: s16 / 8192, 6 shorts per vertex = position + normal, from src +
-align) and the same .gpl positions (skin dst / 12). fm2 (user: the jaw looked prominent / masculine from three-quarters;
-round it and bring it to a point): below the eyes the face narrows, more at the sides; the jaw's sides go back (a U from
-above) and up (the jaw line climbs to the ears); the whole lower face sets back a little; the chin's middle drops a
-little to a point. Collar, neck, ears, buns and back hair untouched.
+align) and the same .gpl positions (skin dst / 12). fm3 (user: fm1's jaw looked prominent / masculine from
+three-quarters, fm2's had a stepped outline): below the eyes the face narrows by height only (a smooth front outline,
+narrowest at the jaw), the jaw's sides go back by x^2 (a U from above), the lower face sets back a little, the chin's
+middle drops a little to a point. Collar, neck, ears, buns and back hair untouched.
 Texture: the 58 eye frames (gd_0_f0_e.tpl, 32x32 CMPR, shared data) decoded, brows (dark brown strokes above the eye)
 recoloured to the hair green, a soft tint over the upper lid, re-encoded in place (same size).
-usage: slim_face.py IN_gd_0.arc OUT_gd_0.arc [--slim --round --lift --back --chin] [--shadow R,G,B] [--no-texture]"""
+usage: slim_face.py IN_gd_0.arc OUT_gd_0.arc [--slim --round --back --chin] [--shadow R,G,B] [--no-texture]"""
 import sys, os, struct, argparse, ast, numpy as np
 from PIL import Image
 HERE = os.path.dirname(os.path.abspath(__file__))
 ap = argparse.ArgumentParser()
 ap.add_argument('src'); ap.add_argument('dst')
-ap.add_argument('--slim', type=float, default=0.22)          # lateral squeeze of the lower face (more at the sides)
-ap.add_argument('--round', type=float, default=0.10)         # the jaw's sides pulled back (a U, not a box, from above)
-ap.add_argument('--lift', type=float, default=0.04)         # the jaw corners raised (the jaw line climbs to the ears)
-ap.add_argument('--back', type=float, default=0.03)          # the whole lower face set back (less muzzle from the side)
-ap.add_argument('--chin', type=float, default=0.02)         # the chin's middle: down by this (the point)
+ap.add_argument('--slim', type=float, default=0.16)          # width taken off at the jaw (by height only: a smooth outline)
+ap.add_argument('--round', type=float, default=0.10)         # the jaw's sides set back (by x^2: a U from above)
+ap.add_argument('--back', type=float, default=0.015)         # the whole lower face set back a little (less muzzle)
+ap.add_argument('--chin', type=float, default=0.01)          # the chin's middle: down by this (the point)
 ap.add_argument('--brow', default='70,120,80')               # her hair's mid green
 ap.add_argument('--shadow', default='100,170,175')           # faint teal
 ap.add_argument('--shadow-a', type=float, default=0.5)
 ap.add_argument('--no-texture', action='store_true')
 A = ap.parse_args()
-EYE_LO, JAW, NECK, MOUTH = 1.05, 0.945, 0.885, 0.975            # built heights (1.1 x the source model)
+EYE_LO, JAW, MOUTH = 1.04, 0.925, 0.975                         # built heights (1.1 x the source model)
 
 def sm(x): x = np.clip(x, 0, 1); return x * x * (3 - 2 * x)
-def warp(P):
-    P = P.copy(); x, y, z = P[:, 0], P[:, 1], P[:, 2]; ax = abs(x)
-    w = sm((EYE_LO - y) / (EYE_LO - JAW)) * sm((y - NECK) / (JAW - NECK))   # 0 at the eyes -> 1 at the jaw -> 0 at the neck
-    f = sm((z + 0.06) / 0.12) * sm((0.30 - ax) / 0.06)                       # the face: front of the head, not ears / collar
-    s = np.clip(ax / 0.17, 0, 1.2)                                          # 0 on the centre line -> 1 at the jaw's side
-    c = w * f * np.exp(-(x / 0.07) ** 2) * sm((MOUTH - y) / 0.04)          # the chin's middle, below the mouth
+def warp(P):                                                # head-bone vertices only (see below)
+    P = P.copy(); x, y, z = P[:, 0], P[:, 1], P[:, 2]
+    w = sm((EYE_LO - y) / (EYE_LO - JAW))                     # 0 at the eyes -> 1 at the jaw's bottom and below
+    f = sm((z + 0.06) / 0.12) * sm((0.30 - abs(x)) / 0.06)   # the face: front of the head, not the ears
+    c = w * f * np.exp(-(x / 0.07) ** 2) * sm((MOUTH - y) / 0.04)
     k = w * f
-    P[:, 0] = x * (1 - A.slim * k * (0.35 + 0.65 * s))
-    P[:, 1] = y + A.lift * k * s ** 1.5 - A.chin * c
-    P[:, 2] = z - A.round * k * s ** 1.5 - A.back * k
+    P[:, 0] = x * (1 - A.slim * k)                            # the front outline: the same shape, narrower lower down
+    P[:, 1] = y - A.chin * c
+    P[:, 2] = z - A.round * k * np.clip(x / 0.17, -1.3, 1.3) ** 2 - A.back * k
     return P
 
 def u8_entries(d):
