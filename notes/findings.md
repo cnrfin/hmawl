@@ -4145,3 +4145,23 @@ so, door fades are timed there, possibly per frame. Not traced yet.
 - Size: pm.c's slot code (S: model swap, spawn via func_8002D128 / func_80027FAC / func_8007DECC, dup sweep, scene
   change) serves one slot; Joe on 35 needs a second instance of it, Joe's schedule kept in our code, his native outings
   and the 5 scenes off, the 0x23 size patch, and a memory check with Joe and the goddess out together.
+
+### 7.79 jm1: Joe on character 35 (Mukumuku's)
+- Mukumuku's files are in the chapter archive (mc1 list: mkmk_0.arc 0x1A0E0, mkmk_0.anm.arc 0x6624, subact / subanm),
+  his animation set is 55 (chapter preload mask 0x3F: resident), and his character slot is set up in the valley (slot
+  +0xC = 1, model handle 0x80738620 inside the chapter archive) in both dumps. A permanent rename would make every
+  chapter load preload Joe's archives into pool A (memory layout change), so the swap is done only while Joe is out, as
+  slot 37's always was: func_8002D3B4 (unload) only closes the ARC handle (func_8019A1CC), so tearing down Mukumuku's
+  slot frees nothing of the chapter archive; set 55's preloaded entry is kept in orig_set, zeroed so load_animset loads
+  ours, and put back on release.
+- pm.c: struct slot (cid, aset, model + the old S fields + motion entries / list, dup_sweep sizes and candidates,
+  expression patch) with P = { 37, 71, 74 } and J = { 35, 55, 70 }; S = *CS, the current one (CS = &P except around
+  joe_frame and the per-slot housekeeping). Entry / set addresses computed from S (0x80249A6C + model x 0x18,
+  0x80248B40 + set x 0x14, 0x802EA714 + set x 0x30, 0x802EB4D4 + char x 0x44). Motion entries' word 0 = set << 25 |
+  0x400 | anim (71 -> 0x8E, 55 -> 0x6E); lists 32 long (Mukumuku's scenes ask motions up to 30: past Joe's 13, idle).
+  The Postman's jog patch (set 71 entry 2) only on P. joe_frame runs on J every frame and no longer blocks the
+  Postman / goddess; pm_scene_change frees both; pm_joe_pos reads J.
+- mk_off: record k 32 (+4 = 0x0023) schedule id +0x24 kept 0 (mk_offs counts resets). func_8002EC24 gives 0x23 / 0x15
+  45 instead of 90 (look-at angle limit, caller 0x8007C9A8): left (Joe turns his head less).
+- Not yet: Mukumuku's 5 scenes (Chapter1 file 33, Common 365 / 385 / 387 / 393) still show Mukumuku when Joe is not out.
+- pm.bin 150,956 B (gqtest) of 151,648 (arena 0x80384000). pm normal / test / gqtest in jm1.zip; data as gd1.

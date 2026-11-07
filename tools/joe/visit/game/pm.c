@@ -22,11 +22,14 @@ typedef struct { float x, y, z; } Vec;
 #define CONTROL     (*(u8 *)(*(u8 **)0x80349218 + 8))   /* 1 = player free; 0 in menus (X menu: state 3 enter) */
 #define PAD_HELD    (*(volatile u32 *)0x80341574)
 #define PAD_PRESS   (*(volatile u32 *)0x8034157C)
-#define MODEL74_NAME (*(const char **)0x8024A15C)  /* model entry 74 (character 37) */
-#define MODEL74_SIZE ((float *)0x8024A160)
-#define SET71_NAME  (*(const char **)0x802490CC)  /* animation set 71 */
-#define SET71_DATA  ((u32 *)(0x802EA714 + 71 * 0x30))   /* loaded set 71 (archive pointer at +0) */
-#define MODEL37_ARC (*(u8 **)(0x802EB4D4 + 37 * 0x44))   /* character 37's loaded model archive: the entry's ARC handle +0 (func_8002D3B4 frees it) */
+/* jm1: the slot code serves two characters (struct slot below; S = the one being worked on): P = character 37
+   (model entry 74, animation set 71: the Postman, the goddess) and J = character 35 (Mukumuku's: model entry 70,
+   animation set 55: Joe). These name the current slot's entries. */
+#define MODEL74_NAME (*(const char **)(0x80249A6C + S.model * 0x18))   /* its model entry: name, sizes */
+#define MODEL74_SIZE ((float *)(0x80249A6C + S.model * 0x18 + 4))
+#define SET71_NAME  (*(const char **)(0x80248B40 + S.aset * 0x14))   /* its animation set */
+#define SET71_DATA  ((u32 *)(0x802EA714 + S.aset * 0x30))   /* the loaded set (archive pointer at +0) */
+#define MODEL37_ARC (*(u8 **)(0x802EB4D4 + S.cid * 0x44))   /* the character's loaded model archive: the entry's ARC handle +0 (func_8002D3B4 frees it) */
 
 /* ---- game functions */
 #define F(addr, ret, args) ((ret (*) args)(addr))
@@ -60,8 +63,8 @@ typedef struct { float x, y, z; } Vec;
 #define rucksack_add  F(0x8004FDA0, s32, (u8 *, s32, s32, s32))   /* container game+0x50: id, count, slot (-1 = any) */
 #define vcall(obj, vt_off, idx) (*(void (**)(u8 *, s32))(*(u32 *)((obj) + (vt_off)) + 4 * (idx)))
 
-#define CHAR_ID   37
-#define ANIMSET   71
+#define CHAR_ID   S.cid
+#define ANIMSET   S.aset
 #define VALLEY    1
 #define EVENT     406
 #define scene_req F(0x8017767C, void, (u8 *, s32, s32))
@@ -133,11 +136,11 @@ static const float hg_size[3] = { 0.95f, 1.70f, 1.2f };
 #define GD_ANIMS 13                       /* Joe (gd_0 test 13+): idle, walk, Van's 2-5, sit down, sitting, stand up,
                                              talk (Van's 17), sitting talk, gift (take + pocket),
                                              12 = the sitting loop again, with the cross-fade (after talking) */
-#define SET71_LIST (*(u32 ***)(0x80248B40 + 71 * 0x14 + 0xC))   /* set 71's motion list (motion n -> entry) */
-static u32 gd_mot[GD_ANIMS][6];           /* her motion entries: [set*2, flags, anim], mask, ... (as the teddy's) */
-static u32 *gd_list[GD_ANIMS];
+#define SET71_LIST (*(u32 ***)(0x80248B40 + S.aset * 0x14 + 0xC))   /* the set's motion list (motion n -> entry) */
+#define MOT_N 32                          /* motion list length (Joe on 35: Mukumuku's scenes ask up to 30; the rest idle) */
 
-static struct {
+struct slot {
+    s32 cid, aset, model;         /* character, animation set, model entry */
     u8 *actor, *col;
     s32 loaded;                 /* our model/animations are set up in character slot 37 */
     s32 talking, motion;
@@ -155,7 +158,15 @@ static struct {
     s32 sweep;                    /* frames since the last duplicate sweep */
     u8 *last_anims;               /* the animation archive we loaded last (set 71 +0) */
     Vec pos, dir;
-} S;
+    u32 mot[MOT_N][6];            /* motion entries: [set*2, flags, anim], mask, ... (as the teddy's) */
+    u32 *list[MOT_N];
+    u32 model_size, anims_size;   /* dup_sweep: block sizes of the two archives, learnt once */
+    u8 *seen[8];                  /* dup_sweep: candidates of the previous sweep */
+    u32 expr[11][2], *orig_expr[6]; s32 expr_patched;   /* the face (joe_face / gs_face) */
+};
+static struct slot P = { 37, 71, 74 }, J = { 35, 55, 70 };   /* 37: Postman / goddess; 35 (Mukumuku's): Joe */
+static struct slot *CS = &P;
+#define S (*CS)
 
 static float rsqrt(float x)               /* Gekko has no fsqrt: estimate + two Newton steps */
 {
@@ -331,19 +342,22 @@ static void setup_model(void)
         for (i = 0; i < 4; i++) if (cur && S.orphan[i] == cur) ours = 1;
         if (!ours) for (i = 0; i < 12; i++) S.orig_set[i] = SET71_DATA[i];   /* (after a menu it still holds ours) */
     }
-    S.orig_mot2 = MOT2_WORD; MOT2_WORD = MOT2_JOG;
+    if (S.aset == 71) { S.orig_mot2 = MOT2_WORD; MOT2_WORD = MOT2_JOG; }
     S.orig_list = SET71_LIST;
-    if (S.who) {                              /* the goddess: motion n = Celia's animation n */
-        for (i = 0; i < (S.who == WHO_HG ? HG_ANIMS : GD_ANIMS); i++) {
-            gd_mot[i][0] = 0x8E000400u | (u32)(i == 12 && S.who != WHO_HG ? 7 : i); gd_mot[i][2] = 0;
+    if (S.aset != 71) for (i = 0; i < 12; i++) SET71_DATA[i] = 0;   /* jm1: set 55 is preloaded (Mukumuku's, kept in orig_set): load ours */
+    if (S.who) {                              /* the goddess / Joe: motion n = animation n (Joe: past his 13, idle) */
+        s32 n = S.who == WHO_HG ? HG_ANIMS : GD_ANIMS;
+        for (i = 0; i < MOT_N; i++) {
+            s32 an = i >= n ? 0 : i == 12 && S.who != WHO_HG ? 7 : i;
+            S.mot[i][0] = ((u32)S.aset << 25) | 0x400u | (u32)an; S.mot[i][2] = 0;
             /* word 1 bits 6-10 = cross-fade frames into this motion (31 = the default 10, func_8017DB28).
                Joe's sitting loop (7) starts with no fade: it begins right as he turns 180 degrees, and a
                fade from the sit down's pose under the new facing looked like a second sit down. */
-            gd_mot[i][1] = i == 7 && S.who != WHO_HG ? 0x07FBF83Fu : 0x07FBFFFFu;
-            gd_mot[i][3] = 0xFFFFFFFFu; gd_mot[i][4] = 0xFFFFFFFFu; gd_mot[i][5] = 0;
-            gd_list[i] = gd_mot[i];
+            S.mot[i][1] = i == 7 && S.who != WHO_HG ? 0x07FBF83Fu : 0x07FBFFFFu;
+            S.mot[i][3] = 0xFFFFFFFFu; S.mot[i][4] = 0xFFFFFFFFu; S.mot[i][5] = 0;
+            S.list[i] = S.mot[i];
         }
-        SET71_LIST = gd_list;
+        SET71_LIST = S.list;
     }
     joe_to_a = 1;
     load_animset(ANIMSET, 0);
@@ -413,7 +427,8 @@ static void free_orphans(void)
    menu (the rucksack) closes - the game reloads character 37's model and keeps only the new copy (user dumps:
    2, then 3 copies; the slowdown and T-pose followed). Once loading has settled, any other pool-B block that is a copy of our live model or
    animation archive (same size, same header) and that nothing in RAM points at is freed. */
-static u32 model_size, anims_size;          /* block sizes of our two archives (pool-B records), learnt once */
+#define model_size S.model_size                 /* block sizes of our two archives (pool-B records), learnt once */
+#define anims_size S.anims_size
 static u32 block_size(u8 *p)
 {
     u8 *r; s32 k;
@@ -424,7 +439,7 @@ static u32 block_size(u8 *p)
 }
 static void dup_sweep(void)
 {
-    static u8 *seen[8];                                   /* candidates of the previous sweep */
+    u8 **seen = S.seen;                                   /* candidates of the previous sweep */
     u8 *r, *live_m = MODEL37_ARC, *live_a = (u8 *)SET71_DATA[0], *now[8], *p; s32 k, i, n = 0, again;
     dup_dbg.magic = 0x44555053u; dup_dbg.sweeps++;
     if (S.loaded) {                                       /* learn the sizes while ours are the live ones */
@@ -488,7 +503,7 @@ static void release_model(void)
     if (!S.own_anims || (u8 *)SET71_DATA[0] == S.own_anims) { unload_animset(ANIMSET); S.own_anims = 0; }
     /* anything not freed above stays in own_* and goes to free_orphans via restore_names */
     for (i = 0; i < 12; i++) SET71_DATA[i] = S.orig_set[i];
-    MOT2_WORD = S.orig_mot2;
+    if (S.aset == 71) MOT2_WORD = S.orig_mot2;
     SET71_LIST = S.orig_list;
     restore_names();
 }
@@ -1163,9 +1178,9 @@ static s32 jcnt(u8 *g, s32 i)
    at Joe's table while he is loaded (restored after), every expression in it = the face we want. */
 #define EXPR_TABS  ((u32 **)0x8029F818)
 #define face_set   F(0x8002F3E8, void, (u8 *, s32))
-static u32 joe_expr[11][2];
-static u32 *orig_expr[6];
-static s32 expr_patched;
+#define joe_expr S.expr
+#define orig_expr S.orig_expr
+#define expr_patched S.expr_patched
 static void joe_expr_patch(s32 on)
 {
     s32 k;
@@ -1224,6 +1239,14 @@ static void joe_talk_frame(u8 *g, s32 in_event)
     else if (in_event == 2) joe_motion(talking ? JM_SITTALK : JM_SIT2);
     joe_face(joe_faces[jt.face][0], joe_faces[jt.face][talking ? 2 : 1]);
 }
+/* jm1: Mukumuku's own outings off - Joe has character 35. His daily-routine record (k 32, game+0x124C4 + 31 x 0x124)
+   schedule id +0x24 (0 = no outing, as in the dumps) is kept at 0. */
+u32 mk_offs;
+static void mk_off(u8 *g)
+{
+    s32 *r = (s32 *)(g + 0x124C4 + 31 * 0x124 + 0x24);
+    if (*(unsigned short *)(g + 0x124C4 + 31 * 0x124 + 4) == 0x23 && *r) { *r = 0; mk_offs++; }
+}
 static s32 joe_frame(u8 *g, s32 map, u32 t)
 {
     u32 tod = t % T_DAY;
@@ -1232,7 +1255,7 @@ static s32 joe_frame(u8 *g, s32 map, u32 t)
     if (joe_forced && joe_forced != (s32)(t / T_DAY) + 1) joe_forced = 0;
     joe_here = 0;
     if ((!joe_forced && !joe_visit_day(t / T_DAY)) || tod < J_IN || tod >= J_GONE) {
-        if (S.who == 2 && no_event()) { if (S.actor) despawn(); if (S.loaded) release_model(); S.who = 0; }
+        if (no_event()) { if (S.actor) despawn(); if (S.loaded) release_model(); }
         return 0;
     }
     if (map != VALLEY) {
@@ -1249,7 +1272,6 @@ static s32 joe_frame(u8 *g, s32 map, u32 t)
         else { joe_trade(g); joe_talk_frame(g, 2); return 1; }
     }
     if (!no_event()) return 1;
-    if (S.loaded && S.who != 2) { if (S.actor) despawn(); release_model(); }
     if (!S.actor) {
         S.who = 2;
         if (!S.loaded) setup_model();
@@ -1379,20 +1401,25 @@ void pm_scene_change(void)
     spring_release();
     if (S.talking) {                         /* the talk keeps him, but the next scene must not load our files as 37 */
         if (S.loaded) { MODEL74_NAME = S.orig_model; SET71_NAME = S.orig_anims; }
-        return;
-    }
+    } else {
     if (S.actor) despawn();
     if (S.loaded) release_model();
+    }
     if (GD.st) { GD.st = 0; gs_plate(0); joe_expr_patch(0); S.who = 0; }   /* gd1: she goes when the scene changes */
     joe_free_now();
+    CS = &J;                                 /* jm1: Joe (character 35) */
+    if (S.actor && !joe_talking) despawn();
+    if (S.loaded && !S.actor) release_model();
+    joe_free_now();
+    CS = &P;
 }
 
 void zt_frame(u8 *g, s32 map, volatile u32 *held, volatile u32 *press);
 /* Z targeting (zt.c): Joe's position while he is out (who 2 = Joe) */
 s32 pm_joe_pos(float *p)
 {
-    if (S.who != 2 || !S.actor) return 0;
-    p[0] = S.pos.x; p[1] = S.pos.y; p[2] = S.pos.z;
+    if (!J.actor) return 0;
+    p[0] = J.pos.x; p[1] = J.pos.y; p[2] = J.pos.z;
     return 1;
 }
 void pm_frame(void)
@@ -1413,8 +1440,11 @@ void pm_frame(void)
     }
 #endif
     joe_seed_frame();                         /* joetv.c: the save's own $JOE market seed (first day of a new game) */
-    free_orphans();                           /* our archives a scene change left behind */
-    if (++S.sweep >= 60) { S.sweep = 0; dup_sweep(); }   /* every second: the game reloads 37's model after menus */
+    for (CS = &J; ; CS = &P) {               /* both slots (jm1) */
+        free_orphans();                       /* our archives a scene change left behind */
+        if (++S.sweep >= 60) { S.sweep = 0; dup_sweep(); }   /* every second: the game reloads the model after menus */
+        if (CS == &P) break;
+    }
     mem_gauge();                              /* debug: the gap between the two memory pools */
     t = CLOCK;
     day = (t / T_DAY) % 10;
@@ -1545,8 +1575,9 @@ void pm_frame(void)
             }
         }
     }
+    CS = &J; joe_frame(g, map, t); CS = &P;  /* jm1: Joe on character 35 (Mukumuku's), apart from slot 37 */
+    mk_off(g);                                /* jm1: Mukumuku's own outings off */
     if (gd_frame(g, map, t)) return;           /* the goddess's scene owns slot 37 (spring.c asks for it) */
-    if (S.who != 1 && joe_frame(g, map, t)) return;   /* Joe's visit owns slot 37 today */
     if (day != 7 && !S.forced && flag_get(g + 0x12078, FLAG_MET)) flag_clear(g + 0x12078, FLAG_MET);
     if (day != 7 && !S.forced && flag_get(g + 0x12078, FLAG_FED)) flag_clear(g + 0x12078, FLAG_FED);
     active = day == 7 && tod >= T_START && tod < T_END;
