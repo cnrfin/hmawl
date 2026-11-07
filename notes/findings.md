@@ -4115,7 +4115,8 @@ so, door fades are timed there, possibly per frame. Not traced yet.
   0xFF clamps to 100). Event 413 (Common.arc node 113, build_gd_daily.py): camera from 20-25, cmd_56 when 28 = 1, lines
   from counters 26 / 27 (cmd_04(debug.mes, counter, 0x25)). Lines: debug.mes 0x42-0x61 (gd_daily.h).
 - Love: first talk of the day +1, offering / fish +4, other throwable +2, Trash / failed -2, one gift a day (a second
-  is kept, no change). Starts at 40 (GD_LOVE0, 2 hearts) at the summoning (gq5 had it full).
+  is kept, no change). Starts full (GD_LOVE0 100) at the summoning, as gq5 (user: the offerings take most of a year,
+  the Blue Feather must still be possible); gd1 first shipped 40 by mistake.
 - pm.c: gd_daily_input runs before spring_frame (takes the A); gd_frame hands slot 37 to gd_daily_frame while she is
   up (the Postman / Joe wait); pm_scene_change sends her away. 'GDLY' GD struct (0x80380C80 in gqtest). Busy slot
   (Postman / Joe out): "The water is restless" (GQ_MSG_BUSY). pm 148 KB of ~151.

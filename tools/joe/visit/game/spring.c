@@ -71,7 +71,7 @@ s32 gq_slot_busy(void);
 #define GQ_ALL        0x7FFF
 #define GQ_SUMMONED   0x10000
 #define GQ_FISHED     0x20000
-#define GD_LOVE0      40         /* gd1: her love at the summoning (2 red hearts; 90 = 5) */
+#define GD_LOVE0      100        /* her love at the summoning: full (user, gq5: the offerings take most of a year, the Blue Feather must still be possible) */
 #define FOSSIL        0x448
 #define MES_DEBUG     0x32
 #define ST_MESSAGE    0x2A
