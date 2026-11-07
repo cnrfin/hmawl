@@ -4124,3 +4124,24 @@ so, door fades are timed there, possibly per frame. Not traced yet.
   logs.c pm_label -> gd_label returns action 0x24 = label 11 "Talk"; the field label table is u8 at 0x8024F694, action ->
   opguide label: 0x28 -> 7 Toss, 0x24 / 0x25 / 0x32 -> 11 Talk; our A press is always taken before the game sees it).
   She no longer turns to follow the farmer (user: creepy): she faces him as she rises and at each talk only.
+
+### 7.78 Research: Joe as Mukumuku (character 35) instead of slot 37
+- User: replace Mukumuku with Joe entirely (Joe was assumed to have his slot), so slot 37 is free for the goddess /
+  Postman. Read-only research (dump d7d09a2b, all.s, the US scripts):
+- Model: character 35 -> model 70 'mkmk_0.arc' in all 6 chapters (table 0x8024A6E0 + 35 x 6), anim set 25
+  (mkmk_0.anm.arc / _subact / _subanm). Swapping entry 70's name / sizes and set 25's names (as setup_model does for
+  74 / 71) would load Joe wherever the game loads Mukumuku.
+- Schedule: record k = 32 (pair table 0x8024F594: 0x23 -> 0x20) at game+0x124C4 + 31 x 0x124; +4 = 0x00230032,
+  schedule id +0x24 = 0 in that dump (no outing today). NormalTalk tables use mukumuku.mes 0-39 / 270 (talkable on his
+  outings). His outings would have to be switched off (schedule id forced to none) or replaced by Joe's route.
+- Scripts placing character 35 (cmd_58 / 59 / 5A / 69 / 6C / 6F / 72 / 76 / 6D / 7F with 35 first): Chapter1 file 33
+  (by the Spring, 278, 129; Daryl lines 0-13), Common events 365 (Van, 268.5, 127.2), 385 and 387 (Daryl's trap, ~276,
+  123), 393 (90, 141). Their motions 0 / 3 / 7 / 8 / 19 / 30 index Mukumuku's set: Joe's 13-clip set would play the
+  wrong clips or none. These 5 scenes must be switched off or have their char-35 commands removed.
+- Code special-casing 0x23: func_8002EC24(char) returns a different float for 0x23 and 0x15 (size / talk height kind;
+  caller 0x8007C9A8) - to patch for a human-sized Joe. The other 0x23 compares are AI states / other ids
+  (func_8015F5B8 = animal AI state 0x23).
+- Joe already speaks as 0x23 (mukumuku.mes lines, name plate, hearts from record 0x23 +0xF).
+- Size: pm.c's slot code (S: model swap, spawn via func_8002D128 / func_80027FAC / func_8007DECC, dup sweep, scene
+  change) serves one slot; Joe on 35 needs a second instance of it, Joe's schedule kept in our code, his native outings
+  and the 5 scenes off, the 0x23 size patch, and a memory check with Joe and the goddess out together.
