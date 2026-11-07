@@ -682,6 +682,16 @@ static void joe_cam(u8 *g, float tx, float tz, float ty)
     c[2] = (s32)((tz + dz * inv * JCAM_D) * 128.0f);
     c[3] = (s32)(tx * 128.0f); c[4] = (s32)(ty * 128.0f); c[5] = (s32)(tz * 128.0f);
 }
+static void joe_cam_gift(u8 *g)            /* jm2: the gift: back and lower, so his hands and the back pocket show */
+{
+    s32 *c = (s32 *)(g + 0x12194 + 20 * 4);
+    float *p = (float *)(g + 0x29C78), dx = p[0] - S.pos.x, dz = p[2] - S.pos.z, l2 = dx * dx + dz * dz, inv;
+    if (l2 < 0.0001f) { dx = S.dir.x; dz = S.dir.z; l2 = 1; }
+    inv = rsqrt(l2); dx *= inv; dz *= inv;
+    c[0] = (s32)((S.pos.x + dx * 3.3f + dz * 0.9f) * 128.0f); c[1] = (s32)((S.pos.y + 1.25f) * 128.0f);
+    c[2] = (s32)((S.pos.z + dz * 3.3f - dx * 0.9f) * 128.0f);
+    c[3] = (s32)(S.pos.x * 128.0f); c[4] = (s32)((S.pos.y + 0.8f) * 128.0f); c[5] = (s32)(S.pos.z * 128.0f);
+}
 /* the trade event asks through counter 41: 1 buy / 4 sell (count in 42); answer 2 bought, 3 short of gold, 5 sold */
 static void joe_trade(u8 *g)
 {
@@ -1158,7 +1168,8 @@ static void joe_place(float s)
 #define JT_FRAMES  2                       /* frames per letter (the message window's typing speed) */
 #define JC_LINE    49                      /* counter: the line being said (+1) */
 #define JC_POCKET  50                      /* counter: the gift event asks for the take-and-pocket (1 -> pm.c 0) */
-#define JT_POCKET  90                      /* frames of the pocket clip (it holds after) */
+#define JT_POCKET  180                     /* frames of the pocket clip (90 clip frames at 30 / s; it holds after).
+                                              jm2: was 90 = cut off while he still looked at the coin */
 static const unsigned char joe_faces[4][3] = {    /* eye, mouth still, mouth talking */
     { 58 + 9, 0, 36 + 11 },                /* neutral */
     { 58 + 3, 7, 36 + 9 },                 /* angry */
@@ -1233,8 +1244,15 @@ static void joe_talk_frame(u8 *g, s32 in_event)
     talking = jt.timer > 0;
     if (in_event == 1 && jcnt(g, JC_POCKET) == 1 && !jt.pocket) jt.pocket = JT_POCKET;
     if (jt.pocket) {
+        s32 e = JT_POCKET - jt.pocket, *c = (s32 *)(g + 0x12194 + 10 * 4);   /* jm2: the coin in his hand (event 409) */
+        float lx = -0.33f, ly = 0.70f, lz = 0.34f;          /* his right hand, reach / look keys (joe_sit.py), model space */
         joe_motion(JM_POCKET);
-        if (!--jt.pocket) *(s32 *)(g + 0x12194 + JC_POCKET * 4) = 0;
+        c[0] = (s32)((S.pos.x + lx * S.dir.z + lz * S.dir.x) * 128.0f);
+        c[1] = (s32)((S.pos.y + ly) * 128.0f);
+        c[2] = (s32)((S.pos.z - lx * S.dir.x + lz * S.dir.z) * 128.0f);
+        c[3] = (s32)(atan2_deg(S.dir.x, S.dir.z) * 128.0f);
+        c[4] = e >= 27 && e < 114 ? 128 : 0;                 /* shown from the reach (0.45 s) until it goes round to the pocket */
+        if (!--jt.pocket) { *(s32 *)(g + 0x12194 + JC_POCKET * 4) = 0; c[4] = 0; }
     } else if (in_event == 1) joe_motion(talking ? JM_TALK : JM_IDLE);
     else if (in_event == 2) joe_motion(talking ? JM_SITTALK : JM_SIT2);
     joe_face(joe_faces[jt.face][0], joe_faces[jt.face][talking ? 2 : 1]);
@@ -1330,7 +1348,7 @@ static s32 joe_frame(u8 *g, s32 map, u32 t)
             S.dir.x = -dx * inv; S.dir.y = 0; S.dir.z = -dz * inv;   /* turns to the player */
             actor_setdir(S.actor, &S.dir);
             joe_motion(JM_IDLE);
-            joe_cam(g, S.pos.x, S.pos.z, S.pos.y + 1.1f);
+            if (kind == 5 || kind == 6) joe_cam_gift(g); else joe_cam(g, S.pos.x, S.pos.z, S.pos.y + 1.1f);
             joe_hearts(g);
             joe_talking = 1;
             event_start(EVMGR, JOE_TALK_EVENT, 0, 0);

@@ -28,17 +28,21 @@ TEXT = {
     26: "Another $JOE? You're\na real one, kid.<wait><page>We're homies now.\nWAGMI.<wait>",
     27: "You already gave me\none today, kid.<wait><page>HODL the rest.<wait>",
 }
-ev = open(mes_in, 'rb').read()
-ents = mes_entries(ev)
-assert mes_build(ents) == ev and all(ents[k] == b'\0\0\0\0' for k in TEXT), 'debug.mes slots 21-27 not free'
-for k, t in TEXT.items(): ents[k] = enc(t)
-grow = sum(len(x) for x in ents) - sum(len(x) for x in mes_entries(ev))
-assert set(ents[-1]) == {0} and len(ents[-1]) > grow
-ents[-1] = ents[-1][:len(ents[-1]) - grow]
-body = mes_build(ents); assert len(body) <= len(ev)
-new_mes = body + bytes(len(ev) - len(body))
+_u0 = open(common_in, 'rb').read()
+REPLACE = struct.unpack_from('>I', _u0, struct.unpack_from('>I', _u0, 4)[0] + 8)[0] > 109   # jm2: events past 409 already
+if not REPLACE:
+    ev = open(mes_in, 'rb').read()
+    ents = mes_entries(ev)
+    assert mes_build(ents) == ev and all(ents[k] == b'\0\0\0\0' for k in TEXT), 'debug.mes slots 21-27 not free'
+    for k, t in TEXT.items(): ents[k] = enc(t)
+    grow = sum(len(x) for x in ents) - sum(len(x) for x in mes_entries(ev))
+    assert set(ents[-1]) == {0} and len(ents[-1]) > grow
+    ents[-1] = ents[-1][:len(ents[-1]) - grow]
+    body = mes_build(ents); assert len(body) <= len(ev)
+    new_mes = body + bytes(len(ev) - len(body))
 
 KIND = 48
+JOE_ITEM = 0x442
 a = Asm(); L = a.new
 a.sys(0x10)
 for base, cmd in ((20, 0x14), (23, 0x15)):                   # camera from counters 20-25 (pm.c), as the trade
@@ -67,8 +71,19 @@ a.label(labels[2]); say(22); a.jmp(done)
 a.label(labels[3]); say(23); a.jmp(done)
 a.label(labels[4]); say(24); a.jmp(done)
 def pocket():                                                 # counter 50 = 1: pm.c plays Joe's take-and-pocket, then sets 0
+    # jm2: while it plays, the coin shows in his hand (cmd_91 item slot 0 every frame, from counters 10-13 = x, y, z,
+    # angle x 128 that pm.c keeps on his hand) as long as counter 14 = 1; then it is hidden (he pockets it).
+    def cnt(k): a.num(k); a.sys(0x95); a.num(128); a.emit('div')
     a.num(50); a.num(1); a.sys(0x93)
-    top = L('pk'); a.label(top); a.sys(0x00); a.num(50); a.sys(0x95); a.num(1); a.emit('cmp'); a.jz(top)
+    top = L('pk'); out = L('pkout'); hide = L('pkhide'); nxt = L('pknext')
+    a.label(top); a.sys(0x00)
+    a.num(50); a.sys(0x95); a.num(0); a.emit('cmp'); a.jz(out)
+    a.num(14); a.sys(0x95); a.num(1); a.emit('cmp'); a.jnz(hide)
+    a.num(0); a.num(JOE_ITEM); cnt(10); cnt(11); cnt(12); cnt(13); a.sys(0x91); a.emit('pop')
+    a.jmp(nxt)
+    a.label(hide); a.num(0); a.sys(0x92)
+    a.label(nxt); a.jmp(top)
+    a.label(out); a.num(0); a.sys(0x92)
 a.label(labels[5]); a.sys(0x56); pocket(); say(25); a.jmp(done)        # cmd_56: take the coin out of the hands
 a.label(labels[6]); a.sys(0x56); pocket(); say(26); a.jmp(done)
 a.label(labels[7]); say(27); a.jmp(done)
@@ -84,17 +99,20 @@ u = open(common_in, 'rb').read()
 be = lambda b, o: struct.unpack_from('>I', b, o)[0]
 root, hsize, dstart = be(u, 4), be(u, 8), be(u, 12)
 n = be(u, root + 8); st = root + 12 * n
-assert n == 109, 'expected the trade Common.arc (108 entries)'
+assert n >= 109, 'expected the trade Common.arc (108 entries) or a later one'
 names = bytes(u[st:root + hsize])
 nodes = [bytearray(u[root + 12 * i:root + 12 * i + 12]) for i in range(n)]
 raws = [clz_decompress(u[be(u, root+12*i+4):be(u, root+12*i+4)+be(u, root+12*i+8)]) for i in range(1, n)]
-raws.append(script)
 al = lambda x: (x + 0x1F) & ~0x1F
-name_off = len(names.rstrip(b'\0')) + 1
-names2 = names[:name_off] + b'@\0'
-nodes.append(bytearray(struct.pack('>III', name_off, 0, 0)))
-struct.pack_into('>I', nodes[0], 8, n + 1)
-hlen = 12 * (n + 1) + len(names2)
+if REPLACE:
+    raws[108] = script; names2 = names; hlen = 12 * n + len(names2)
+else:
+    raws.append(script)
+    name_off = len(names.rstrip(b'\0')) + 1
+    names2 = names[:name_off] + b'@\0'
+    nodes.append(bytearray(struct.pack('>III', name_off, 0, 0)))
+    struct.pack_into('>I', nodes[0], 8, n + 1)
+    hlen = 12 * (n + 1) + len(names2)
 dstart = max(dstart, al(root + hlen))
 data = bytearray(); offs = []
 for r in raws:
@@ -106,9 +124,9 @@ struct.pack_into('>I', out, 8, len(hdr)); struct.pack_into('>I', out, 12, dstart
 out += bytes(dstart - len(out)); out += data
 out = bytes(out)
 open(os.path.join(outdir, 'Common.arc'), 'wb').write(out)
-open(os.path.join(outdir, 'debug.mes'), 'wb').write(new_mes)
+if not REPLACE: open(os.path.join(outdir, 'debug.mes'), 'wb').write(new_mes)
 _, fs = load(os.path.join(outdir, 'Common.arc'))
-assert [b for _, b in fs] == raws and len(fs) == 109
+assert [b for _, b in fs] == raws and (REPLACE or len(fs) == 109)
 print('script: %d instructions; node %d = event %d' % (len(a.ins), len(fs), 300 + len(fs)))
-for f in ('Common.arc', 'debug.mes'):
+for f in ('Common.arc',) + (() if REPLACE else ('debug.mes',)):
     b = open(os.path.join(outdir, f), 'rb').read(); print(f, hex(len(b)), hashlib.sha1(b).hexdigest()[:8])

@@ -77,3 +77,13 @@ body atlas (UVs unchanged) and the eye / mouth frames (56x48 CMPR, 56x36 RGB5A3)
 JOE_TEX=0.5 JOE_SOFTMOUTH=1 JOE_SCALE=0.9 JOE_CIG=$PWD/../joegame/sit_out/cig.json JOE_WALK=28 JOE_FACE=0.9 python3 ../joegame/joe_game.py gd_0 OUT
 ```
 (`JOE_TEX` unset rebuilds test 10 byte for byte.) gd_0.anm.arc unchanged (test 10).
+
+## Test 12 (`build/test12/gd_0.arc`): cleaner face (jm2)
+User: some expressions (the angry one most) not clean. The face frames go back up to 75 % (`JOE_FACETEX=0.75`, the body
+atlas stays at JOE_TEX 0.5) and the eyes are stored uncompressed (`JOE_SOFTEYES=1`: RGB5A3, only the blink frames he
+shows, 84x72; CMPR = 2 colours a 4x4 block and 1-bit alpha made the brows / outlines blocky). Mouth 84x52 RGB5A3.
+gd_0.arc 156,128 -> 283,136 B (test 10 was 386,720). Joe's archives go to pool A in the valley (memfix 18).
+```
+JOE_FACETEX=0.75 JOE_SOFTEYES=1 JOE_TEX=0.5 JOE_SOFTMOUTH=1 JOE_SCALE=0.9 JOE_CIG=$PWD/../joegame/sit_out/cig.json JOE_WALK=28 JOE_FACE=0.9 python3 ../joegame/joe_game.py gd_0 OUT
+```
+(without JOE_FACETEX / JOE_SOFTEYES test 11 rebuilds byte for byte.)

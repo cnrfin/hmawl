@@ -4165,3 +4165,14 @@ so, door fades are timed there, possibly per frame. Not traced yet.
   45 instead of 90 (look-at angle limit, caller 0x8007C9A8): left (Joe turns his head less).
 - Not yet: Mukumuku's 5 scenes (Chapter1 file 33, Common 365 / 385 / 387 / 393) still show Mukumuku when Joe is not out.
 - pm.bin 150,956 B (gqtest) of 151,648 (arena 0x80384000). pm normal / test / gqtest in jm1.zip; data as gd1.
+- jm1 test (user, dump 177202aa): works, no crashes; Joe's face now animates properly (it had not, on slot 37).
+- jm2: the gift's put-away never showed: JT_POCKET was 90 game frames, the clip is 90 frames at 30 / s = 180 game
+  frames, so pm.c handed him back to the talk pose while he still looked at the coin. Now 180; while it plays pm.c keeps
+  counters 10-13 = the coin's place in his right hand (joe_sit.py keys: model (-0.33, 0.70, 0.34)) and angle, 14 = shown
+  (0.45-1.9 s, until it goes round to the pocket); event 409's pocket loop (build_joe_talk.py, now also replaces node
+  109 in a later Common.arc) draws it with cmd_91 item slot 0 each frame, cmd_92 hides it. Gift camera (kinds 5 / 6)
+  wider and lower (joe_cam_gift: 3.3 back, 0.9 aside, eye 1.25, aim 0.8) so the hands and pocket show.
+- pm.bin outgrew 0x80384000 by 12 B: arena low now 0x80388000 (lis 0x8039 / addi -0x8000 at 0x801B0EE4/EE8 and
+  0x801B0F28/F2C; PREV takes the 0x80384000 words). Joe's face textures: tools/joe test 12 (75 %, soft eyes, 283 KB).
+- jm2 files: Common.arc 91402794 (gd1 + event 409 replaced), gd/gd_0.arc (Joe test 12), pm normal / test / gqtest,
+  make_pm_dol.py 0f3a0ee5.

@@ -7,6 +7,10 @@ EYE_BOX=(104,30,412,298); MOUTH_BOX=(72,222,504,508)
 EYE_SIZE=(112,96); MOUTH_SIZE=(112,72)
 TEX=float(os.environ.get('JOE_TEX','1'))          # 0.5: face frames at half size (memory: 314 KB of textures vs a villager's ~33 KB)
 if TEX!=1: EYE_SIZE=(int(112*TEX)//8*8,int(96*TEX)//8*8); MOUTH_SIZE=(int(112*TEX)//4*4,int(72*TEX)//4*4)
+FTEX=float(os.environ.get('JOE_FACETEX',str(TEX)))   # jm2: the face frames' own scale (the body atlas keeps JOE_TEX)
+if FTEX!=TEX:
+    q=4 if os.environ.get('JOE_SOFTEYES')=='1' else 8                 # RGB5A3 tiles are 4x4, CMPR 8x8
+    EYE_SIZE=(int(112*FTEX)//q*q,int(96*FTEX)//q*q); MOUTH_SIZE=(int(112*FTEX)//4*4,int(72*FTEX)//4*4)
 def layers_eyes(spec):
     out=Image.new('RGBA',(512,512),(0,0,0,0)); ex=spec.get('extras',{})
     if ex.get('blush'):

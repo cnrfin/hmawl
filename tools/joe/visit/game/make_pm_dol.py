@@ -16,7 +16,7 @@ import os, struct, sys, hashlib
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 CODE_ADDR = 0x8035EFA0
-ARENA_LO = 0x80384000                                 # pm.bin room: 0x8035EFA0-0x80384000 (150 KB; was 0x8037C000 (battle12), 0x80377000 before)
+ARENA_LO = 0x80388000                                 # pm.bin room: 0x8035EFA0-0x80388000 (166 KB; jm2; was 0x80384000, 0x8037C000 (battle12), 0x80377000 before)
 AXE_STUB_OFF = 0x54                                    # pm_axe_stub in pm.bin (after pm_hook2)
 HOOK = 0x80213CFC
 HOOK2 = 0x8017755C
@@ -77,13 +77,13 @@ HOOK29 = 0x8015A2BC                                   # wild animal update: bl f
 HOOK29_OFF = 0x440                                    # pm_move_stub
 HOOK30 = 0x801020E4                                   # func_801020E4 entry (every message box)
 HOOK30_OFF = 0x1E8                                    # pm_msg_stub's b pm_msgopen_stub
-PREV = {0x8028DDE4: (0x02206E10,), 0x8028DE08: (0x02206F11,), 0x80113894: (0x4824B8F1, 0x4824B8F1), 0x80060EF8: (0x482FE260,), 0x801B0EE4: (0x3C608036, 0x3C608037, 0x3C608038), 0x801B0EE8: (0x38636000, 0x3863A000, 0x38630000, 0x38637000, 0x3863C000), 0x801B0F28: (0x3C608037, 0x3C608038), 0x801B0F2C: (0x38636000, 0x3863A000, 0x38630000, 0x38637000, 0x3863C000)}   # earlier builds' words (update mode)
+PREV = {0x8028DDE4: (0x02206E10,), 0x8028DE08: (0x02206F11,), 0x80113894: (0x4824B8F1, 0x4824B8F1), 0x80060EF8: (0x482FE260,), 0x801B0EE4: (0x3C608036, 0x3C608037, 0x3C608038, 0x3C608039), 0x801B0EE8: (0x38636000, 0x3863A000, 0x38630000, 0x38637000, 0x3863C000, 0x38634000), 0x801B0F28: (0x3C608037, 0x3C608038, 0x3C608039), 0x801B0F2C: (0x38636000, 0x3863A000, 0x38630000, 0x38637000, 0x3863C000, 0x38634000)}   # earlier builds' words (update mode)
 PATCHES = [  # (RAM address, original word, new word, why)
-    (0x801B0EE4, 0x80630030, 0x3C608038, 'OSInit: arena low = 0x80384000 (was BootInfo->arenaLo or __ArenaLo) ...'),
-    (0x801B0EE8, 0x28030000, 0x38634000, '... + 0x4000'),
+    (0x801B0EE4, 0x80630030, 0x3C608039, 'OSInit: arena low = 0x80388000 (was BootInfo->arenaLo or __ArenaLo) ...'),
+    (0x801B0EE8, 0x28030000, 0x38638000, '... - 0x8000'),
     (0x801B0EEC, 0x40820010, 0x48000010, '... then OSSetArenaLo'),
-    (0x801B0F28, 0x3C608036, 0x3C608038, 'OSInit debug path: arena low = 0x80384000 (was _stack_addr) ...'),
-    (0x801B0F2C, 0x3863CFA0, 0x38634000, '... + 0x4000'),
+    (0x801B0F28, 0x3C608036, 0x3C608039, 'OSInit debug path: arena low = 0x80388000 (was _stack_addr) ...'),
+    (0x801B0F2C, 0x3863CFA0, 0x38638000, '... - 0x8000'),
     (HOOK, 0x80010014, None, 'pad update end -> Postman code'),
     (HOOK2, 0x9421FFF0, None, 'g_system update start -> scene-change check'),
     (HOOK3, 0x9421F5D0, None, 'field A handler start -> pm_player_stub (remember the player)'),
