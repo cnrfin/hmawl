@@ -71,6 +71,7 @@ s32 gq_slot_busy(void);
 #define GQ_ALL        0x7FFF
 #define GQ_SUMMONED   0x10000
 #define GQ_FISHED     0x20000
+#define GD_LOVE0      40         /* gd1: her love at the summoning (2 red hearts; 90 = 5) */
 #define FOSSIL        0x448
 #define MES_DEBUG     0x32
 #define ST_MESSAGE    0x2A
@@ -202,7 +203,8 @@ static void offering(u8 *g, s32 item)
     W.last[W.n++ & 7] = item;
     if (item == FOSSIL && (c & GQ_ALL) == GQ_ALL && !(c & GQ_SUMMONED)) {   /* the summoning */
         u8 *fd = FADER;
-        CNT(g, GQ) = (c | GQ_SUMMONED | 0xFF000000u);         /* gq5: her affection starts full (a year of offerings) */
+        CNT(g, GQ) = (c & 0x00FFFFFFu) | GQ_SUMMONED | ((u32)GD_LOVE0 << 24);   /* gd1: her love starts at GD_LOVE0 (hearts
+                                                           like the brides'; was full in gq5) */
         gq_scene_req = 1;                                        /* pm.c raises her and runs event GQ_SCENE_EVENT */
         if (OK(fd)) { u32 from = 0xFFFFFFFFu, to = 0xFFFFFF00u; fade_to(fd, &from, &to, 0, 0, 1.6f); }   /* gq4: one flash (white -> clear;
                                                            gq1-3's white-in, hold, white-out read as two) */
@@ -212,6 +214,11 @@ static void offering(u8 *g, s32 item)
     }
     if (b && !(c & b)) { CNT(g, GQ) = c | b; GQD.msg = ((c | b) & GQ_ALL) == GQ_ALL ? GQ_MSG_GLOW : GQ_MSG_SHIMMER; }
 }
+
+/* gd1 (pm.c gd_daily): the Pool B point in front of the player (A there calls her), and a message box */
+s32 spring_pool_point(u8 *g, float *pt) { return facing_pool(g, pt); }
+void spring_say(s32 m) { GQD.msg = m; }
+s32 spring_giftable(s32 item) { return tossable(item); }   /* not tools: items the game lets you throw */
 
 void spring_release(void)
 {

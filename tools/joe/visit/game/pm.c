@@ -813,11 +813,16 @@ static void gs_cam(u8 *g, const struct gshot *sh, float f)
     cam_update(cam);
 }
 static s32 gs_get(u8 *g, s32 i) { s32 v = *(s32 *)(g + 0x12194 + i * 4); if (v >= 128 && !(v & 127)) v >>= 7; return v; }
+/* gd1 (below): the daily visit's state */
+struct { u32 magic; s32 st, t, waited, love, hearts, l1, l2, item, summons, talks; u8 *plate; float surf; } GD;   /* 'GDLY' */
+static s32 gd_daily_frame(u8 *g, s32 map);
+static void gd_hearts(u8 *g);
 static s32 gd_frame(u8 *g, s32 map, u32 t)
 {
     s32 *cn = (s32 *)(g + 0x12194);
     u8 *au = *(u8 **)0x803491E4;
     GS.magic = 0x4753434Eu;
+    if (!GS.st && GD.st && gq_scene_req != 1) return gd_daily_frame(g, map);   /* gd1: she is up for a visit */
     if (!GS.st) {
         Vec v;
         float *p = (float *)(g + 0x29C78);
@@ -846,7 +851,7 @@ static s32 gd_frame(u8 *g, s32 map, u32 t)
         GS.bow = 0; GS.eyes = 0; GS.white = 0; GS.face = -1; GS.ground = 0;
         /* gq9: her own face (the user found the gq8 set overdone); only lines the JSON names get another */
         gq_scene_req = 0;
-        gs_plate(1);
+        gs_plate(1); gd_hearts(g);
         event_start(EVMGR, GQ_SCENE_EVENT, 0, 0);
         return 1;
     }
@@ -915,6 +920,188 @@ static s32 gd_frame(u8 *g, s32 map, u32 t)
         if (GS.white) { GS.white = 0; gs_fade(0xFFFFFFFFu, 0xFFFFFF00u, 0.8f, 0); }   /* control is back: white -> clear */
         return 0;
     }
+    return 1;
+}
+/* ---- gd1: the goddess's daily visits (tools/goddess/quest/build_gd_daily.py = event GD_EVENT and her lines; the rules:
+   tools/goddess/dialogue/goddess_daily.json). After the summoning, A at Pool B with empty hands (the toss's own
+   facing check) raises her at that point: white flash, magic sound, she rises facing the farmer and stays up until the
+   scene changes (a house, another map). A near her: a talk, or with an item in hand a gift (once a day; the event takes
+   it). Her love: counter 51 bits 24-31 (0-100), hearts on her plate like the brides' (love 20 / 40 / 60 / 80 / 90 =
+   1-5 red; under 10 one grey, 10-19 one green): people.mes 37's heart bytes rewritten in RAM. Counter 31: low 16 bits
+   = day + 1 of the last talk, bits 16-19 talks that day, bit 20 gifted that day. Counter 51 bit 19 met (B1 said),
+   bit 20 a fish given once (B14b). */
+#include "gd_daily.h"
+#define GQ_C        51
+#define GQ_SUMM     0x10000
+#define GQ_MET      0x80000
+#define GQ_FISHED1  0x100000
+#define GD_C_DAY    31
+#define GD_RISE     50                            /* frames */
+#define GD_NEAR     3.0f                          /* A this close to her (and facing her): talk / gift */
+#define WEATHER     (*(s32 *)(*(u8 **)0x803491D4 + 0x20))   /* 3 rain, 5 storm, 4 snow (findings) */
+#define SE_MAGIC    306
+s32 spring_pool_point(u8 *g, float *pt);
+void spring_say(s32 m);
+s32 spring_giftable(s32 item);
+static const unsigned short GD_OFFER[15] = { 0x1F, 0x22, 0x25, 0x28, 0x2B, 0x2E, 0x31, 0x34, 0x43E, 0x43B, 0x43C, 0x43D, 0x07, 0x1C, 0x19 };
+static const unsigned char GD_NAME[15] = { 0x80, 0x11, 0x80, 0xE6, 0x80, 0xDB, 0x80, 0xDB, 0x80, 0xDC, 0x80, 0xEA, 0x80, 0xEA, 0x02 };   /* "Goddess " */
+static s32 gd_name_at(const u8 *p)              /* people.mes 37: "Goddess " + a heart colour + a heart (not her lines' text) */
+{
+    s32 i;
+    for (i = 0; i < 15; i++) if (p[i] != GD_NAME[i]) return 0;
+    return (p[15] == 0x12 || p[15] == 0x13 || p[15] == 0x15) && p[16] == 0x80 && p[17] == 0xD6;
+}
+static void gd_hearts(u8 *g)                     /* her plate's hearts from her love */
+{
+    static const unsigned char thr[5] = { 20, 40, 60, 80, 90 };
+    s32 love = (s32)((u32)*(s32 *)(g + 0x12194 + GQ_C * 4) >> 24), n = 0, k;
+    u8 *p, col;
+    if (love > 100) love = 100;
+    GD.love = love;
+    if (!GD.plate || !gd_name_at(GD.plate)) {   /* people.mes (in Message.arc) moves between boots: find "Goddess " once */
+        GD.plate = 0;
+        for (p = (u8 *)0x80C00000; p < (u8 *)0x81700000; p += 2)
+            if (p[0] == 0x80 && p[1] == 0x11 && gd_name_at(p)) { GD.plate = p; break; }
+        if (!GD.plate) return;
+    }
+    if (love < 10) { col = 0x15; n = 1; }        /* grey */
+    else if (love < 20) { col = 0x13; n = 1; }   /* green */
+    else { col = 0x12; for (k = 0; k < 5; k++) if (love >= thr[k]) n++; }
+    GD.hearts = love < 20 ? 0 : n;
+    p = GD.plate + 15; *p++ = col;
+    for (k = 0; k < n; k++) { *p++ = 0x80; *p++ = 0xD6; }
+    *p++ = 0x17; *p = 0;
+}
+static void gd_face_player(u8 *g)
+{
+    float *p = (float *)(g + 0x29C78), *pd = (float *)(g + 0x29F84), dx = p[0] - S.pos.x, dz = p[2] - S.pos.z;
+    float l2 = dx * dx + dz * dz, inv = l2 > 0.0001f ? rsqrt(l2) : 0;
+    if (inv <= 0) return;
+    S.dir.x = dx * inv; S.dir.y = 0; S.dir.z = dz * inv;
+    actor_setdir(S.actor, &S.dir);
+    if (GD.st == 3) { pd[0] = -S.dir.x; pd[1] = 0; pd[2] = -S.dir.z; }   /* in the talk he faces her */
+}
+static s32 gd_is(const unsigned short *t, s32 n, s32 it) { s32 k; for (k = 0; k < n; k++) if (t[k] == it) return 1; return 0; }
+static void gd_lines(u8 *g, u32 t, s32 item)     /* picks the event's lines, counts the love */
+{
+    s32 *cn = (s32 *)(g + 0x12194), c = cn[GQ_C], d = cn[GD_C_DAY], day1 = (s32)(t / T_DAY) + 1, talks, love, hrs;
+    s32 tod = (s32)(t % T_DAY), hour = tod / 36000, season = (s32)(t / T_DAY / 10) % 4, w = WEATHER;
+    static const unsigned short SEASON[4][2] = { { GDL_0C9, GDL_0CB }, { GDL_0CC, GDL_0CF }, { GDL_0D0, GDL_0D1 }, { GDL_0D4, GDL_0D5 } };
+    static const unsigned short LOW[4] = { GDL_D1, GDL_D2, GDL_D3, GDL_D4 }, HIGH[4] = { GDL_D5, GDL_D6, GDL_D7, GDL_D8 };
+    static const unsigned short GREET[3] = { GDL_B2, GDL_B8, GDL_B9 };
+    if ((d & 0xFFFF) != day1) d = day1;          /* a new day: no talks, no gift yet */
+    talks = (d >> 16) & 15;
+    love = (s32)((u32)c >> 24); if (love > 100) love = 100;
+    hrs = love >= 60 ? 3 : 0;
+    GD.l1 = GD.l2 = 0; GD.item = item;
+    if (item) {
+        if (d & 0x100000) GD.l1 = GDL_G3;                                       /* a second gift today: kept, no change */
+        else {
+            d |= 0x100000;
+            if (gd_is(GD_OFFER, 15, item)) { GD.l1 = GDL_G1; love += 4; }
+            else if (item >= 0x46F && item <= 0x47E) { GD.l1 = (c & GQ_FISHED1) ? GDL_060 : GDL_B14b; c |= GQ_FISHED1; love += 4; }
+            else if (item == 0x503 || item == 0x47F) { GD.l1 = GDL_G2; love -= 2; }
+            else { GD.l1 = GDL_B16; love += 2; }
+        }
+    } else {
+        if (!(c & GQ_MET)) { GD.l1 = GDL_B1; c |= GQ_MET; }
+        else if (talks == 0) {
+            if (w == 3 || w == 5) GD.l1 = GDL_B7;
+            else if (hour >= 5 && hour < 9) GD.l1 = GDL_B4;
+            else if (hour >= 17 && hour < 20) GD.l1 = GDL_B5;
+            else if (hour >= 20 || hour < 5) GD.l1 = GDL_B6;
+            else GD.l1 = love < 40 ? GDL_B3 : GREET[day1 % 3];
+        } else if (talks >= 5) GD.l1 = GDL_R1;
+        else if (talks & 1) GD.l1 = SEASON[season][(talks >> 1) & 1];
+        else GD.l1 = (hrs ? HIGH : LOW)[(day1 + talks) & 3];
+        if (talks == 0) love += 1;                                              /* the day's first talk */
+        if (talks < 15) talks++;
+    }
+    if (love < 0) love = 0;
+    if (love > 100) love = 100;
+    d = (d & ~0xF0000) | (talks << 16);
+    cn[GD_C_DAY] = d;
+    cn[GQ_C] = (c & 0x00FFFFFF) | (love << 24);
+    GD.talks = talks;
+}
+static void gd_cam(u8 *g)                        /* the event's camera (counters 20-25): over his shoulder at her face */
+{
+    s32 *c = (s32 *)(g + 0x12194 + 20 * 4), i;
+    float *p = (float *)(g + 0x29C78), dx = S.pos.x - p[0], dz = S.pos.z - p[2], l2 = dx * dx + dz * dz, inv, e[3], tg[3];
+    inv = l2 > 0.0001f ? rsqrt(l2) : 0; dx *= inv; dz *= inv;
+    e[0] = p[0] - dx * 1.9f - dz * 0.8f; e[1] = p[1] + 1.9f; e[2] = p[2] - dz * 1.9f + dx * 0.8f;
+    tg[0] = S.pos.x; tg[1] = GD.surf + 1.05f; tg[2] = S.pos.z;
+    for (i = 0; i < 3; i++) { c[i] = (s32)(e[i] * 128.0f); c[3 + i] = (s32)(tg[i] * 128.0f); }
+}
+/* A at the pool / near her: before spring.c sees the press (its toss) */
+static void gd_daily_input(u8 *g, s32 map, u32 t)
+{
+    s32 c = *(s32 *)(g + 0x12194 + GQ_C * 4), item = HELD_ITEM;
+    float pt[3];
+    GD.magic = 0x47444C59u;
+    if (map != VALLEY || !(c & GQ_SUMM) || GS.st || !(PAD_PRESS & 0x100) || (PAD_HELD & 0x10) || CONTROL != 1 ||
+        !no_event() || (FADER && *(u8 *)(FADER + 0x60))) return;
+    if (GD.st == 0) {                             /* call her: empty hands, facing Pool B */
+        if (item || !spring_pool_point(g, pt)) return;                      /* (a tool in hand: its own A, e.g. fishing) */
+        PAD_PRESS &= ~0x100u; PAD_HELD &= ~0x100u;
+        if (S.actor && S.who != WHO_HG) { spring_say(GQ_MSG_BUSY); return; }   /* the Postman / Joe has slot 37 */
+        if (!S.actor) {
+            if (S.loaded && S.who != WHO_HG) release_model();
+            S.who = WHO_HG;
+            if (!S.loaded) setup_model();
+            spawn();
+            if (!S.actor) { release_model(); S.who = 0; return; }
+        }
+        {   Vec v; float *p = (float *)(g + 0x29C78);
+            v.x = pt[0]; v.y = 40.0f; v.z = pt[2]; GD.surf = ground_y(COLLMAP, &v);
+            if (GD.surf != GD.surf || GD.surf < p[1] - 3.0f || GD.surf > p[1] + 1.0f) GD.surf = p[1] - 0.4f;
+            S.pos.x = pt[0]; S.pos.z = pt[2]; S.pos.y = GD.surf - GD_SINK;
+        }
+        gd_face_player(g);
+        actor_setpos(S.actor, &S.pos); actor_show(S.actor);
+        joe_motion(0);
+        gs_fade(0xFFFFFFFFu, 0xFFFFFF00u, 0.8f, 0);
+        sfx_play(*(u8 **)0x803491E4, SE_MAGIC, 0);
+        sfx_play(*(u8 **)0x803491E4, SE_WATER, 0);
+        gs_plate(1); gd_hearts(g);
+        GD.st = 1; GD.t = 0; GD.summons++;
+        return;
+    }
+    if (GD.st == 2 && S.actor) {                  /* talk / gift */
+        float *p = (float *)(g + 0x29C78), *d = (float *)(g + 0x29F84);
+        float dx = S.pos.x - p[0], dz = S.pos.z - p[2], d2 = dx * dx + dz * dz;
+        if (d2 > GD_NEAR * GD_NEAR || d2 < 0.0001f || (dx * d[0] + dz * d[2]) * rsqrt(d2) < 0.3f) return;
+        if (item && !spring_giftable(item)) return;                         /* a tool in hand: the tool's A */
+        PAD_PRESS &= ~0x100u; PAD_HELD &= ~0x100u;
+        gd_lines(g, t, item);
+        gd_hearts(g);
+        gd_cam(g);
+        {   s32 *cn = (s32 *)(g + 0x12194);
+            cn[GD_C_L1] = GD.l1; cn[GD_C_L2] = GD.l2; cn[GD_C_TAKE] = item ? 1 : 0;
+        }
+        GD.st = 3; GD.waited = 0;
+        gd_face_player(g);
+        joe_motion(0);
+        event_start(EVMGR, GD_EVENT, 0, 0);
+    }
+}
+static s32 gd_daily_frame(u8 *g, s32 map)        /* while she is up: slot 37 is hers */
+{
+    if (!GD.st) return 0;
+    if (map != VALLEY || !S.actor || S.who != WHO_HG) {   /* (the scene change frees her: pm_scene_change) */
+        if (map == VALLEY && !S.actor) { GD.st = 0; gs_plate(0); }
+        return GD.st != 0;
+    }
+    if (GD.st == 1) {                             /* rising */
+        float k = smooth((float)++GD.t / (float)GD_RISE);
+        S.pos.y = GD.surf - GD_SINK * (1.0f - k);
+        if (GD.t >= GD_RISE) { S.pos.y = GD.surf; GD.st = 2; }
+    } else if (GD.st == 3) {                      /* her event */
+        if (no_event()) { if (++GD.waited > 20) GD.st = 2; }
+        else GD.waited = 0;
+    }
+    gd_face_player(g);
+    actor_setpos(S.actor, &S.pos);
     return 1;
 }
 static void joe_place(float s)
@@ -1179,6 +1366,7 @@ void pm_scene_change(void)
     }
     if (S.actor) despawn();
     if (S.loaded) release_model();
+    if (GD.st) { GD.st = 0; gs_plate(0); joe_expr_patch(0); S.who = 0; }   /* gd1: she goes when the scene changes */
     joe_free_now();
 }
 
@@ -1219,6 +1407,7 @@ void pm_frame(void)
     zt_frame(g, map, &PAD_HELD, &PAD_PRESS);  /* Z targeting (zt.c): takes Z before anything else reads it */
     logs_frame(g, map, PAD_HELD, PAD_PRESS);  /* choppable logs (logs.c) */
     skill_frame(g, PAD_HELD, PAD_PRESS);      /* tool skill on the HUD (skill.c) */
+    gd_daily_input(g, map, t);               /* gd1: A at Pool B calls the goddess; A near her: talk / gift */
     spring_frame(g, map, PAD_HELD, PAD_PRESS);  /* offerings at the goddess pond (spring.c) */
     joe_dig_frame();                          /* $JOE coin dig-site halving (joetv.c) */
     /* Bench by the tree (valley): A within 1.6 of the seat, facing it, no event running -> event 407

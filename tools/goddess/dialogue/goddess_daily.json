@@ -1,0 +1,29 @@
+{
+  "_about": "Daily visits at the Spring (gd1). 'lines': id -> text (blank line = new box; <name> = the farmer). Ids starting with B / 0 are already approved in batch 1 / batch 2 and are only referenced here; D / G / R are new drafts for the user to edit. 'rules' says when each line is used.",
+  "rules": {
+    "first_ever":   "B1  - the first time you call her after the summoning",
+    "greet":        "first talk of the day: rain/storm B7; 5:00-8:59 B4; 17:00-19:59 B5; 20:00-4:59 B6; otherwise B3 (0-1 hearts) or B2 / B8 / B9 in turn",
+    "chat":         "later talks the same day: her season line (0C9/0CB spring, 0CC/0CF summer, 0D0/0D1 autumn, 0D4/0D5 winter) or a hearts line (D1-D4 under 3 hearts, D5-D8 from 3 hearts), alternating",
+    "too_much":     "R1 - after the 5th talk in a day",
+    "gift_offering":"G1 - one of the 15 offering items (loved): +4",
+    "gift_fish":    "B14b the first fish ever, then 060 (loved): +4",
+    "gift_liked":   "B16 - any other item: +2",
+    "gift_disliked":"G2 - Trash, failed dishes: -2",
+    "gift_again":   "G3 - a second gift the same day (she keeps it; no change)",
+    "affection":    "first talk of the day +1; hearts like Celia / Muffy / Nami: love 20 / 40 / 60 / 80 / 90 = 1-5 red (under 10 one grey, 10-19 one green); 0 at the summoning"
+  },
+  "lines": {
+    "D1": "The water's so calm\ntoday. You should\nsit and rest a bit.",
+    "D2": "Don't just stand\nthere. Tell me\nsomething fun!",
+    "D3": "I've been asleep for\nso long... The valley\nlooks so different.",
+    "D4": "A princess needs\nvisitors, you know.\nCome by more often.",
+    "D5": "I was hoping you'd\ncome. ...Don't let\nit go to your head.",
+    "D6": "You always look so\nserious. Smile for\nme, <name>!",
+    "D7": "When you're here,\nthe spring feels\nwarmer.",
+    "D8": "Stay a little\nlonger? Just a\nlittle.",
+    "R1": "Again? You really\ncan't stay away from\nme, can you?",
+    "G1": "Oh! Just like the\nold offerings...\n\nYou remembered.\nThank you, <name>.",
+    "G2": "...What is this?\n\nYou don't give\nrubbish to a\nprincess!",
+    "G3": "Another gift? I'll\ntake it, of course.\n\nBut one a day is\nplenty, you know."
+  }
+}

@@ -4097,3 +4097,25 @@ so, door fades are timed there, possibly per frame. Not traced yet.
   as gh2 (files 5-7, not ebony 70-74, no event, year 1, not summoned, first line per Sprite per day; GQ_TEST every
   line). HOOK12 back to the original bl (PREV takes gh2's 0x4824B8F1). pm normal / test / gqtest in gh3.zip.
 - gh3 confirmed in game (user screenshot: a Sprite in their tree says the P3 line with the count filled in).
+
+### 7.77 Daily visits (gd1)
+- User: after the summoning, press A at the pool; she comes up where A was pressed and stays until the farmer leaves
+  (a house / another map); talk with A; gifts: the offering items loved; hearts the same system as Celia / Muffy / Nami;
+  Claude drafts the lines, the user edits. Hearts check (our hearts v7, FEATURES): the brides show 1-5 red from their
+  love byte (thresholds table 0x8034B624 = 20 40 60 80 90; under 10 one grey 0x15, 10-19 one green 0x13, red 0x12);
+  villagers 3 at most. Her plate text is people.mes 37 ("Goddess" 02 12 (80 D6)x5 17; 02 = space, then the colour
+  byte): Message.arc sits at a different address each boot (U8 at 0x810663C0 in d7d09a2b, pointer at 0x802FEC3C there),
+  so gd_hearts scans 0x80C00000-0x81700000 once for "Goddess " + colour + 80 D6 and rewrites colour / n hearts / 17 00.
+- The hand slot (game+0x11CC4) also holds tools (zt.c's weapons), so a gift must be throwable (spring.c tossable,
+  item flag 0x8); calling her needs empty hands (a rod in hand keeps its own A).
+- Items: offerings as gq (0x1F..0x34, 0x43B-0x43E, 0x07, 0x1C, 0x19); fish 0x46F-0x47E (fish table); Trash 0x503,
+  failed dish 0x47F. Weather = *(*0x803491D4 + 0x20) (3 rain, 5 storm, 4 snow).
+- Counters: 31 (unused by scripts, outside both daily count-ups) = day + 1 of the last talk (low 16), talks that day
+  (bits 16-19), gifted that day (bit 20); 51 bit 19 met, bit 20 a fish given once, bits 24-31 love (0-100; older saves'
+  0xFF clamps to 100). Event 413 (Common.arc node 113, build_gd_daily.py): camera from 20-25, cmd_56 when 28 = 1, lines
+  from counters 26 / 27 (cmd_04(debug.mes, counter, 0x25)). Lines: debug.mes 0x42-0x61 (gd_daily.h).
+- Love: first talk of the day +1, offering / fish +4, other throwable +2, Trash / failed -2, one gift a day (a second
+  is kept, no change). Starts at 40 (GD_LOVE0, 2 hearts) at the summoning (gq5 had it full).
+- pm.c: gd_daily_input runs before spring_frame (takes the A); gd_frame hands slot 37 to gd_daily_frame while she is
+  up (the Postman / Joe wait); pm_scene_change sends her away. 'GDLY' GD struct (0x80380C80 in gqtest). Busy slot
+  (Postman / Joe out): "The water is restless" (GQ_MSG_BUSY). pm 148 KB of ~151.
