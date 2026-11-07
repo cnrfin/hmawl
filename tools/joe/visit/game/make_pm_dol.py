@@ -108,7 +108,7 @@ PATCHES = [  # (RAM address, original word, new word, why)
     (HOOK8, 0x9421FFE0, None, 'TV channel 3 caption (func_8008E298) -> pm_tv_stub: $JOE Coin Daily'),
     (HOOK9, 0x9421FFC0, None, 'villager talk line (func_80117B10) -> pm_talk_stub: villagers hate the $JOE coin'),
     (HOOK10, 0x9421FFD0, None, 'villager liked/wanted-item lists (func_80148A4C) -> pm_want_stub: never the $JOE coin'),
-    (HOOK12, 0x4BFEE851, 0x4BFEE851, 'script message window: original bl func_801020E4 kept (test 11 hook removed: mode 1 = sign-post box)'),
+    (HOOK12, 0x4BFEE851, 'blhook', 'talk / script message window (func_80113864) -> pm_msg_stub: Harvest Sprite progress lines (gh2)'),
     (HOOK11, 0x9421FEC0, 0x9421FEC0, 'villager daily plan: original code kept (bench-sit probe hook removed)'),
     (HOOK13, 0x806DA80C, None, 'player update after the state handler -> pm_zt_stub: face the Z-target'),
     (HOOK14, 0x80010034, None, 'camera look-at (func_8017B834) -> pm_tilt_stub: Z-target tilt up'),

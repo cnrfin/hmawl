@@ -3,35 +3,42 @@
 jaw and a slightly more pointed chin, like Flora's), and recolour her eye frames: eyebrows in her hair's green, a faint
 eyeshadow on the upper lid.
 Geometry: one smooth warp of model-space positions (+Y up, +Z forward, x 0 = the face's centre line), applied to every
-skin source vertex (.skn group 1 sources: s16 / 8192, 6 shorts per vertex = position + normal, from src + align) and
-every .gpl position, so shared seams stay joined. Below the eyes the face narrows toward the jaw (front half of the head
-only: buns, back hair and neck untouched); the chin's middle moves a little down and forward.
+head-bone skin source vertex (.skn group 1 sources: s16 / 8192, 6 shorts per vertex = position + normal, from src +
+align) and the same .gpl positions (skin dst / 12). fm2 (user: the jaw looked prominent / masculine from three-quarters;
+round it and bring it to a point): below the eyes the face narrows, more at the sides; the jaw's sides go back (a U from
+above) and up (the jaw line climbs to the ears); the whole lower face sets back a little; the chin's middle drops a
+little to a point. Collar, neck, ears, buns and back hair untouched.
 Texture: the 58 eye frames (gd_0_f0_e.tpl, 32x32 CMPR, shared data) decoded, brows (dark brown strokes above the eye)
 recoloured to the hair green, a soft tint over the upper lid, re-encoded in place (same size).
-usage: slim_face.py IN_gd_0.arc OUT_gd_0.arc [--slim 0.14] [--chin 0.02] [--shadow R,G,B] [--no-texture]"""
+usage: slim_face.py IN_gd_0.arc OUT_gd_0.arc [--slim --round --lift --back --chin] [--shadow R,G,B] [--no-texture]"""
 import sys, os, struct, argparse, ast, numpy as np
 from PIL import Image
 HERE = os.path.dirname(os.path.abspath(__file__))
 ap = argparse.ArgumentParser()
 ap.add_argument('src'); ap.add_argument('dst')
-ap.add_argument('--slim', type=float, default=0.20)          # lateral squeeze at the jaw
-ap.add_argument('--chin', type=float, default=0.03)          # chin point: down by this, forward by 0.6 x this
+ap.add_argument('--slim', type=float, default=0.22)          # lateral squeeze of the lower face (more at the sides)
+ap.add_argument('--round', type=float, default=0.10)         # the jaw's sides pulled back (a U, not a box, from above)
+ap.add_argument('--lift', type=float, default=0.04)         # the jaw corners raised (the jaw line climbs to the ears)
+ap.add_argument('--back', type=float, default=0.03)          # the whole lower face set back (less muzzle from the side)
+ap.add_argument('--chin', type=float, default=0.02)         # the chin's middle: down by this (the point)
 ap.add_argument('--brow', default='70,120,80')               # her hair's mid green
 ap.add_argument('--shadow', default='100,170,175')           # faint teal
 ap.add_argument('--shadow-a', type=float, default=0.5)
 ap.add_argument('--no-texture', action='store_true')
 A = ap.parse_args()
-EYE_LO, JAW, CHIN, NECK, MOUTH = 1.06, 0.96, 0.925, 0.86, 0.975            # built heights (1.1 x the source model)
+EYE_LO, JAW, NECK, MOUTH = 1.05, 0.945, 0.885, 0.975            # built heights (1.1 x the source model)
 
 def sm(x): x = np.clip(x, 0, 1); return x * x * (3 - 2 * x)
 def warp(P):
-    P = P.copy(); x, y, z = P[:, 0], P[:, 1], P[:, 2]
-    w = sm((EYE_LO - y) / (EYE_LO - JAW)) * sm((y - NECK) / (CHIN - NECK))   # 0 at the eyes -> 1 at the jaw, off at the neck
-    f = sm((z + 0.05) / 0.15)                                               # front of the head only
-    c = w * f * np.exp(-(x / 0.09) ** 2) * sm((MOUTH - y) / 0.04)          # the chin's middle, below the mouth
-    P[:, 0] = x * (1 - A.slim * w * f)
-    P[:, 1] = y - A.chin * c
-    P[:, 2] = z + 0.6 * A.chin * c
+    P = P.copy(); x, y, z = P[:, 0], P[:, 1], P[:, 2]; ax = abs(x)
+    w = sm((EYE_LO - y) / (EYE_LO - JAW)) * sm((y - NECK) / (JAW - NECK))   # 0 at the eyes -> 1 at the jaw -> 0 at the neck
+    f = sm((z + 0.06) / 0.12) * sm((0.30 - ax) / 0.06)                       # the face: front of the head, not ears / collar
+    s = np.clip(ax / 0.17, 0, 1.2)                                          # 0 on the centre line -> 1 at the jaw's side
+    c = w * f * np.exp(-(x / 0.07) ** 2) * sm((MOUTH - y) / 0.04)          # the chin's middle, below the mouth
+    k = w * f
+    P[:, 0] = x * (1 - A.slim * k * (0.35 + 0.65 * s))
+    P[:, 1] = y + A.lift * k * s ** 1.5 - A.chin * c
+    P[:, 2] = z - A.round * k * s ** 1.5 - A.back * k
     return P
 
 def u8_entries(d):
@@ -50,19 +57,23 @@ pre = [n for n in F if n.endswith('.gpl')][0][:-4]
 # ---- skin sources
 so, ss = F[pre + '.skn']; S = bytearray(d[so:so + ss])
 n1 = struct.unpack_from('>H', S, 0)[0]; g1o = struct.unpack_from('>I', S, 8)[0]
-moved = 0
+moved = 0; heads = []; HEAD = None
+grp = []
 for k in range(n1):
     o = g1o + 0x40 * k; src, dst, bone, cnt = struct.unpack_from('>IIHH', S, o + 0x30); al = S[o + 0x3C]
-    a = np.array(struct.unpack_from('>%dh' % (6 * cnt), S, src + al), float).reshape(-1, 6)
+    a = np.array(struct.unpack_from('>%dh' % (6 * cnt), S, src + al), float).reshape(-1, 6); grp.append((src + al, dst, bone, cnt, a))
+HEAD = max(set(g[2] for g in grp), key=lambda b: max(g[4][:, 1].max() for g in grp if g[2] == b))   # the head bone (the top)
+for src, dst, bone, cnt, a in grp:                          # only the head's own vertices: the collar / neck stay put
+    if bone != HEAD: continue
     P = a[:, :3] / 8192; Q = warp(P); moved += int((abs(Q - P).max(1) > 1e-4).sum())
     a[:, :3] = np.round(Q * 8192)
-    struct.pack_into('>%dh' % (6 * cnt), S, src + al, *a.astype(int).ravel())
+    struct.pack_into('>%dh' % (6 * cnt), S, src, *a.astype(int).ravel()); heads.append((dst // 12, cnt))
 d[so:so + ss] = S
-# ---- gpl positions (the bind copy)
+# ---- gpl positions (the bind copy), the same vertices (skin dst = byte offset into it, 12 per vertex)
 go, gs = F[pre + '.gpl']; G = bytearray(d[go:go + gs]); m0 = 0x1C
 po = struct.unpack_from('>I', G, m0)[0]; off, cnt, fmt, comp = struct.unpack_from('>IHBB', G, m0 + po)
 frac = fmt & 0xF; raw = np.array(struct.unpack_from('>%dh' % (6 * cnt), G, m0 + off), float).reshape(-1, 6)
-raw[:, :3] = np.round(warp(raw[:, :3] / (1 << frac)) * (1 << frac))
+for i0, n in heads: raw[i0:i0 + n, :3] = np.round(warp(raw[i0:i0 + n, :3] / (1 << frac)) * (1 << frac))
 struct.pack_into('>%dh' % (6 * cnt), G, m0 + off, *raw.astype(int).ravel())
 d[go:go + gs] = G
 print('skin vertices moved:', moved)

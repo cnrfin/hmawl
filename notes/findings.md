@@ -4059,3 +4059,23 @@ so, door fades are timed there, possibly per frame. Not traced yet.
   re-encoded with build_blank.py's cmpr. make_hg.py --slim: hg_0.arc 49a1c7ec (anm.arc unchanged, c0c522d6).
   Preview previews/slim_face_fm1.png.
 
+### 7.75 Sprite progress lines via the talk dispatcher (gh2), rounder jaw (fm2)
+- Dump a6d53280 (talking to Nic in the Sprites' tree, gqtest gh1): GHD ('GHNT', 0x803806C0) all zero, so func_80117B10
+  was never called; EVMGR +0x680 -1 / +0x58C 0 (no event); only ebony.mes loaded (0x815EA680); msg manager +0x60 = 33
+  (speaker Nic). The Sprites have their own talk kind in the dispatcher (0x80110xxx: each kind's getter -
+  80113B80 everyday, 80113DBC, 80113FBC, 80117390 / 754C / 7740, 8011997C, 8011A664, 8011ACCC, 8011E4D4, 8011E65C,
+  80124824 / 48D8 / 498C - then func_80113864(?, group, msg, speaker obj, callback) -> its bl func_801020E4 at
+  0x80113894). func_801020E4(mm, mode, group, msg, speaker, ...) returns a value func_80113864 passes on.
+- gh2: HOOK12 (0x80113894) re-enabled as a bl to pm_msg_stub (+0x1E4, still starts with the 0x2C050015 marker) ->
+  spring.c gq_msg_open: group 5 / 6 / 7 (david / ebony / flat), not ebony 70-74 (GBA link), no event (+0x680 -1,
+  +0x58C 0), year 1, not summoned -> the first such line per Sprite per day becomes gq_sprite_line (P1-P8, number slot
+  0) in debug.mes (group 50); speaker kept. GQ_TEST: every line. Debug 'GMSG' struct GMD {calls, grp, msg, hit, line}.
+  Sprites can be talked to from Day 1 (user). pm normal 150806c2, test 0ced6e54, gqtest 278f766d; make_pm_dol.py
+  8c7223e4 (HOOK12 now 'blhook').
+- fm2 (user: front view fine, but from three-quarters the face was prominent, the chin masculine; wanted a round jaw
+  coming to a point): slim_face.py rewritten - only the head bone's vertices (bone 7, the highest; skn group-1 dst /
+  12 = .gpl index), so the collar and neck no longer move (fm1 pulled shirt-collar points into spikes). Lower-face
+  weight 0 at the eyes (1.05) -> 1 at the jaw (0.945) -> 0 at 0.885; x narrowed by slim x (0.35 + 0.65 s) (s = |x| /
+  0.17), the sides set back (round x s^1.5) and raised (lift x s^1.5), the whole lower face back (back), the chin middle
+  down (chin). Defaults 0.22 / 0.10 / 0.04 / 0.03 / 0.02; fm1's forward chin push dropped (it made the muzzle).
+  build_slim/gd_0.arc f146ab63; previews/slim_face_fm2.png (front-facing views: original / fm1 / fm2).

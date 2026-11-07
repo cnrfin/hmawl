@@ -249,6 +249,22 @@ static const struct { u8 who; unsigned short msg, mask; } GQ_HINT[] = {
 static u8 gh_seen[40]; static u32 gh_day = 0xFFFFFFFFu;
 struct { u32 magic; s32 calls, who, rec, hit, msg; } GHD;   /* 'GHNT' (dump) */
 static s32 popc(u32 x) { s32 n = 0; while (x) { n += x & 1; x >>= 1; } return n; }
+static s32 gq_sprite_line(s32 c)                            /* the Harvest Sprites' progress line */
+{
+    s32 m, got = popc((u32)(c & GQ_ALL));
+    if (got == 0) m = GH_P1;
+    else if (got == 15) m = (c & GQ_FISHED) ? GH_P4 : GH_P8;
+    else if (got == 14) m = GH_P4;
+    else {
+        s32 r = (s32)(rand_() % 4u);
+        if (r == 1 && (~c & 0x00FF)) m = GH_P5;
+        else if (r == 2 && (~c & 0x0F00)) m = GH_P6;
+        else if (r == 3 && (~c & 0x7000)) m = GH_P7;
+        else m = got <= 7 ? GH_P2 : GH_P3;
+        if ((m == GH_P2 || m == GH_P3) && OK(MSGMGR)) msg_num(MSGMGR, 0, 15 - got);
+    }
+    return m;
+}
 s32 gq_talk(s32 who, s32 rec, s32 *grp, s32 *msg)
 {
     u8 *g = GAME;
@@ -259,19 +275,8 @@ s32 gq_talk(s32 who, s32 rec, s32 *grp, s32 *msg)
     c = CNT(g, GQ); day = CLOCK_ / DAY_;
     if ((c & GQ_SUMMONED) || day >= 40) return 0;             /* year 1 (4 seasons x 10 days), until she is summoned */
     got = popc((u32)(c & GQ_ALL));
-    if (who >= 32 && who <= 34) {                             /* the Harvest Sprites: progress */
-        if (got == 0) m = GH_P1;
-        else if (got == 15) m = (c & GQ_FISHED) ? GH_P4 : GH_P8;
-        else if (got == 14) m = GH_P4;
-        else {
-            s32 r = (s32)(rand_() % 4u);
-            if (r == 1 && (~c & 0x00FF)) m = GH_P5;
-            else if (r == 2 && (~c & 0x0F00)) m = GH_P6;
-            else if (r == 3 && (~c & 0x7000)) m = GH_P7;
-            else m = got <= 7 ? GH_P2 : GH_P3;
-            if ((m == GH_P2 || m == GH_P3) && OK(MSGMGR)) msg_num(MSGMGR, 0, 15 - got);
-        }
-    } else {
+    if (who >= 32 && who <= 34) m = gq_sprite_line(c);         /* (the Sprites' chat comes through gq_msg_open) */
+    else {
         if (day != gh_day) { for (k = 0; k < 40; k++) gh_seen[k] = 0; gh_day = day; }
         if (gh_seen[who] || rand_() % 3u) return 0;
         if (who == 19) { if (got == 15 && !(c & GQ_FISHED)) m = GH_V11; }   /* Daryl: the fossil, once all 15 are in */
@@ -282,6 +287,34 @@ s32 gq_talk(s32 who, s32 rec, s32 *grp, s32 *msg)
     }
     *grp = G_DEBUG; *msg = m; GHD.hit++; GHD.msg = m;
     return 1;
+}
+/* gh2: the Harvest Sprites' chat (their own talk kind in the dispatcher, files 5 david / 6 ebony / 7 flat) never asks
+   func_80117B10, so hook.s pm_msg_stub (func_80113864's bl func_801020E4) comes here first. Outside events, in year 1
+   before the summoning, a Sprite's first chat line of the day becomes a progress line (debug.mes); the speaker (name
+   plate) stays. Not the GBA-link lines (ebony 70-74). In GQ_TEST every chat line. */
+#define msg_open_r    F(0x801020E4, s32, (u8 *, s32, s32, s32, s32, s32, s32, s32))
+static u32 gh_sday[3];
+struct { u32 magic; s32 calls, grp, msg, hit, line; } GMD;   /* 'GMSG' (dump) */
+s32 gq_msg_open(u8 *mm, s32 mode, s32 grp, s32 msg, s32 spk, s32 a, s32 b, s32 c2)
+{
+    u8 *g = GAME, *ev = EVMGR_;
+    GMD.magic = 0x474D5347u; GMD.calls++; GMD.grp = grp; GMD.msg = msg;
+    if (grp >= 5 && grp <= 7 && !(grp == 6 && msg >= 70 && msg <= 74) && OK(g) && OK(ev) &&
+        *(s32 *)(ev + 0x680) == -1 && !*(s32 *)(ev + 0x58C)) {
+        s32 c = CNT(g, GQ);
+        u32 day = CLOCK_ / DAY_;
+        if (!(c & GQ_SUMMONED) && day < 40) {
+#ifndef GQ_TEST
+            if (gh_sday[grp - 5] != day + 1)
+#endif
+            {
+                gh_sday[grp - 5] = day + 1;
+                msg = gq_sprite_line(c); grp = G_DEBUG;
+                GMD.hit++; GMD.line = msg;
+            }
+        }
+    }
+    return msg_open_r(mm, mode, grp, msg, spk, a, b, c2);
 }
 static void gq_intro(u8 *g)                                 /* the Sprites' scene at the Spring, once */
 {

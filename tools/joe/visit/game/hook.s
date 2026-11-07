@@ -176,15 +176,15 @@ pm_van_stub:
     stwu  r1, -0x140(r1)            # original first instruction
     b     van_hook_return           # 0x80060EFC
 
-# Script messages: func_80113864 (every script message command) opens the window with mode 0, which never
-# shows the speaker's name and heart. HOOK12 (its bl func_801020E4 at 0x80113894) comes here: Joe's lines
-# (file 0x15, mukumuku.mes) open in mode 1, the villager talk window with name and heart.
+# Talk / script messages: func_80113864 (the talk dispatcher's line for every talk kind, and script message
+# commands) opens the window through its bl func_801020E4 at 0x80113894 (HOOK12), which comes here (gh2): the
+# Harvest Sprites' chat (files 5-7) bypasses the villager line hook func_80117B10.
     .globl pm_msg_stub
 pm_msg_stub:
-    cmpwi r5, 0x15
-    bne   1f
-    li    r4, 1
-1:  b     msg_open                  # 0x801020E4
+    cmpwi r5, 0x15                  # (marker word checked by make_pm_dol.py)
+    b     gq_msg_open               # gh2: spring.c, may swap a Harvest Sprite's chat line, then func_801020E4
+    nop
+    nop
 
 # Z targeting: 0x800313C4, in the player's update right after his state handler (r30 = player), before his
 # position and facing are copied into event slot 0. zt_post(player) turns him toward the lock-on target.
