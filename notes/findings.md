@@ -4046,3 +4046,16 @@ so, door fades are timed there, possibly per frame. Not traced yet.
   can be talked to in year 1 (P lines). pm normal 963b1969, test 2c36cb2a, gqtest 8ef23501; Common.arc dc43bc50,
   debug.mes 8bdffe73, david.mes cab5ab6e, ebony.mes 29e13844, flat.mes fc06416a.
 
+### 7.74 Goddess face edit (fm1)
+- User: keep the current model, slim the face a little (less of Muffy's baby face, more like Flora / a slightly pointed
+  chin), eyebrows in her hair colour, a faint eyeshadow.
+- Built files edited directly (tools/goddess/scripts/slim_face.py on build_jiggle/gd_0.arc -> build_slim/):
+  .skn group-1 sources are model-space (s16 / 8192, position + normal per vertex, starting at src + align byte), the
+  .gpl positions the bind copy; one smooth warp of both: below the eye bottom (y 1.06, built = 1.1 x source) the front
+  half of the head narrows toward the jaw (x 0.80 at y 0.96, off again at the neck 0.86-0.925), the chin's middle
+  (below the mouth, y 0.975) moves 0.03 down and 0.018 forward. 189 vertices moved. Eye frames (f0_e, 13 unique 32x32
+  CMPR images, shared offsets): brow strokes (rows < 10, darker than the skin) blended to green (70, 120, 80); skin
+  above each column's lash line tinted teal (100, 170, 175), 0.5 at the lash fading over 5 rows and to the eye's ends;
+  re-encoded with build_blank.py's cmpr. make_hg.py --slim: hg_0.arc 49a1c7ec (anm.arc unchanged, c0c522d6).
+  Preview previews/slim_face_fm1.png.
+
