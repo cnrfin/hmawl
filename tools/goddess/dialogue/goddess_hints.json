@@ -1,0 +1,122 @@
+{
+ "O1": {
+  "who": "Nak runs up as you leave the house (morning, Day 2)",
+  "section": "Opening: the Sprites start the quest (Spring 1, Day 2)",
+  "line": "Hey, <name>!\nGot a second?"
+ },
+ "O2": {
+  "who": "Nak",
+  "section": "Opening: the Sprites start the quest (Spring 1, Day 2)",
+  "line": "There's an old Spring\nin this valley.\n\nA Harvest Goddess\nlived there long ago.\nNow the water sleeps."
+ },
+ "O3": {
+  "who": "Flak joins in",
+  "section": "Opening: the Sprites start the quest (Spring 1, Day 2)",
+  "line": "We think she'd wake\nup if the valley gave\nher wonderful things.\n\nThings that grow,\nthings that bloom...\nall sorts of things!"
+ },
+ "O4": {
+  "who": "Nic",
+  "section": "Opening: the Sprites start the quest (Spring 1, Day 2)",
+  "line": "You're a farmer!\nYou've got LOTS of\nwonderful things!\n\nTry tossing some in.\nWe'll be watching!"
+ },
+ "P1": {
+  "who": "Nothing offered yet",
+  "section": "Harvest Sprites: progress (talk to a Sprite, year 1)",
+  "line": "The Spring's still\nfast asleep.\n\nGo on, toss something\nnice in!"
+ },
+ "P2": {
+  "who": "1-7 offered. <n> = how many are left",
+  "section": "Harvest Sprites: progress (talk to a Sprite, year 1)",
+  "line": "The water shimmered!\nI think it wants...\n<n> more things?\n\nSomething like that!"
+ },
+ "P3": {
+  "who": "8-13 offered",
+  "section": "Harvest Sprites: progress (talk to a Sprite, year 1)",
+  "line": "Over halfway! Maybe\n<n> more wonderful\nthings to go."
+ },
+ "P4": {
+  "who": "14 offered",
+  "section": "Harvest Sprites: progress (talk to a Sprite, year 1)",
+  "line": "Just one more!\nI can feel it in\nmy hat!"
+ },
+ "P5": {
+  "who": "Some crops still missing (said instead of P2/P3 sometimes)",
+  "section": "Harvest Sprites: progress (talk to a Sprite, year 1)",
+  "line": "Hmm... something from\nyour fields is still\nmissing, I bet."
+ },
+ "P6": {
+  "who": "Some flowers still missing",
+  "section": "Harvest Sprites: progress (talk to a Sprite, year 1)",
+  "line": "The Spring's banks\nwere once full of\nflowers. Rare ones!"
+ },
+ "P7": {
+  "who": "Milk, egg or wool still missing",
+  "section": "Harvest Sprites: progress (talk to a Sprite, year 1)",
+  "line": "The old herders\nbrought gifts from\ntheir animals too.\n\nThat's what Grandpa\nNic says, anyway."
+ },
+ "P8": {
+  "who": "All 15 given, no fossil yet",
+  "section": "Harvest Sprites: progress (talk to a Sprite, year 1)",
+  "line": "The water's glowing,\nbut she won't come.\n\nMaybe someone from\nthe old days has to\ncome home first..."
+ },
+ "V1": {
+  "who": "Ruby (Inn)",
+  "section": "Villager hints (year 1, while that offering is still missing)",
+  "line": "When I was a girl, a\nfortune-teller said\nto throw gifts into\n\nthe Spring. Nothing\nhappened. Maybe I\ndidn't give enough..."
+ },
+ "V2": {
+  "who": "Celia",
+  "section": "Villager hints (year 1, while that offering is still missing)",
+  "line": "Vesta says the old\nfolks shared a bit of\nevery crop with\n\nthe Spring. Isn't\nthat sweet?"
+ },
+ "V3": {
+  "who": "Vesta",
+  "section": "Villager hints (year 1, while that offering is still missing)",
+  "line": "My granny tossed her\nfirst tomato into the\nSpring every year.\n\nShe'd tell me\nthe water shimmered\nwhen she did."
+ },
+ "V4": {
+  "who": "Marlin",
+  "section": "Villager hints (year 1, while that offering is still missing)",
+  "line": "It's said that our\nberries and melons\nare loved by the\n\nSpirit of the valley.\nNonsense, if you ask\nme."
+ },
+ "V5": {
+  "who": "Carter (dig site)",
+  "section": "Villager hints (year 1, while that offering is still missing)",
+  "line": "These pictures depict\nbeings offering roots\nto a deity who lived\n\nin a pool of water.\nFascinating!"
+ },
+ "V6": {
+  "who": "Flora (dig site)",
+  "section": "Villager hints (year 1, while that offering is still missing)",
+  "line": "Sometimes on my\nbreak I go over to\nthe Spring.\n\nSome gross guy there\ngave me a\nGoddess Drop.\n\nI just chucked it in\nand ran!"
+ },
+ "V7": {
+  "who": "Gustafa",
+  "section": "Villager hints (year 1, while that offering is still missing)",
+  "line": "I'm writing a song\nabout a lady.\n\nShe loved three\nflowers... a misty\nmoon, a trick of blue\n\nand one for love.\nGroovy, right?"
+ },
+ "V8": {
+  "who": "Takakura",
+  "section": "Villager hints (year 1, while that offering is still missing)",
+  "line": "The old herders here\npoured a cup of milk\ninto the Spring.\n\nI guess they believed\nit would make their\ncows healthy.\n\nSilly, if you ask me."
+ },
+ "V9": {
+  "who": "Muffy",
+  "section": "Villager hints (year 1, while that offering is still missing)",
+  "line": "I'd love to eat a\nhot spring egg!\n\nThere's a spring in\nthe town but it's so\ncold. Even in summer.\n\nIf you threw one in,\nIt'd never cook."
+ },
+ "V10": {
+  "who": "Nami",
+  "section": "Villager hints (year 1, while that offering is still missing)",
+  "line": "Some towns leave wool\nby the Spring, so the\nHarvest Sprites\n\ncan weave.\n\nI've seen stranger\nthings."
+ },
+ "V11": {
+  "who": "Daryl",
+  "section": "Villager hints (year 1, while that offering is still missing)",
+  "line": "My readings show\nsomething old in the\nother pond.\n\nVery old. Bones,\nperhaps. Hmhmhm..."
+ },
+ "V12": {
+  "who": "Hugh",
+  "section": "Villager hints (year 1, while that offering is still missing)",
+  "line": "I saw tiny people\nwith hats by the\nSpring!\n\nThey were talking\nabout a goddess!"
+ }
+}

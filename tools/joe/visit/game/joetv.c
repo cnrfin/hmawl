@@ -299,8 +299,10 @@ static const u16 hate_line[46] = {   /* by message group: that villager's own di
 };
 static u8 hate_day_seen[64];
 static u32 hate_day = 0xFFFFFFFFu;
+s32 gq_talk(s32 who, s32 rec, s32 *grp, s32 *msg);
 s32 joe_talk_post(s32 who, s32 rec, s32 *grp, s32 *msg, s32 ret)
 {
+    if (gq_talk(who, rec, grp, msg)) return ret;          /* gh1: goddess quest hints (spring.c) */
     if (rec != 0x3E || HELD_ITEM != 0x442) return ret;
     s32 g = *grp;
     if (g >= 0 && g < 46 && hate_line[g]) *msg = hate_line[g];

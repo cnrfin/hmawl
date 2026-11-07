@@ -4019,3 +4019,30 @@ so, door fades are timed there, possibly per frame. Not traced yet.
   stored-answer path - lv3's looping script waited on it, frozen. lv4: ev_running() = +0x680 != -1 || +0x58C; menu 1
   -> 2 on that or on an answer; the menu ends when neither and no answer is pending; the next menu needs !ev_running.
   pm normal 875facf3, test 0c39d6af, gqtest 9ae80fe7 (Common.arc as lv3).
+
+### 7.73 Goddess quest hints (gh1)
+- User design: hints by talking to villagers (lore, not "throw in a tomato"), all in year 1; the Harvest Sprites show
+  progress ("maybe 7 more things?"); the cut quest event early in the game. The user's edited lines:
+  tools/goddess/dialogue/goddess_hints.json (O1-O4 opening, P1-P8 Sprites, V1-V12 villagers). Defaults (questions left
+  blank): 1 in 3 in everyday talk, once a day each, year 1, until that offering is made; opening on the first Spring
+  visit from Day 2.
+- Message groups = the file table 0x802517E0 (0 badog ... 31 sepilia, 35 takakura, 37 vesta, 42 other, 50 debug):
+  the talk hook's *group is the .mes file. func_80117B10(villager, record, &group, &line) has 163 callers, one per
+  record; func_80113B80 (everyday chat) asks for records 4 / 5 / 6. Character ids (people.mes): Celia 2, Muffy 3, Nami
+  4, Carter 6, Takakura 7, Hugh 13, Daryl 19, Gustafa 20, Ruby 25, Flora 28, Vesta 29, Marlin 30, Nak 32, Nic 33, Flak 34.
+- The cut quest event = Common event 376 (node 76; 'file 75' in the loader's 0-based list - notes 7.36's "Common file
+  75"): places Nak / Nic / Flak (cmd_60, chars 32-34) at ~(276, 136) by Pool B and runs 13 cmd_04 lines (david 1,
+  ebony 0, flat 0, david 2, david 0x31, ebony 1, flat 1, david 3, ebony 2, flat 2, david 4, ebony 3, flat 3), speaker
+  -1. Vanilla trigger not found.
+- tools/goddess/quest/build_gq_hints.py: V/P lines into free debug.mes entries 0x2E-0x41 (<n> = 2A 00 00, number slot
+  0); event 376's 13 lines rewritten in david/ebony/flat.mes (O1+O2, O3, O4 the user's; 10 joining lines new), its
+  speakers 32 / 33 / 34 (push #id + nop for push #128 + neg). gq_hints.h.
+- spring.c gq_talk (called first by joetv.c joe_talk_post): records 4-6, year 1, not summoned. Sprites: P1 (none),
+  P2 / P3 with 15 - n in slot 0, P5 / P6 / P7 (a missing kind, 1 in 4 each), P4 (14, or 15 with the fossil caught),
+  P8 (15, no fossil). Villagers: 1 in 3, once a day each, while their mask still has a missing bit (Daryl V11 only with
+  all 15 and no fossil). gq_intro: Pool B box + 4, from Day 2 (any day in GQ_TEST), no event: event 376, bit 18
+  (0x40000) of counter 51. 'GHNT' debug struct (GHD) 0x803806C0 in gqtest.
+- Untested: whether the Sprites' models are loaded in the valley for event 376 in chapter 1, and whether the Sprites
+  can be talked to in year 1 (P lines). pm normal 963b1969, test 2c36cb2a, gqtest 8ef23501; Common.arc dc43bc50,
+  debug.mes 8bdffe73, david.mes cab5ab6e, ebony.mes 29e13844, flat.mes fc06416a.
+

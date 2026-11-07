@@ -218,12 +218,92 @@ void spring_release(void)
     W.item = 0;
 }
 
+/* ---- gh1: quest hints (tools/goddess/quest/build_gq_hints.py; the user's lines). The villager talk hook (joetv.c
+   joe_talk_post) asks gq_talk first: in year 1, before the summoning, an everyday chat line (talk records 4-6, the
+   game's func_80113B80) may become that villager's hint (debug.mes = message group 50; the speaker and name plate stay)
+   while its offering is still missing - 1 in 3, at most once a day each. The Harvest Sprites (32-34) always give a
+   progress line: how many are left (number slot 0), or which kind is still missing, or (all 15) the fossil hint.
+   The opening: the cut Sprite scene at the Spring (Common event 376, rewritten) starts on the first visit to the
+   Spring from Day 2 (bit 18 of counter 51). */
+#include "gq_hints.h"
+#define GQ_INTRO      0x40000
+#define CLOCK_        (**(u32 **)0x80349218)
+#define DAY_          864000u
+#define EVMGR_        (*(u8 **)0x803491BC)
+#define event_start_  F(0x8010AAC4, s32, (u8 *, s32, s32, s32))
+#define msg_num       F(0x80102300, void, (u8 *, s32, s32))
+#define G_DEBUG       50
+static const struct { u8 who; unsigned short msg, mask; } GQ_HINT[] = {
+    { 25, GH_V1, GQ_ALL },          /* Ruby: throwing gifts in at all */
+    {  2, GH_V2, 0x00FF },          /* Celia: every crop */
+    { 29, GH_V3, 0x0001 },          /* Vesta: tomato */
+    { 30, GH_V4, 0x000C },          /* Marlin: strawberry, melon */
+    {  6, GH_V5, 0x00F0 },          /* Carter: turnip, potato, carrot, sweet potato */
+    { 28, GH_V6, 0x0100 },          /* Flora: Goddess Drop */
+    { 20, GH_V7, 0x0E00 },          /* Gustafa: Mist Moon, Trick Blue, Amorous */
+    {  7, GH_V8, 0x1000 },          /* Takakura: milk */
+    {  3, GH_V9, 0x2000 },          /* Muffy: egg */
+    {  4, GH_V10, 0x4000 },         /* Nami: wool */
+    { 13, GH_V12, GQ_ALL },         /* Hugh: the Sprites */
+};
+static u8 gh_seen[40]; static u32 gh_day = 0xFFFFFFFFu;
+struct { u32 magic; s32 calls, who, rec, hit, msg; } GHD;   /* 'GHNT' (dump) */
+static s32 popc(u32 x) { s32 n = 0; while (x) { n += x & 1; x >>= 1; } return n; }
+s32 gq_talk(s32 who, s32 rec, s32 *grp, s32 *msg)
+{
+    u8 *g = GAME;
+    s32 c, k, got, m = -1;
+    u32 day;
+    GHD.magic = 0x47484E54u; GHD.calls++; GHD.who = who; GHD.rec = rec;
+    if (!OK(g) || rec < 4 || rec > 6 || who < 0 || who >= 40) return 0;
+    c = CNT(g, GQ); day = CLOCK_ / DAY_;
+    if ((c & GQ_SUMMONED) || day >= 40) return 0;             /* year 1 (4 seasons x 10 days), until she is summoned */
+    got = popc((u32)(c & GQ_ALL));
+    if (who >= 32 && who <= 34) {                             /* the Harvest Sprites: progress */
+        if (got == 0) m = GH_P1;
+        else if (got == 15) m = (c & GQ_FISHED) ? GH_P4 : GH_P8;
+        else if (got == 14) m = GH_P4;
+        else {
+            s32 r = (s32)(rand_() % 4u);
+            if (r == 1 && (~c & 0x00FF)) m = GH_P5;
+            else if (r == 2 && (~c & 0x0F00)) m = GH_P6;
+            else if (r == 3 && (~c & 0x7000)) m = GH_P7;
+            else m = got <= 7 ? GH_P2 : GH_P3;
+            if ((m == GH_P2 || m == GH_P3) && OK(MSGMGR)) msg_num(MSGMGR, 0, 15 - got);
+        }
+    } else {
+        if (day != gh_day) { for (k = 0; k < 40; k++) gh_seen[k] = 0; gh_day = day; }
+        if (gh_seen[who] || rand_() % 3u) return 0;
+        if (who == 19) { if (got == 15 && !(c & GQ_FISHED)) m = GH_V11; }   /* Daryl: the fossil, once all 15 are in */
+        else for (k = 0; k < (s32)(sizeof GQ_HINT / sizeof GQ_HINT[0]); k++)
+            if (GQ_HINT[k].who == who && (GQ_HINT[k].mask & ~c)) { m = GQ_HINT[k].msg; break; }
+        if (m < 0) return 0;
+        gh_seen[who] = 1;
+    }
+    *grp = G_DEBUG; *msg = m; GHD.hit++; GHD.msg = m;
+    return 1;
+}
+static void gq_intro(u8 *g)                                 /* the Sprites' scene at the Spring, once */
+{
+    u8 *ev = EVMGR_;
+    float *p = (float *)(g + 0x29C78);
+    s32 c = CNT(g, GQ);
+    if (c & (GQ_INTRO | GQ_SUMMONED)) return;
+#ifndef GQ_TEST
+    if (CLOCK_ / DAY_ < 1) return;                           /* from Day 2 */
+#endif
+    if (p[0] < POOL_X0 - 4.0f || p[0] > POOL_X1 + 4.0f || p[2] < POOL_Z0 - 4.0f || p[2] > POOL_Z1 + 4.0f) return;
+    if (!OK(ev) || *(s32 *)(ev + 0x680) != -1 || *(s32 *)(ev + 0x58C) || CONTROL != 1) return;
+    CNT(g, GQ) = c | GQ_INTRO;
+    event_start_(ev, GQ_EV_SPRITES, 0, 0);
+}
 void spring_frame(u8 *g, s32 map, u32 pad_held, u32 pad_press)
 {
     u8 *pl = pm_player;
     float pt[3];
     gq_hooks();
     if (map != VALLEY || !pl) { W.item = 0; return; }
+    gq_intro(g);
 #ifdef GQ_TEST
     {   /* test (gq2): Z + D-Down fills the rucksack's free slots with offerings not yet made (and not already
            carried); with all 15 made, the Mermaid Fossil. Z from the pad's own record (zt.c takes Z out of the held word before we see it). */
