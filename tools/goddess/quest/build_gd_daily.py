@@ -26,7 +26,9 @@ DLG = os.path.join(HERE, '..', 'dialogue')
 B1J = json.load(open(os.path.join(DLG, 'goddess_lines_batch1.json')))
 B2J = json.load(open(os.path.join(DLG, 'goddess_lines_batch2.json')))
 DJ = json.load(open(os.path.join(DLG, 'goddess_daily.json')))['lines']
-DJ.update(json.load(open(os.path.join(DLG, 'goddess_proposal.json')))['lines'])   # m1: the proposal (PA / PN / PT) and the Sprites' feather (SF)
+DJ.update(json.load(open(os.path.join(DLG, 'goddess_proposal.json')))['lines'])
+_B4 = json.load(open(os.path.join(DLG, 'goddess_lines_batch4_extra.json')))
+DJ.update({k: _B4[k] for k in ('N1', 'N2')})   # w1: Nami's farewell (approved batch 4)   # m1: the proposal (PA / PN / PT) and the Sprites' feather (SF)
 USE = ['B%d' % i for i in range(1, 10)] + ['B14b', 'B16', '060', '0C9', '0CB', '0CC', '0CF', '0D0', '0D1', '0D4', '0D5']
 TEXT = {}
 for k in USE: TEXT[k] = B1J[k] if k in B1J else B2J[k]

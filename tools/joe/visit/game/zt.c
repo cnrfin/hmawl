@@ -186,6 +186,7 @@ static s32 tpos(u8 *g, s32 id, s32 map, float *x, float *z)
     s = SLOT_POS(g, id);                                 /* the live position (event slot, every frame) */
     *x = s[0]; *z = s[2]; return 1;
 }
+s32 zt_char_pos(u8 *g, s32 id, s32 map, float *x, float *z) { return tpos(g, id, map, x, z); }   /* w1 (pm.c) */
 static float ztan_half_fov(u8 *c)
 {
     float f = *(float *)(c + 0x38) * (3.14159274f / 360.0f);

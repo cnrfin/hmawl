@@ -4269,3 +4269,22 @@ so, door fades are timed there, possibly per frame. Not traced yet.
 - m2 test (user): Sprite gave the feather, proposal recorded (dump c6975b87: counter 51 bits 21 / 22, 66 = 1, 67 = 0). User: the feather comes from the game's own event (Chapter1 fs[30], Sprites at map 41); m3: our Sprite shortcut only in GQ_TEST builds. Open: that event's trigger (a goddess-only player must be able to get it).
 - dof5 (user: some ghosting / halo): 8 taps on a circle (radius 1.0 half-res texel; TEXMTX2-9, 8 texgens) averaged in a tree over 11 TEV stages (c0-c2 as temporaries) instead of 4 corner taps (doubled edges); sheets at focus x {1.25, 1.8, 2.8} + {2.5, 6, 14}, alphas 0.30 / 0.40 / 0.50. The halo (foreground colours in the blurred copy) shrinks with the radius; removing it needs a depth-aware blur (EFB depth copy + TEV compare), not done.
 - User: the game's Blue Feather cutscene comes around summer 1 (the feather is kept until she is summoned).
+
+### 7.84 Wedding research; w1: Nami's farewell
+- Research (subagent, scratchpad wedding_report.md; static + dumps): the Blue Feather cutscene (Chapter1 fs[30], event
+  31) comes from EventCondition_C00 file 0 records 38 / 39: any trigger / map, one shot, Summer-Winter, 16:00-23:59 or
+  00:00-02:59, status byte game+0x11CEC == 0; no love / flag check: everyone gets it (Summer 1, 16:00+). Nami's wedding
+  section (Chapter1 fs[4] pcs 537-2830) is her leaving the Inn (Nami 23/92-97, Tim 34/19-21, Ruby 28/20-22; 34/19,
+  34/21, 28/22 name her through <20:04> = people.mes 4), then the shared ending (pcs 7448+: Takakura 35/44 "What are
+  you going to call <20:00> now?", the bride's answer, Nami 23/160). Character -> animation set lbl_80249108[char x 6 +
+  chapter]: Nami set 37 (nami_0, list 0x8029CB44, mask 0x3F, 13 motions -> clips 0 2 1 3 3 4 1 5 6 7 8 9 4, as Celia's);
+  nami_0.arc / .anm.arc resident in mainchapter1.arc; model loaded with the actor (0x8007F57C -> func_8002D128(4)) and
+  kept for the chapter. Nami's routine record k 4 = game+0x12820 (+0x24 schedule). cmd_72 = expression.
+- User: skip Nami's Inn goodbye and play a goddess scene with W1-W4, then the farm ending; her answer to Takakura:
+  "Hmm... <name> is fine. For now."; Nami's farewell the day after the proposal; a nickname for her later (placeholder
+  "Goddess").
+- w1: build_gd_daily.py adds N1 / N2 (batch 4) to debug.mes (0x66 / 0x67); build_gd_marry.py appends event 414 (camera
+  20-25, cmd_59 facings from 26 / 27, N1 / N2 as speaker 4, fade, cmd_5A(4, 0), fade back) to the jm2 Common.arc.
+  pm.c gd_marry_frame: engaged (bit 21), no wife yet (game+0x27E54 == -1), a day after the proposal (counter 30 = day
+  + 1, set at the proposal), 6:00-16:00, valley, Nami within 7 (zt.c tpos) -> event 414, bit 23 GQ_NAMI_BYE; then her
+  schedule id kept 0. 'GMBY' debug GMB.

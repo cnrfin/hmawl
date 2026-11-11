@@ -958,12 +958,15 @@ static s32 gd_frame(u8 *g, s32 map, u32 t)
    = day + 1 of the last talk, bits 16-19 talks that day, bit 20 gifted that day. Counter 51 bit 19 met (B1 said),
    bit 20 a fish given once (B14b). */
 #include "gd_daily.h"
+#include "gd_marry.h"
 #define GQ_C        51
 #define GQ_SUMM     0x10000
 #define GQ_MET      0x80000
 #define GQ_FISHED1  0x100000
 #define GQ_ENGAGED  0x200000                      /* m1: she took the Blue Feather (the game sees: engaged to Nami) */
 #define BLUE_FEATHER 0x51F
+#define GQ_NAMI_BYE 0x800000                      /* w1: Nami has said goodbye and left */
+#define WIFE        (*(s32 *)(g + 0x27E54))        /* the wife's character (-1 before the wedding; 4 = Nami's role) */
 #define chapter_fn  F(0x8000FEE8, s32, (u8 *))     /* (the clock object) 0 = chapter 1 */
 #define chapter_now() chapter_fn(*(u8 **)0x80349218)
 #define flag_set_   F(0x801129E0, void, (u8 *, s32))
@@ -1057,6 +1060,7 @@ static void gd_lines(u8 *g, u32 t, s32 item)     /* picks the event's lines, cou
             cn[66] = 1; cn[67] = 0;               /* fiancee = 1 (Nami: the chapter end plays her wedding, wife = 4) */
             flag_set_(g + 0x12078, 265); flag_set_(g + 0x12078, 268);
             c |= GQ_ENGAGED;
+            cn[30] = day1;                        /* w1: the day of the proposal + 1 (Nami's farewell comes after it) */
         }
         cn[GQ_C] = c;
         return;
@@ -1171,6 +1175,42 @@ static void gd_daily_input(u8 *g, s32 map, u32 t)
     gd_cam(g);
     joe_motion(0);
     event_start(EVMGR, GD_EVENT, 0, 0);
+}
+/* ---- w1: Nami's farewell (tools/goddess/quest/build_gd_marry.py, event GM_EV_BYE). The day after the proposal, 6:00-16:00,
+   when Nami is out on the player's map within 7 of him: they face each other, N1 / N2, fade, she is hidden. From then on,
+   while the game still has no wife (until the wedding makes character 4 the goddess), her daily routine is kept off
+   (routine record k 4 = game+0x12820, schedule id +0x24), as Mukumuku's. */
+s32 zt_char_pos(u8 *g, s32 id, s32 map, float *x, float *z);
+struct { u32 magic; s32 starts, offs, near; } GMB;   /* 'GMBY' (dump) */
+static void gd_marry_frame(u8 *g, s32 map, u32 t)
+{
+    s32 *cn = (s32 *)(g + 0x12194), c = cn[GQ_C];
+    u32 tod = t % T_DAY;
+    float nx, nz, *p = (float *)(g + 0x29C78);
+    GMB.magic = 0x474D4259u;
+    if (!(c & GQ_ENGAGED) || WIFE != -1) return;
+    if (c & GQ_NAMI_BYE) {                       /* gone: no routine (the wedding places her itself) */
+        s32 *r = (s32 *)(g + 0x12820 + 0x24);
+        if (*(unsigned short *)(g + 0x12820 + 4) == 4 && *r) { *r = 0; GMB.offs++; }
+        return;
+    }
+    if (map != VALLEY || (s32)(t / T_DAY) + 1 <= cn[30] || tod < 6u * 36000u || tod >= 16u * 36000u) return;
+    if (!no_event() || CONTROL != 1 || GS.st || GD.st == 3 || (FADER && *(u8 *)(FADER + 0x60))) return;
+    if (!zt_char_pos(g, 4, map, &nx, &nz)) return;
+    {   float dx = nx - p[0], dz = nz - p[2], d2 = dx * dx + dz * dz, inv, mx, mz;
+        s32 *k = cn + 20, d;
+        GMB.near = (s32)d2;
+        if (d2 > 7.0f * 7.0f || d2 < 0.01f) return;
+        inv = rsqrt(d2); dx *= inv; dz *= inv;
+        mx = (p[0] + nx) * 0.5f; mz = (p[2] + nz) * 0.5f;
+        k[0] = (s32)((mx - dz * 3.6f) * 128.0f); k[1] = (s32)((p[1] + 1.6f) * 128.0f); k[2] = (s32)((mz + dx * 3.6f) * 128.0f);
+        k[3] = (s32)(mx * 128.0f); k[4] = (s32)((p[1] + 1.0f) * 128.0f); k[5] = (s32)(mz * 128.0f);
+        d = (s32)atan2_deg(dx, dz); cn[GM_C_FACE0] = d < 0 ? d + 360 : d;
+        d = (s32)atan2_deg(-dx, -dz); cn[GM_C_FACE4] = d < 0 ? d + 360 : d;
+    }
+    cn[GQ_C] = c | GQ_NAMI_BYE;
+    GMB.starts++;
+    event_start(EVMGR, GM_EV_BYE, 0, 0);
 }
 static s32 gd_daily_frame(u8 *g, s32 map)        /* while she is up: slot 37 is hers */
 {
@@ -1519,6 +1559,7 @@ void pm_frame(void)
     logs_frame(g, map, PAD_HELD, PAD_PRESS);  /* choppable logs (logs.c) */
     skill_frame(g, PAD_HELD, PAD_PRESS);      /* tool skill on the HUD (skill.c) */
     gd_daily_input(g, map, t);               /* gd1: A at Pool B calls the goddess; A near her: talk / gift */
+    gd_marry_frame(g, map, t);               /* w1: Nami's farewell after the proposal, then she stays away */
     spring_frame(g, map, PAD_HELD, PAD_PRESS);  /* offerings at the goddess pond (spring.c) */
     joe_dig_frame();                          /* $JOE coin dig-site halving (joetv.c) */
     /* Bench by the tree (valley): A within 1.6 of the seat, facing it, no event running -> event 407
