@@ -4236,3 +4236,4 @@ so, door fades are timed there, possibly per frame. Not traced yet.
   camera), so dof_draw gave up. List there: 3D at 0x8201-0x9001, that 2D camera 0xC000, the HUD states 0xC001...
   dof4: our object at 0xBFFF. (An earlier guess, the arena line at 0x80384000, was wrong: dof1 already ended at
   0x80384DC4.)
+- dof4 test (user): working.
