@@ -597,8 +597,14 @@ extern u8 *pm_player;
 #define NIGHT_AMB  0.4f                                 /* nl2 (user: no big difference at 0.6 / 0.5) */
 #define NIGHT_LT   0.35f
 #define NIGHT_FOG  0.6f
-struct { u32 magic, patches; u8 *amb, *lt, *fog; } night_dbg;   /* 'NITE' (dump) */
-static s32 night_track(u8 *t, float k, s32 force)
+/* nl3 (user): by season. Winter: the dark nights above. Spring / autumn: the game's own. Summer: the game's night
+   brightness and longer days: the dusk keys (5.0 - 7.0: 15:00 - 21:00) 1.5 h later, the dawn keys (1.0 - 3.0) 1 h
+   earlier. Valley tracks (dump 6d0d4934): ambient / fog fade 15:00 -> 19:00-20:00 and 04:00 -> 09:00; the light switches
+   off at 05:30 / 18:30 (keys 1.83 / 6.17). */
+#define SUMMER_DUSK 0.5f                                /* keys: 1 = 3 hours */
+#define SUMMER_DAWN 0.333f
+struct { u32 magic, patches; u8 *amb, *lt, *fog; s32 season; } night_dbg;   /* 'NITE' (dump) */
+static s32 night_track(u8 *t, float k, s32 force, s32 season)
 {
     u32 n, i, c;
     float key;
@@ -607,8 +613,13 @@ static s32 night_track(u8 *t, float k, s32 force)
     if (n == 0 || n > 32 || *(float *)(t + 4) != 8.0f || (!force && (*(u32 *)(t + 8) & 0xFF) == 0xFE)) return 0;
     for (i = 0; i < n; i++) {
         c = *(u32 *)(t + 8 + 8 * i); key = *(float *)(t + 12 + 8 * i);
-        if (key <= 1.7f || key >= 6.3f)
+        if (season == 3 && (key <= 1.7f || key >= 6.3f))
             c = ((u32)((c >> 24) * k) << 24) | ((u32)(((c >> 16) & 0xFF) * k) << 16) | ((u32)(((c >> 8) & 0xFF) * k) << 8) | (c & 0xFF);
+        if (season == 1) {
+            if (key > 1.0f && key <= 3.0f) key -= SUMMER_DAWN;
+            else if (key >= 5.0f && key < 7.0f) key += SUMMER_DUSK;
+            *(float *)(t + 12 + 8 * i) = key;
+        }
         *(u32 *)(t + 8 + 8 * i) = c;
     }
     if (!force) *(u32 *)(t + 8) = (*(u32 *)(t + 8) & 0xFFFFFF00u) | 0xFEu;
@@ -617,11 +628,14 @@ static s32 night_track(u8 *t, float k, s32 force)
 static void night_frame(void)
 {
     u8 *o = *(u8 **)0x803493CC;
+    u32 clk = **(u32 **)0x80349218;
+    s32 season = (s32)(clk / 864000u / 10u) % 4;         /* 0 spring, 1 summer, 2 autumn, 3 winter */
     if ((u32)o < 0x80000000u || (u32)o >= 0x81800000u) return;
     night_dbg.magic = 0x4E495445u; night_dbg.amb = *(u8 **)(o + 0x04); night_dbg.lt = *(u8 **)(o + 0x64); night_dbg.fog = *(u8 **)(o + 0xE8);
-    if (night_track(night_dbg.amb, NIGHT_AMB, 0)) {      /* a fresh load: the light and fog (no alpha marker of their own:
-                                                           the fog may use its alpha) with it */
-        night_track(night_dbg.lt, NIGHT_LT, 0); night_track(night_dbg.fog, NIGHT_FOG, 1); night_dbg.patches++;
+    night_dbg.season = season;
+    if (night_track(night_dbg.amb, NIGHT_AMB, 0, season)) {   /* a fresh load: the light and fog (no alpha marker of their
+                                                           own: the fog may use its alpha) with it */
+        night_track(night_dbg.lt, NIGHT_LT, 0, season); night_track(night_dbg.fog, NIGHT_FOG, 1, season); night_dbg.patches++;
     }
 }
 void zt_frame(u8 *g, s32 map, volatile u32 *held, volatile u32 *press)

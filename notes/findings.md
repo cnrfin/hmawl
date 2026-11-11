@@ -4211,3 +4211,11 @@ so, door fades are timed there, possibly per frame. Not traced yet.
   p1, y = d (+-1 + p4) / p3, z = -d), z test LEQUAL without update: each covers only pixels farther than its d; alphas
   0.40 / 0.40 / 0.45 add up to ~80 % far away; nearer stays sharp. Screen-space mask removed. DOF.proj / tw / pw /
   focus in the 'DOF1' struct.
+
+### 7.81 nl3: nights by season
+- User: darker nights only in winter; summer nights brighter for longer; spring / autumn normal. Valley tracks (dump
+  6d0d4934, spring, already darkened): ambient keys 0, 1.33, 2.0, 3.0, 5.0, 5.67, 6.33, 8.0; light 13 keys (black
+  switch at 1.83 / 6.17); fog (+0xE8) 0, 1.33, 2.0, 3.0, 5.0, 5.67, 6.67, 8.0. zt.c night_track(season): winter scales
+  the night keys (as nl2); summer moves keys in (1.0, 3.0] 0.333 earlier and [5.0, 7.0) 0.5 later (dawn 1 h earlier, dusk
+  1.5 h later), order kept; spring / autumn only get the 0xFE marker. Season = clock / day / 10 % 4; the tracks reload
+  with every map load (sleeping included), so a new season applies from the next load. night_dbg.season.
