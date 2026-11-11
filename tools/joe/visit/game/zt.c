@@ -453,7 +453,8 @@ static void dof_frame(float tx, float ty, float px, float py, s32 alpha, float t
     }
     if (!dof_vt[4]) { for (i = 0; i < 8; i++) dof_vt[i] = ((u32 *)0x802BB238)[i]; dof_vt[4] = (u32)dof_draw; }
     DOFO.owner = &DOFO; DOFO.vt = dof_vt;
-    rl_add(mgr + 0x48, &DOFO, 0xC000);
+    rl_add(mgr + 0x48, &DOFO, 0xBFFF);                   /* dof4: before the 2D camera object (also 0xC000, func_8017B5F0
+                                                           ortho; dump 3ca16979), after the 3D world (<= 0x9001) */
 }
 void dof_release(void)                                       /* pm.c pm_scene_change */
 {

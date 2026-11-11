@@ -4230,3 +4230,9 @@ so, door fades are timed there, possibly per frame. Not traced yet.
 - Mukumuku's 5 scenes are story cutscenes in Daryl's arc (Chapter1 file 33; Common 365 from Chapter3 script 0, 385 / 387
   from Chapter4 script 0, 393 from Chapter5 script 0; 2,000-6,600 instructions, flag commands 0x93-0x95), so they stay:
   outside Joe's outings model entry 70 / set 55 are Mukumuku's own. Joe's swap and Mukumuku's outings off as jm1.
+- gd3 test (user): no blur. Dump 3ca16979: DOF draws counted, buffer fine (nobuf 0), but the projection at our draw
+  was orthographic (proj[0] = 1): another 0xC000 object sits before ours in the render list (0x815EA5B8, vtable
+  0x802ABA78, slot 4 0x8008660C -> func_8017B5F0: PSMTXIdentity, ortho func_801B8930, projection func_801D24F0 = a 2D
+  camera), so dof_draw gave up. List there: 3D at 0x8201-0x9001, that 2D camera 0xC000, the HUD states 0xC001...
+  dof4: our object at 0xBFFF. (An earlier guess, the arena line at 0x80384000, was wrong: dof1 already ended at
+  0x80384DC4.)
