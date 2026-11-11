@@ -1413,10 +1413,12 @@ static void joe_free_now(void)
     S.own_model = S.own_anims = 0;
     for (i = 0; i < 4; i++) S.orphan[i] = 0;
 }
+void dof_release(void);
 void pm_scene_change(void)
 {
     logs_release();
     spring_release();
+    dof_release();                           /* zt.c: the blur's copy buffer */
     if (S.talking) {                         /* the talk keeps him, but the next scene must not load our files as 37 */
         if (S.loaded) { MODEL74_NAME = S.orig_model; SET71_NAME = S.orig_anims; }
     } else {

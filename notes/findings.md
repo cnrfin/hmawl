@@ -4176,3 +4176,27 @@ so, door fades are timed there, possibly per frame. Not traced yet.
   0x801B0F28/F2C; PREV takes the 0x80384000 words). Joe's face textures: tools/joe test 12 (75 %, soft eyes, 283 KB).
 - jm2 files: Common.arc 91402794 (gd1 + event 409 replaced), gd/gd_0.arc (Joe test 12), pm normal / test / gqtest,
   make_pm_dol.py 0f3a0ee5.
+
+### 7.80 dof1: Z-target blur (research + first build)
+- GX in main.dol: named (map) GXSetVtxDesc 0x801CCC7C, GXClearVtxDesc 0x801CD0C8, GXSetVtxAttrFmt 0x801CD100,
+  GXSetTexCoordGen2 0x801CD714, GXSetNumChans 0x801CF624, GXSetChanCtrl 0x801CF660, GXInitTexObj 0x801CF9A0,
+  GXInvalidateTexAll 0x801D03B4, GXSetTevColorIn / AlphaIn / ColorOp / AlphaOp 0x801D12A0 / 12E4 / 1328 / 1390,
+  GXSetTevSwapMode 0x801D161C, GXSetAlphaCompare 0x801D16E4, GXSetTevOrder 0x801D17B4, GXSetNumTevStages 0x801D1950,
+  GXSetBlendMode 0x801D1E70, GXSetColorUpdate 0x801D1EC4, GXSetZMode 0x801D1F1C, GXSetProjectionv 0x801D2594,
+  GXGetProjectionv 0x801D2620, GXLoadPosMtxImm 0x801D2668, GXSetCurrentMtx 0x801D2708, GXLoadTexMtxImm 0x801D273C.
+  Unnamed, from the billboard draw func_8017F2C0: GXBegin 0x801CE2CC, GXSetNumTexGens 0x801CD994, GXSetTevOp
+  0x801D1214, GXLoadTexObj 0x801D00E0; GXSetCullMode 0x801CE4EC (setter of the hardware value 0x801CE510, genMode
+  __GXData + 0x204 bits 14-15). __GXData pointer at 0x8034BEF8. No GXCopyTex / GXSetTexCopy* (stripped): BP writes.
+- Render list (ACTMGR + 0x48): intrusive nodes (object +0 / +4 links, +8 list, +0xC owner, +0x10 vtable, +0x14
+  priority), sorted by priority (func_8017CF0C -> func_8017D208 / func_8000C45C); drawn by func_8017D260 with ptmf
+  0x802C9F80 = vtable slot 4, then ptmf 0x802C9F74 = slot 3 (func_8000ACB8). The HUD's 2D state objects start at
+  priority 0xC001 (0x802F37B0, vtable 0x802BB238: slot 4 = 0x800E0F70 GXSetBlendMode(1, 4, 5, 0)); func_800E111C
+  re-adds it every frame while its +8 is 0.
+- zt.c dof_frame (from reticle, with the target's and the player's screen points and the reticle fade): pool-A buffer
+  (pm_new_a, 153,632 B; dcbi), object at priority 0xC000 (vtable = 0x802BB238's with slot 4 = dof_draw; watchdog
+  re-adds it if no draw for 4 frames while on). dof_draw: BP 0x49 / 0x4A (640 x 480) / 0x4D (stride 80) / 0x4B (dest
+  >> 5) / 0x52 (clamp, RGB565, half) copy; GXInvalidateTexAll; ortho projection (saved / restored), PNMTX0 identity,
+  cull off (restored), VTXFMT7 pos f32 / clr RGBA8 / tex f32, 4 texgens (TEXMTX6-9 = +-1.5 texel offsets), 5 TEV
+  stages (tap average via HALF lerps, alpha = vertex), blend src alpha, z off; 16 x 12 grid, vertex alpha 0 within 70
+  px of the target / player, full from 190 px (smoothstep), x the reticle fade. Debug 'DOF1' struct DOF.
+- pm.bin 155,172 B (gqtest) of 167,520.

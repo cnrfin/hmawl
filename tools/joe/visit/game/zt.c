@@ -299,6 +299,167 @@ static void ret_hide(u8 *a)
 /* reticle B (chosen from four mock-ups, tools/ztarget/reticle): four flat yellow corner brackets round the
    target's body; they snap in from twice the size with a little overshoot, then pulse gently */
 extern s32 gq_lbox;
+/* ---- dof1: depth-of-field-like blur while locked on (user). The render list (ACTMGR + 0x48, objects sorted by
+   priority, each drawn through vtable slot 4 - ptmf 0x802C9F80 - then slot 3) draws the 3D world first and the HUD from
+   priority 0xC001 (the 2D state objects at 0x802F37B0...). Our object goes in at 0xC000, between them: it copies the
+   frame (EFB 640 x 480, box-filtered to half: RGB565 320 x 240, BP 0x49 / 0x4A / 0x4D / 0x4B / 0x52 written straight
+   to the FIFO - the game has no GXCopyTex) and draws it back over the screen as a 16 x 12 grid of quads, each pixel
+   the average of 4 offset samples (TEV, 5 stages), alpha from the vertices: 0 around the target and the player
+   (smooth edge), up to DOF_MAX elsewhere, times the reticle's fade. HUD and text come after it, sharp. The copy
+   buffer (150 KB) comes from pool A (pm_new_a) on the first lock-on and goes at the scene change (dof_release). */
+u8 *pm_new_a(u32 size, const char *tag, s32 line);
+s32 pm_del_a(u8 *p);
+#define gx_desc     F(0x801CCC7C, void, (s32, s32))
+#define gx_cleardesc F(0x801CD0C8, void, (void))
+#define gx_attrfmt  F(0x801CD100, void, (s32, s32, s32, s32, s32))
+#define gx_texgen   F(0x801CD714, void, (s32, s32, s32, s32, s32, s32))
+#define gx_ntexgens F(0x801CD994, void, (s32))
+#define gx_nchans   F(0x801CF624, void, (s32))
+#define gx_chanctrl F(0x801CF660, void, (s32, s32, s32, s32, s32, s32, s32))
+#define gx_inittex  F(0x801CF9A0, void, (void *, void *, s32, s32, s32, s32, s32, s32))
+#define gx_loadtex  F(0x801D00E0, void, (void *, s32))
+#define gx_invtex   F(0x801D03B4, void, (void))
+#define gx_cin      F(0x801D12A0, void, (s32, s32, s32, s32, s32))
+#define gx_ain      F(0x801D12E4, void, (s32, s32, s32, s32, s32))
+#define gx_cop      F(0x801D1328, void, (s32, s32, s32, s32, s32, s32))
+#define gx_aop      F(0x801D1390, void, (s32, s32, s32, s32, s32, s32))
+#define gx_order    F(0x801D17B4, void, (s32, s32, s32, s32))
+#define gx_nstages  F(0x801D1950, void, (s32))
+#define gx_blend    F(0x801D1E70, void, (s32, s32, s32, s32))
+#define gx_zmode    F(0x801D1F1C, void, (s32, s32, s32))
+#define gx_acmp     F(0x801D16E4, void, (s32, s32, s32, s32, s32))
+#define gx_swap     F(0x801D161C, void, (s32, s32, s32))
+#define gx_setproj  F(0x801D2594, void, (const float *))
+#define gx_getproj  F(0x801D2620, void, (float *))
+#define gx_posmtx   F(0x801D2668, void, (const float *, s32))
+#define gx_curmtx   F(0x801D2708, void, (s32))
+#define gx_texmtx   F(0x801D273C, void, (const float *, s32, s32))
+#define gx_cupd     F(0x801D1EC4, void, (s32))
+#define gx_begin    F(0x801CE2CC, void, (s32, s32, s32))       /* GXBegin (unnamed in the map) */
+#define gx_cullraw  F(0x801CE510, void, (s32))                 /* GXSetCullMode's setter (hardware value) */
+#define rl_add      F(0x8017CF0C, void, (u8 *, void *, s32))   /* render list add (list, object, priority) */
+#define GXDATA      (*(u8 **)0x8034BEF8)
+#define WGP8        (*(volatile u8 *)0xCC008000)
+#define WGP32       (*(volatile u32 *)0xCC008000)
+#define WGPF        (*(volatile float *)0xCC008000)
+#define DOF_W 320
+#define DOF_H 240
+#define DOF_GX 16
+#define DOF_GY 12
+#define DOF_MAX 255                                          /* blur strength away from the focus */
+#define DOF_R0 70.0f                                         /* sharp within this many pixels of the target / player */
+#define DOF_R1 190.0f                                        /* fully blurred from here */
+#define DOF_TAP 1.5f                                         /* sample offset, half-res texels */
+struct { u32 next, prev, list; void *owner; const u32 *vt; u32 prio; u32 pad[4]; } DOFO;
+static u32 dof_vt[8];
+static u32 dof_tex[8];
+struct { u32 magic; s32 a; float fx, fy, px, py; u8 *buf; u32 regs, draws, nobuf; } DOF;   /* 'DOF1' (dump) */
+static void bp(u32 v) { WGP8 = 0x61; WGP32 = v; }
+static float dof_alpha(float x, float y)
+{
+    float dx = x - DOF.fx, dy = y - DOF.fy, d2 = dx * dx + dy * dy, ex = x - DOF.px, ey = y - DOF.py, e2 = ex * ex + ey * ey, d, t;
+    if (e2 < d2) d2 = e2;
+    if (d2 <= DOF_R0 * DOF_R0) return 0;
+    d = d2 * rsq(d2);
+    t = (d - DOF_R0) / (DOF_R1 - DOF_R0); if (t > 1) t = 1;
+    return t * t * (3 - 2 * t) * (float)DOF_MAX * (float)DOF.a / 255.0f;
+}
+static void dof_vert(float x, float y)
+{
+    u32 a = (u32)dof_alpha(x, y);
+    WGPF = x; WGPF = y; WGPF = -0.5f;
+    WGP32 = 0xFFFFFF00u | (a > 255 ? 255 : a);
+    WGPF = x / 640.0f; WGPF = y / 480.0f;
+}
+static s32 dof_draw(void *self, s32 arg)
+{
+    static const float ortho[7] = { 1.0f, 1.0f / 320.0f, -1.0f, -1.0f / 240.0f, 1.0f, -1.0f, -1.0f };
+    static const float ident[12] = { 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0 };
+    float proj[7], m[12];
+    s32 i, j, cull;
+    u8 *gd = GXDATA;
+    (void)self; (void)arg;
+    if (DOF.a <= 0 || !DOF.buf || (u32)gd < 0x80000000u || (u32)gd >= 0x81800000u) return 0;
+    DOF.draws++;
+    /* the frame so far -> our texture (EFB 0,0 640 x 480, half: 320 x 240 RGB565, no clear) */
+    bp(0x49000000u);
+    bp(0x4A000000u | 639u | (479u << 10));
+    bp(0x4D000000u | (DOF_W / 4));                           /* stride: 4x4 tiles of 32 bytes per row */
+    bp(0x4B000000u | (((u32)DOF.buf & 0x3FFFFFFFu) >> 5));
+    bp(0x52000000u | 0x3u | (4u << 4) | 0x200u);             /* clamp top / bottom, RGB565, box filter to half */
+    gx_invtex();
+    gx_getproj(proj);
+    cull = (*(u32 *)(gd + 0x204) >> 14) & 3;
+    gx_setproj(ortho);
+    gx_posmtx(ident, 0); gx_curmtx(0);
+    gx_cullraw(0);
+    gx_cleardesc();
+    gx_desc(9, 1); gx_desc(11, 1); gx_desc(13, 1);           /* position, colour, tex 0: direct */
+    gx_attrfmt(7, 9, 1, 4, 0); gx_attrfmt(7, 11, 1, 5, 0); gx_attrfmt(7, 13, 1, 4, 0);
+    gx_nchans(1); gx_chanctrl(4, 0, 0, 1, 0, 0, 2);          /* colour / alpha from the vertices */
+    gx_inittex(dof_tex, DOF.buf, DOF_W, DOF_H, 4, 0, 0, 0);  /* RGB565, clamp, no mips (bilinear) */
+    gx_loadtex(dof_tex, 0);
+    gx_ntexgens(4);
+    for (i = 0; i < 4; i++) {                                /* 4 taps: the corners of a 2 x DOF_TAP square */
+        for (j = 0; j < 12; j++) m[j] = ident[j];
+        m[3] = ((i & 1) ? DOF_TAP : -DOF_TAP) / (float)DOF_W;
+        m[7] = ((i & 2) ? DOF_TAP : -DOF_TAP) / (float)DOF_H;
+        gx_texmtx(m, 48 + 3 * i, 1);
+        gx_texgen(i, 1, 4, 48 + 3 * i, 0, 125);
+    }
+    gx_nstages(5);
+    for (i = 0; i < 5; i++) {
+        bp((u32)(0x10 + i) << 24);                           /* direct (no indirect texturing) */
+        gx_swap(i, 0, 0);
+        gx_order(i, i < 4 ? i : 0xFF, i < 4 ? 0 : 0xFF, 4);
+        gx_ain(i, 7, 7, 7, i ? 0 : 5); gx_aop(i, 0, 0, 0, 1, 0);   /* alpha: the vertex alpha */
+    }
+    gx_cin(0, 15, 15, 15, 8);  gx_cop(0, 0, 0, 0, 1, 0);     /* prev = tap 0 */
+    gx_cin(1, 0, 8, 13, 15);   gx_cop(1, 0, 0, 0, 1, 0);     /* prev = (prev + tap 1) / 2 */
+    gx_cin(2, 15, 15, 15, 8);  gx_cop(2, 0, 0, 0, 1, 1);     /* c0 = tap 2 */
+    gx_cin(3, 2, 8, 13, 15);   gx_cop(3, 0, 0, 0, 1, 1);     /* c0 = (c0 + tap 3) / 2 */
+    gx_cin(4, 0, 2, 13, 15);   gx_cop(4, 0, 0, 0, 1, 0);     /* prev = (prev + c0) / 2 */
+    gx_blend(1, 4, 5, 0); gx_zmode(0, 7, 0); gx_acmp(7, 0, 0, 7, 0); gx_cupd(1);
+    gx_begin(0x80, 7, DOF_GX * DOF_GY * 4);                  /* quads */
+    for (j = 0; j < DOF_GY; j++)
+        for (i = 0; i < DOF_GX; i++) {
+            float x0 = 640.0f * i / DOF_GX, x1 = 640.0f * (i + 1) / DOF_GX, y0 = 480.0f * j / DOF_GY, y1 = 480.0f * (j + 1) / DOF_GY;
+            dof_vert(x0, y0); dof_vert(x1, y0); dof_vert(x1, y1); dof_vert(x0, y1);
+        }
+    gx_setproj(proj);
+    gx_cullraw(cull);
+    gx_ntexgens(1); gx_nstages(1);
+    return 0;
+}
+static void dof_frame(float tx, float ty, float px, float py, s32 alpha)
+{
+    u8 *mgr = ACTMGR;
+    s32 i;
+    DOF.magic = 0x444F4631u;
+    DOF.a = alpha; DOF.fx = tx; DOF.fy = ty; DOF.px = px; DOF.py = py;
+    if (alpha <= 0 || (u32)mgr < 0x80000000u || (u32)mgr >= 0x81800000u) return;
+    if (!DOF.buf) {
+        u8 *p = pm_new_a(DOF_W * DOF_H * 2 + 32, "dof", 1);
+        if (!p) { DOF.nobuf++; return; }
+        DOF.buf = (u8 *)(((u32)p + 31) & ~31u);
+        for (i = 0; i < DOF_W * DOF_H * 2; i += 32) __asm__ volatile("dcbi 0, %0" : : "r"(DOF.buf + i));   /* the GPU writes it */
+        DOF.regs = (u32)p;                                   /* (the block, for pm_del_a) */
+    }
+    if (DOFO.list) {                                         /* still in the list: drawn since? */
+        static u32 last, idle;
+        if (DOF.draws != last) { last = DOF.draws; idle = 0; return; }
+        if (++idle < 4) return;
+        DOFO.next = DOFO.prev = DOFO.list = 0; idle = 0;     /* the list was rebuilt without us: in again */
+    }
+    if (!dof_vt[4]) { for (i = 0; i < 8; i++) dof_vt[i] = ((u32 *)0x802BB238)[i]; dof_vt[4] = (u32)dof_draw; }
+    DOFO.owner = &DOFO; DOFO.vt = dof_vt;
+    rl_add(mgr + 0x48, &DOFO, 0xC000);
+}
+void dof_release(void)                                       /* pm.c pm_scene_change */
+{
+    if (DOF.buf) { pm_del_a((u8 *)DOF.regs); DOF.buf = 0; DOF.regs = 0; }
+    DOF.a = 0;
+}
 static void reticle(u8 *g)
 {
     u8 *a = AGC, *c = CAM;
@@ -306,6 +467,7 @@ static void reticle(u8 *g)
     s32 cx, cy, e7y, hx, hy, sxn, syn, n = 0, bar;
     u32 col;
     zt_dbg.agc_ok = 0;
+    DOF.a = 0;                                           /* dof1: set again below while the reticle shows */
     if ((u32)a < 0x80000000u || (u32)a >= 0x81800000u) return;
     zt_dbg.agc_ok = 1;
     if (*(u32 *)a != 0xC1C7C3C6u) return;
@@ -330,6 +492,10 @@ static void reticle(u8 *g)
     cx = (s32)(sx * 320.0f);
     cy = (s32)(-sy * 240.0f);
     zt_dbg.cx = cx; zt_dbg.cy = cy;
+    {   float *pp = (float *)(g + 0x29C78), qx, qy;          /* dof1: focus on the target and on the player */
+        if (proj(pp[0], pp[1] + 1.0f, pp[2], &qx, &qy) <= 0) { qx = sx; qy = sy; }
+        dof_frame(320.0f + sx * 320.0f, 240.0f - sy * 240.0f, 320.0f + qx * 320.0f, 240.0f - qy * 240.0f, Z.alpha);
+    }
     if (Z.r < 0) Z.r = 0;
     t = Z.r; if (Z.r < 100000) Z.r += 1;
     if (t < RET_SNAP) {                                  /* ease-out-back: 2x size -> 1x, overshooting a little */
