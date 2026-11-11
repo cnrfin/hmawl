@@ -346,14 +346,14 @@ s32 pm_del_a(u8 *p);
 #define DOF_H 240
 #define DOF_GX 16
 #define DOF_GY 12
-#define DOF_MAX 255                                          /* blur strength away from the focus */
-#define DOF_R0 70.0f                                         /* sharp within this many pixels of the target / player */
-#define DOF_R1 190.0f                                        /* fully blurred from here */
-#define DOF_TAP 1.5f                                         /* sample offset, half-res texels */
+#define DOF_MAX 200                                          /* blur strength away from the focus (dof2: was 255) */
+#define DOF_R0 120.0f                                        /* sharp within this many pixels of the target / player (was 70) */
+#define DOF_R1 320.0f                                        /* fully blurred from here (was 190) */
+#define DOF_TAP 1.25f                                        /* sample offset, half-res texels (was 1.5) */
 struct { u32 next, prev, list; void *owner; const u32 *vt; u32 prio; u32 pad[4]; } DOFO;
 static u32 dof_vt[8];
 static u32 dof_tex[8];
-struct { u32 magic; s32 a; float fx, fy, px, py; u8 *buf; u32 regs, draws, nobuf; } DOF;   /* 'DOF1' (dump) */
+struct { u32 magic; s32 a; float fx, fy, px, py; u8 *buf; u32 regs, draws, nobuf; s32 vw, vh; } DOF;   /* 'DOF1' (dump) */
 static void bp(u32 v) { WGP8 = 0x61; WGP32 = v; }
 static float dof_alpha(float x, float y)
 {
@@ -381,10 +381,17 @@ static s32 dof_draw(void *self, s32 arg)
     (void)self; (void)arg;
     if (DOF.a <= 0 || !DOF.buf || (u32)gd < 0x80000000u || (u32)gd >= 0x81800000u) return 0;
     DOF.draws++;
-    /* the frame so far -> our texture (EFB 0,0 640 x 480, half: 320 x 240 RGB565, no clear) */
-    bp(0x49000000u);
-    bp(0x4A000000u | 639u | (479u << 10));
-    bp(0x4D000000u | (DOF_W / 4));                           /* stride: 4x4 tiles of 32 bytes per row */
+    /* the frame so far -> our texture: the viewport (dof2: 640 x 448 here, not the 480 of the render mode: the
+       bottom rows were black), half size RGB565, no clear */
+    {   float *vp = (float *)(gd + 0x4F4);                   /* gxData viewport: left, top, width, height */
+        s32 l = (s32)vp[0], t = (s32)vp[1];
+        DOF.vw = (s32)vp[2]; DOF.vh = (s32)vp[3];
+        if (DOF.vw < 64 || DOF.vw > 640 || DOF.vh < 64 || DOF.vh > 480 || l < 0 || t < 0) { DOF.vw = 640; DOF.vh = 448; l = t = 0; }
+        DOF.vw &= ~7; DOF.vh &= ~7;
+        bp(0x49000000u | (u32)l | ((u32)t << 10));
+        bp(0x4A000000u | (u32)(DOF.vw - 1) | ((u32)(DOF.vh - 1) << 10));
+        bp(0x4D000000u | (u32)(DOF.vw / 2 / 4));             /* stride: 4x4 tiles of 32 bytes per row */
+    }
     bp(0x4B000000u | (((u32)DOF.buf & 0x3FFFFFFFu) >> 5));
     bp(0x52000000u | 0x3u | (4u << 4) | 0x200u);             /* clamp top / bottom, RGB565, box filter to half */
     gx_invtex();
@@ -397,13 +404,13 @@ static s32 dof_draw(void *self, s32 arg)
     gx_desc(9, 1); gx_desc(11, 1); gx_desc(13, 1);           /* position, colour, tex 0: direct */
     gx_attrfmt(7, 9, 1, 4, 0); gx_attrfmt(7, 11, 1, 5, 0); gx_attrfmt(7, 13, 1, 4, 0);
     gx_nchans(1); gx_chanctrl(4, 0, 0, 1, 0, 0, 2);          /* colour / alpha from the vertices */
-    gx_inittex(dof_tex, DOF.buf, DOF_W, DOF_H, 4, 0, 0, 0);  /* RGB565, clamp, no mips (bilinear) */
+    gx_inittex(dof_tex, DOF.buf, DOF.vw / 2, DOF.vh / 2, 4, 0, 0, 0);   /* RGB565, clamp, no mips (bilinear) */
     gx_loadtex(dof_tex, 0);
     gx_ntexgens(4);
     for (i = 0; i < 4; i++) {                                /* 4 taps: the corners of a 2 x DOF_TAP square */
         for (j = 0; j < 12; j++) m[j] = ident[j];
-        m[3] = ((i & 1) ? DOF_TAP : -DOF_TAP) / (float)DOF_W;
-        m[7] = ((i & 2) ? DOF_TAP : -DOF_TAP) / (float)DOF_H;
+        m[3] = ((i & 1) ? DOF_TAP : -DOF_TAP) / (float)(DOF.vw / 2);
+        m[7] = ((i & 2) ? DOF_TAP : -DOF_TAP) / (float)(DOF.vh / 2);
         gx_texmtx(m, 48 + 3 * i, 1);
         gx_texgen(i, 1, 4, 48 + 3 * i, 0, 125);
     }

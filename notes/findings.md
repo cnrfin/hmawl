@@ -4200,3 +4200,7 @@ so, door fades are timed there, possibly per frame. Not traced yet.
   stages (tap average via HALF lerps, alpha = vertex), blend src alpha, z off; 16 x 12 grid, vertex alpha 0 within 70
   px of the target / player, full from 190 px (smoothstep), x the reticle fade. Debug 'DOF1' struct DOF.
 - pm.bin 155,172 B (gqtest) of 167,520.
+- dof1 test (user, dump 6d0d4934): works; too strong / too shallow, black bar at the bottom. The render mode is
+  640 x 480 (0x802E1CE0) but the field draws a 640 x 448 viewport (gxData +0x4F4 left / top / width / height: 0, 0,
+  640, 448): EFB rows 448-479 were empty. dof2: the copy takes the viewport as read each frame (texture 320 x 224;
+  falls back to 640 x 448), DOF_MAX 200, sharp within 120 px, full blur from 320 px, taps +-1.25 texels.
