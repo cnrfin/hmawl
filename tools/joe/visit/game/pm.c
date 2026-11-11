@@ -769,6 +769,7 @@ static const unsigned char GS_FACE[9][2] = {
     { 69, 42 },  /* 8 soft */
 };
 static void gs_face(s32 f);
+static void joe_face(s32 eye, s32 mouth);
 /* hold: 1 keeps the end colour when the fade is over (fader +0x64; with 0 it resets itself to clear: gq8-gq10's white went
    away again before the scene ended) */
 static void gs_fade(u32 from, u32 to, float secs, s32 hold) { u8 *fd = FADER; if (fd) fade_start(fd, &from, &to, hold, 0, secs); }
@@ -839,7 +840,8 @@ static void gs_cam(u8 *g, const struct gshot *sh, float f)
 }
 static s32 gs_get(u8 *g, s32 i) { s32 v = *(s32 *)(g + 0x12194 + i * 4); if (v >= 128 && !(v & 127)) v >>= 7; return v; }
 /* gd1 (below): the daily visit's state */
-struct { u32 magic; s32 st, t, waited, love, hearts, l1, l2, item, summons, talks; u8 *plate; float surf; } GD;   /* 'GDLY' */
+struct { u32 magic; s32 st, t, waited, love, hearts, l1, l2, item, summons, talks; u8 *plate; float surf;
+         s32 face, line, page, timer; } GD;   /* 'GDLY' */
 static s32 gd_daily_frame(u8 *g, s32 map);
 static void gd_hearts(u8 *g);
 static s32 gd_frame(u8 *g, s32 map, u32 t)
@@ -1006,6 +1008,26 @@ static void gd_face_player(u8 *g)
     actor_setdir(S.actor, &S.dir);
     if (GD.st == 3) { pd[0] = -S.dir.x; pd[1] = 0; pd[2] = -S.dir.z; }   /* in the talk he faces her */
 }
+/* gd3: her face in the talk: { eye, mouth still, mouth talking } (eye >= 58 / mouth >= 36 = the common blink / talk
+   animations, as Joe's; her frames are Muffy's): 0 neutral, 1 smile, 2 joy (happy shut eyes), 3 pout, 4 smug, 5 soft */
+static const unsigned char GD_FACES[6][3] = { { 67, 4, 47 }, { 67, 4, 36 }, { 9, 4, 36 }, { 61, 7, 45 }, { 7, 4, 36 }, { 69, 4, 36 } };
+static void gd_line_start(s32 id)
+{
+    GD.line = id; GD.page = 0;
+    GD.timer = id >= GDT_FIRST && id < GDT_FIRST + GDT_N ? gd_text[id - GDT_FIRST].len[0] * 2 : 0;   /* 2 frames a letter */
+}
+static void gd_talk_follow(void)                  /* the typing: mouth flaps while a page types; A finishes / turns it */
+{
+    s32 n = GD.line >= GDT_FIRST && GD.line < GDT_FIRST + GDT_N ? gd_text[GD.line - GDT_FIRST].pages : 0;
+    if (GD.line && (PAD_PRESS & 0x100)) {
+        if (GD.timer > 0) GD.timer = 0;
+        else if (GD.page + 1 < n) { GD.page++; GD.timer = gd_text[GD.line - GDT_FIRST].len[GD.page] * 2; }
+        else if (GD.line == GD.l1 && GD.l2) gd_line_start(GD.l2);
+        else GD.line = 0;
+    }
+    if (GD.timer > 0) GD.timer--;
+    joe_face(GD_FACES[GD.face][0], GD_FACES[GD.face][GD.timer > 0 ? 2 : 1]);
+}
 static s32 gd_is(const unsigned short *t, s32 n, s32 it) { s32 k; for (k = 0; k < n; k++) if (t[k] == it) return 1; return 0; }
 static void gd_lines(u8 *g, u32 t, s32 item)     /* picks the event's lines, counts the love */
 {
@@ -1018,27 +1040,28 @@ static void gd_lines(u8 *g, u32 t, s32 item)     /* picks the event's lines, cou
     talks = (d >> 16) & 15;
     love = (s32)((u32)c >> 24); if (love > 100) love = 100;
     hrs = love >= 60 ? 3 : 0;
-    GD.l1 = GD.l2 = 0; GD.item = item;
+    GD.l1 = GD.l2 = 0; GD.item = item; GD.face = 0;
     if (item) {
-        if (d & 0x100000) GD.l1 = GDL_G3;                                       /* a second gift today: kept, no change */
+        if (d & 0x100000) { GD.l1 = GDL_G3; GD.face = 4; }                      /* a second gift today: kept, no change */
         else {
             d |= 0x100000;
-            if (gd_is(GD_OFFER, 15, item)) { GD.l1 = GDL_G1; love += 4; }
-            else if (item >= 0x46F && item <= 0x47E) { GD.l1 = (c & GQ_FISHED1) ? GDL_060 : GDL_B14b; c |= GQ_FISHED1; love += 4; }
-            else if (item == 0x503 || item == 0x47F) { GD.l1 = GDL_G2; love -= 2; }
-            else { GD.l1 = GDL_B16; love += 2; }
+            if (gd_is(GD_OFFER, 15, item)) { GD.l1 = GDL_G1; love += 4; GD.face = 2; }
+            else if (item >= 0x46F && item <= 0x47E) { GD.l1 = (c & GQ_FISHED1) ? GDL_060 : GDL_B14b; c |= GQ_FISHED1; love += 4; GD.face = 2; }
+            else if (item == 0x503 || item == 0x47F) { GD.l1 = GDL_G2; love -= 2; GD.face = 3; }
+            else { GD.l1 = GDL_B16; love += 2; GD.face = 1; }
         }
     } else {
-        if (!(c & GQ_MET)) { GD.l1 = GDL_B1; c |= GQ_MET; }
+        if (!(c & GQ_MET)) { GD.l1 = GDL_B1; c |= GQ_MET; GD.face = 5; }
         else if (talks == 0) {
+            GD.face = 1;                                                        /* greetings: a smile */
             if (w == 3 || w == 5) GD.l1 = GDL_B7;
             else if (hour >= 5 && hour < 9) GD.l1 = GDL_B4;
             else if (hour >= 17 && hour < 20) GD.l1 = GDL_B5;
             else if (hour >= 20 || hour < 5) GD.l1 = GDL_B6;
             else GD.l1 = love < 40 ? GDL_B3 : GREET[day1 % 3];
-        } else if (talks >= 5) GD.l1 = GDL_R1;
-        else if (talks & 1) GD.l1 = SEASON[season][(talks >> 1) & 1];
-        else GD.l1 = (hrs ? HIGH : LOW)[(day1 + talks) & 3];
+        } else if (talks >= 5) { GD.l1 = GDL_R1; GD.face = 4; }
+        else if (talks & 1) { GD.l1 = SEASON[season][(talks >> 1) & 1]; GD.face = 0; }
+        else { GD.l1 = (hrs ? HIGH : LOW)[(day1 + talks) & 3]; GD.face = hrs ? 1 : 0; }
         if (talks == 0) love += 1;                                              /* the day's first talk */
         if (talks < 15) talks++;
     }
@@ -1123,6 +1146,7 @@ static void gd_daily_input(u8 *g, s32 map, u32 t)
         cn[GD_C_L1] = GD.l1; cn[GD_C_L2] = GD.l2; cn[GD_C_TAKE] = item ? 1 : 0;
     }
     GD.st = 3; GD.waited = 0;
+    gd_line_start(GD.l1);                         /* gd3: her face follows the typing */
     gd_face_player(g);                            /* she turns to him for the talk (and he to her) */
     gd_cam(g);
     joe_motion(0);
@@ -1140,8 +1164,8 @@ static s32 gd_daily_frame(u8 *g, s32 map)        /* while she is up: slot 37 is 
         S.pos.y = GD.surf - GD_SINK * (1.0f - k);
         if (GD.t >= GD_RISE) { S.pos.y = GD.surf; GD.st = 2; }
     } else if (GD.st == 3) {                      /* her event */
-        if (no_event()) { if (++GD.waited > 20) GD.st = 2; }
-        else GD.waited = 0;
+        if (no_event()) { if (++GD.waited > 20) { GD.st = 2; GD.line = 0; gs_face(9); } }   /* her own face back */
+        else { GD.waited = 0; gd_talk_follow(); }
     }
     actor_setpos(S.actor, &S.pos); actor_setdir(S.actor, &S.dir);   /* (no turning to follow him: user) */
     return 1;

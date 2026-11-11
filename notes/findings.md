@@ -4219,3 +4219,14 @@ so, door fades are timed there, possibly per frame. Not traced yet.
   the night keys (as nl2); summer moves keys in (1.0, 3.0] 0.333 earlier and [5.0, 7.0) 0.5 later (dawn 1 h earlier, dusk
   1.5 h later), order kept; spring / autumn only get the 0xFE marker. Season = clock / day / 10 % 4; the tracks reload
   with every map load (sleeping included), so a new season applies from the next load. night_dbg.season.
+
+### 7.82 gd3: her face in the daily talks; Mukumuku's scenes kept
+- User: daily lines fine as drafted. build_gd_daily.py writes gd_text[] (pages, letters per page; <name> = 6) into
+  gd_daily.h (data files unchanged). pm.c gd_talk_follow (event 413 running): 2 frames a letter, A finishes a page /
+  turns it / goes on to the second line; joe_face on slot 37 with GD_FACES { eye, mouth still, mouth talking }:
+  0 neutral (67, 4, 47), 1 smile (67, 4, 36), 2 joy (9, 4, 36), 3 pout (61, 7, 45), 4 smug (7, 4, 36), 5 soft (69, 4,
+  36); picked in gd_lines (B1 soft, greetings smile, season / low-heart chat neutral, high-heart chat smile, R1 / G3
+  smug, offering / fish joy, B16 smile, G2 pout); her own table back (gs_face(9)) when the event ends.
+- Mukumuku's 5 scenes are story cutscenes in Daryl's arc (Chapter1 file 33; Common 365 from Chapter3 script 0, 385 / 387
+  from Chapter4 script 0, 393 from Chapter5 script 0; 2,000-6,600 instructions, flag commands 0x93-0x95), so they stay:
+  outside Joe's outings model entry 70 / set 55 are Mukumuku's own. Joe's swap and Mukumuku's outings off as jm1.
