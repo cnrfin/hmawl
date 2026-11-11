@@ -344,36 +344,15 @@ s32 pm_del_a(u8 *p);
 #define WGPF        (*(volatile float *)0xCC008000)
 #define DOF_W 320
 #define DOF_H 240
-#define DOF_GX 16
-#define DOF_GY 12
-#define DOF_MAX 200                                          /* blur strength away from the focus (dof2: was 255) */
-#define DOF_R0 120.0f                                        /* sharp within this many pixels of the target / player (was 70) */
-#define DOF_R1 320.0f                                        /* fully blurred from here (was 190) */
+#define DOF_MAX 255                                          /* blur strength (dof3: the depth sheets share it out) */
 #define DOF_TAP 1.25f                                        /* sample offset, half-res texels (was 1.5) */
 struct { u32 next, prev, list; void *owner; const u32 *vt; u32 prio; u32 pad[4]; } DOFO;
 static u32 dof_vt[8];
 static u32 dof_tex[8];
-struct { u32 magic; s32 a; float fx, fy, px, py; u8 *buf; u32 regs, draws, nobuf; s32 vw, vh; } DOF;   /* 'DOF1' (dump) */
+struct { u32 magic; s32 a; float fx, fy, px, py; u8 *buf; u32 regs, draws, nobuf; s32 vw, vh; float tw, pw, focus; float proj[7]; } DOF;   /* 'DOF1' (dump) */
 static void bp(u32 v) { WGP8 = 0x61; WGP32 = v; }
-static float dof_alpha(float x, float y)
-{
-    float dx = x - DOF.fx, dy = y - DOF.fy, d2 = dx * dx + dy * dy, ex = x - DOF.px, ey = y - DOF.py, e2 = ex * ex + ey * ey, d, t;
-    if (e2 < d2) d2 = e2;
-    if (d2 <= DOF_R0 * DOF_R0) return 0;
-    d = d2 * rsq(d2);
-    t = (d - DOF_R0) / (DOF_R1 - DOF_R0); if (t > 1) t = 1;
-    return t * t * (3 - 2 * t) * (float)DOF_MAX * (float)DOF.a / 255.0f;
-}
-static void dof_vert(float x, float y)
-{
-    u32 a = (u32)dof_alpha(x, y);
-    WGPF = x; WGPF = y; WGPF = -0.5f;
-    WGP32 = 0xFFFFFF00u | (a > 255 ? 255 : a);
-    WGPF = x / 640.0f; WGPF = y / 480.0f;
-}
 static s32 dof_draw(void *self, s32 arg)
 {
-    static const float ortho[7] = { 1.0f, 1.0f / 320.0f, -1.0f, -1.0f / 240.0f, 1.0f, -1.0f, -1.0f };
     static const float ident[12] = { 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0 };
     float proj[7], m[12];
     s32 i, j, cull;
@@ -396,9 +375,10 @@ static s32 dof_draw(void *self, s32 arg)
     bp(0x52000000u | 0x3u | (4u << 4) | 0x200u);             /* clamp top / bottom, RGB565, box filter to half */
     gx_invtex();
     gx_getproj(proj);
+    for (i = 0; i < 7; i++) DOF.proj[i] = proj[i];
+    if (proj[0] != 0.0f || proj[1] == 0.0f || proj[3] == 0.0f) return 0;   /* (the world's perspective expected) */
     cull = (*(u32 *)(gd + 0x204) >> 14) & 3;
-    gx_setproj(ortho);
-    gx_posmtx(ident, 0); gx_curmtx(0);
+    gx_posmtx(ident, 0); gx_curmtx(0);                       /* view space: the sheets sit in front of the camera */
     gx_cullraw(0);
     gx_cleardesc();
     gx_desc(9, 1); gx_desc(11, 1); gx_desc(13, 1);           /* position, colour, tex 0: direct */
@@ -426,24 +406,37 @@ static s32 dof_draw(void *self, s32 arg)
     gx_cin(2, 15, 15, 15, 8);  gx_cop(2, 0, 0, 0, 1, 1);     /* c0 = tap 2 */
     gx_cin(3, 2, 8, 13, 15);   gx_cop(3, 0, 0, 0, 1, 1);     /* c0 = (c0 + tap 3) / 2 */
     gx_cin(4, 0, 2, 13, 15);   gx_cop(4, 0, 0, 0, 1, 0);     /* prev = (prev + c0) / 2 */
-    gx_blend(1, 4, 5, 0); gx_zmode(0, 7, 0); gx_acmp(7, 0, 0, 7, 0); gx_cupd(1);
-    gx_begin(0x80, 7, DOF_GX * DOF_GY * 4);                  /* quads */
-    for (j = 0; j < DOF_GY; j++)
-        for (i = 0; i < DOF_GX; i++) {
-            float x0 = 640.0f * i / DOF_GX, x1 = 640.0f * (i + 1) / DOF_GX, y0 = 480.0f * j / DOF_GY, y1 = 480.0f * (j + 1) / DOF_GY;
-            dof_vert(x0, y0); dof_vert(x1, y0); dof_vert(x1, y1); dof_vert(x0, y1);
+    /* dof3: real depth. Each sheet is the blurred frame laid over the whole view at view distance d, drawn with the
+       depth test (LEQUAL, no depth write): it covers only what lies farther than d. Three sheets behind the focus
+       add up (1 - (1-a1)(1-a2)(1-a3)), so the blur grows with distance; the target, the farmer and anything nearer
+       stay sharp. Corners from the projection: ndc x = (p1 x + p2 z) / -z, y = (p3 y + p4 z) / -z. */
+    gx_blend(1, 4, 5, 0); gx_zmode(1, 3, 0); gx_acmp(7, 0, 0, 7, 0); gx_cupd(1);
+    {   static const float far_k[3] = { 1.15f, 1.6f, 2.6f }, far_add[3] = { 1.5f, 4.0f, 10.0f }, far_a[3] = { 0.40f, 0.40f, 0.45f };
+        s32 k;
+        for (k = 0; k < 3; k++) {
+            float d = DOF.focus * far_k[k] + far_add[k], av = far_a[k] * (float)DOF_MAX * (float)DOF.a / 255.0f, x0, x1, yt, yb;
+            u32 col = 0xFFFFFF00u | (u32)(av > 255 ? 255 : av);
+            if (d > 900.0f) d = 900.0f;
+            x0 = d * (-1.0f + proj[2]) / proj[1]; x1 = d * (1.0f + proj[2]) / proj[1];
+            yt = d * (1.0f + proj[4]) / proj[3]; yb = d * (-1.0f + proj[4]) / proj[3];
+            gx_begin(0x80, 7, 4);
+            WGPF = x0; WGPF = yt; WGPF = -d; WGP32 = col; WGPF = 0; WGPF = 0;
+            WGPF = x1; WGPF = yt; WGPF = -d; WGP32 = col; WGPF = 1; WGPF = 0;
+            WGPF = x1; WGPF = yb; WGPF = -d; WGP32 = col; WGPF = 1; WGPF = 1;
+            WGPF = x0; WGPF = yb; WGPF = -d; WGP32 = col; WGPF = 0; WGPF = 1;
         }
-    gx_setproj(proj);
+    }
     gx_cullraw(cull);
     gx_ntexgens(1); gx_nstages(1);
     return 0;
 }
-static void dof_frame(float tx, float ty, float px, float py, s32 alpha)
+static void dof_frame(float tx, float ty, float px, float py, s32 alpha, float tw, float pw)
 {
     u8 *mgr = ACTMGR;
     s32 i;
     DOF.magic = 0x444F4631u;
     DOF.a = alpha; DOF.fx = tx; DOF.fy = ty; DOF.px = px; DOF.py = py;
+    DOF.tw = tw; DOF.pw = pw; DOF.focus = tw > pw ? tw : pw;   /* dof3: focus at the farther of the two */
     if (alpha <= 0 || (u32)mgr < 0x80000000u || (u32)mgr >= 0x81800000u) return;
     if (!DOF.buf) {
         u8 *p = pm_new_a(DOF_W * DOF_H * 2 + 32, "dof", 1);
@@ -500,8 +493,9 @@ static void reticle(u8 *g)
     cy = (s32)(-sy * 240.0f);
     zt_dbg.cx = cx; zt_dbg.cy = cy;
     {   float *pp = (float *)(g + 0x29C78), qx, qy;          /* dof1: focus on the target and on the player */
-        if (proj(pp[0], pp[1] + 1.0f, pp[2], &qx, &qy) <= 0) { qx = sx; qy = sy; }
-        dof_frame(320.0f + sx * 320.0f, 240.0f - sy * 240.0f, 320.0f + qx * 320.0f, 240.0f - qy * 240.0f, Z.alpha);
+        float pw = proj(pp[0], pp[1] + 1.0f, pp[2], &qx, &qy);
+        if (pw <= 0) { qx = sx; qy = sy; pw = w; }
+        dof_frame(320.0f + sx * 320.0f, 240.0f - sy * 240.0f, 320.0f + qx * 320.0f, 240.0f - qy * 240.0f, Z.alpha, w, pw);
     }
     if (Z.r < 0) Z.r = 0;
     t = Z.r; if (Z.r < 100000) Z.r += 1;

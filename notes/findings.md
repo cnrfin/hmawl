@@ -4204,3 +4204,10 @@ so, door fades are timed there, possibly per frame. Not traced yet.
   640 x 480 (0x802E1CE0) but the field draws a 640 x 448 viewport (gxData +0x4F4 left / top / width / height: 0, 0,
   640, 448): EFB rows 448-479 were empty. dof2: the copy takes the viewport as read each frame (texture 320 x 224;
   falls back to 640 x 448), DOF_MAX 200, sharp within 120 px, full blur from 320 px, taps +-1.25 texels.
+- dof2 test (user): no bar, but it reads as a vignette (screen-space mask: the mansion far behind the target, mid-screen,
+  stayed sharp). dof3: real depth. The blurred frame is drawn as 3 sheets in view space (PNMTX0 identity, the world's
+  own perspective from GXGetProjectionv - skipped if not perspective) at d = focus x {1.15, 1.6, 2.6} + {1.5, 4, 10}
+  (focus = the farther of target / farmer view depth from zt.c proj), corners from the projection (x = d (+-1 + p2) /
+  p1, y = d (+-1 + p4) / p3, z = -d), z test LEQUAL without update: each covers only pixels farther than its d; alphas
+  0.40 / 0.40 / 0.45 add up to ~80 % far away; nearer stays sharp. Screen-space mask removed. DOF.proj / tw / pw /
+  focus in the 'DOF1' struct.
