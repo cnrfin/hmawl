@@ -964,7 +964,8 @@ static s32 gd_frame(u8 *g, s32 map, u32 t)
 #define GQ_FISHED1  0x100000
 #define GQ_ENGAGED  0x200000                      /* m1: she took the Blue Feather (the game sees: engaged to Nami) */
 #define BLUE_FEATHER 0x51F
-#define chapter_now F(0x8000FEE8, s32, (void))     /* 0 = chapter 1 */
+#define chapter_fn  F(0x8000FEE8, s32, (u8 *))     /* (the clock object) 0 = chapter 1 */
+#define chapter_now() chapter_fn(*(u8 **)0x80349218)
 #define flag_set_   F(0x801129E0, void, (u8 *, s32))
 #define GD_C_DAY    31
 #define GD_RISE     50                            /* frames */

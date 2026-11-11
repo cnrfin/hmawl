@@ -237,7 +237,8 @@ void spring_release(void)
 #include "gd_daily.h"
 #define GQ_FEATHER    0x400000   /* m1: the Sprites gave the Blue Feather */
 #define GQ_ENGAGED_   0x200000   /* (pm.c GQ_ENGAGED) */
-#define chapter_      F(0x8000FEE8, s32, (void))
+#define chapter_fn_   F(0x8000FEE8, s32, (u8 *))   /* chapter from the clock object [0x80349218]: 0 = chapter 1 */
+#define chapter_()    chapter_fn_(*(u8 **)0x80349218)
 #define item_count_   F(0x8004FD68, s32, (u8 *, s32))
 #define GQ_INTRO      0x40000
 #define CLOCK_        (**(u32 **)0x80349218)

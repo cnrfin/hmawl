@@ -4265,3 +4265,4 @@ so, door fades are timed there, possibly per frame. Not traced yet.
   tools/goddess/dialogue/goddess_proposal.json (drafts), debug.mes 0x62-0x65. Next: the wedding (event 2 / Chapter1
   fs[4] case 4 with her model and lines), Nami's farewell, married life (model 4 -> hg in chapters 2-6, nami_wife.mes
   / speaker 4 redirected when GQ_ENGAGED), the son.
+- m1 test (user): no feather from the Sprites. func_8000FEE8 takes the clock object (r3 = [0x80349218]; func_8000FFB0 = clock / 34,560,000 = the year, then table 0x8023DF70): called without it, the chapter check read garbage. m2: passed (pm.c chapter_now, spring.c chapter_).
