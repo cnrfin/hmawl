@@ -315,6 +315,8 @@ void gq_msg_swap(s32 *grp, s32 *msg)
     GMD.magic = 0x474D5347u; GMD.calls++; GMD.grp = gr; GMD.msg = m;
     if (gr < 5 || gr > 7 || (gr == 6 && m >= 70 && m <= 74) || !OK(g) || !OK(ev) ||
         *(s32 *)(ev + 0x680) != -1 || *(s32 *)(ev + 0x58C)) return;
+#ifdef GQ_TEST                                       /* m3 (user): the feather comes from the game's own event; this
+                                                       shortcut is for test builds only */
     {   /* m1: after the summoning, in chapter 1, with her love 80+, nobody promised and no feather on him, a Sprite gives
            a Blue Feather (once) */
         s32 c = CNT(g, GQ), k66 = CNT(g, 66), room = 0, j;
@@ -328,6 +330,7 @@ void gq_msg_swap(s32 *grp, s32 *msg)
             return;
         }
     }
+#endif
     {
         s32 c = CNT(g, GQ);
         u32 day = CLOCK_ / DAY_;

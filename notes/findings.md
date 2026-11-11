@@ -4266,3 +4266,4 @@ so, door fades are timed there, possibly per frame. Not traced yet.
   fs[4] case 4 with her model and lines), Nami's farewell, married life (model 4 -> hg in chapters 2-6, nami_wife.mes
   / speaker 4 redirected when GQ_ENGAGED), the son.
 - m1 test (user): no feather from the Sprites. func_8000FEE8 takes the clock object (r3 = [0x80349218]; func_8000FFB0 = clock / 34,560,000 = the year, then table 0x8023DF70): called without it, the chapter check read garbage. m2: passed (pm.c chapter_now, spring.c chapter_).
+- m2 test (user): Sprite gave the feather, proposal recorded (dump c6975b87: counter 51 bits 21 / 22, 66 = 1, 67 = 0). User: the feather comes from the game's own event (Chapter1 fs[30], Sprites at map 41); m3: our Sprite shortcut only in GQ_TEST builds. Open: that event's trigger (a goddess-only player must be able to get it).
