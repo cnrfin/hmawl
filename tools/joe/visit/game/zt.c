@@ -345,7 +345,7 @@ s32 pm_del_a(u8 *p);
 #define DOF_W 320
 #define DOF_H 240
 #define DOF_MAX 255                                          /* blur strength (dof3: the depth sheets share it out) */
-#define DOF_TAP 1.25f                                        /* sample offset, half-res texels (was 1.5) */
+#define DOF_TAP 1.0f                                         /* tap circle radius, half-res texels (dof5: was 1.25 corners) */
 struct { u32 next, prev, list; void *owner; const u32 *vt; u32 prio; u32 pad[4]; } DOFO;
 static u32 dof_vt[8];
 static u32 dof_tex[8];
@@ -386,32 +386,38 @@ static s32 dof_draw(void *self, s32 arg)
     gx_nchans(1); gx_chanctrl(4, 0, 0, 1, 0, 0, 2);          /* colour / alpha from the vertices */
     gx_inittex(dof_tex, DOF.buf, DOF.vw / 2, DOF.vh / 2, 4, 0, 0, 0);   /* RGB565, clamp, no mips (bilinear) */
     gx_loadtex(dof_tex, 0);
-    gx_ntexgens(4);
-    for (i = 0; i < 4; i++) {                                /* 4 taps: the corners of a 2 x DOF_TAP square */
-        for (j = 0; j < 12; j++) m[j] = ident[j];
-        m[3] = ((i & 1) ? DOF_TAP : -DOF_TAP) / (float)(DOF.vw / 2);
-        m[7] = ((i & 2) ? DOF_TAP : -DOF_TAP) / (float)(DOF.vh / 2);
-        gx_texmtx(m, 48 + 3 * i, 1);
-        gx_texgen(i, 1, 4, 48 + 3 * i, 0, 125);
+    /* dof5: 8 taps on a circle (no doubled edges from 4 corner taps), averaged in a tree over 11 TEV stages */
+    gx_ntexgens(8);
+    {   static const float cs[8][2] = { { 1, 0 }, { 0.7071f, 0.7071f }, { 0, 1 }, { -0.7071f, 0.7071f },
+                                        { -1, 0 }, { -0.7071f, -0.7071f }, { 0, -1 }, { 0.7071f, -0.7071f } };
+        for (i = 0; i < 8; i++) {
+            for (j = 0; j < 12; j++) m[j] = ident[j];
+            m[3] = cs[i][0] * DOF_TAP / (float)(DOF.vw / 2);
+            m[7] = cs[i][1] * DOF_TAP / (float)(DOF.vh / 2);
+            gx_texmtx(m, 36 + 3 * i, 1);                     /* TEXMTX2-9 */
+            gx_texgen(i, 1, 4, 36 + 3 * i, 0, 125);
+        }
     }
-    gx_nstages(5);
-    for (i = 0; i < 5; i++) {
-        bp((u32)(0x10 + i) << 24);                           /* direct (no indirect texturing) */
-        gx_swap(i, 0, 0);
-        gx_order(i, i < 4 ? i : 0xFF, i < 4 ? 0 : 0xFF, 4);
-        gx_ain(i, 7, 7, 7, i ? 0 : 5); gx_aop(i, 0, 0, 0, 1, 0);   /* alpha: the vertex alpha */
+    gx_nstages(11);
+    {   /* stage: tap (-1 none), colour a, b, c, d, out (0 prev, 1-3 c0-c2): prev = t0..t3 avg, c1 = t4..t7 avg, prev = avg */
+        static const signed char T[11][6] = {
+            { 0, 15, 15, 15, 8, 0 }, { 1, 0, 8, 13, 15, 0 }, { 2, 15, 15, 15, 8, 1 }, { 3, 2, 8, 13, 15, 1 },
+            { -1, 0, 2, 13, 15, 0 }, { 4, 15, 15, 15, 8, 2 }, { 5, 4, 8, 13, 15, 2 }, { 6, 15, 15, 15, 8, 3 },
+            { 7, 6, 8, 13, 15, 3 }, { -1, 4, 6, 13, 15, 2 }, { -1, 0, 4, 13, 15, 0 } };
+        for (i = 0; i < 11; i++) {
+            bp((u32)(0x10 + i) << 24);                       /* direct (no indirect texturing) */
+            gx_swap(i, 0, 0);
+            gx_order(i, T[i][0] < 0 ? 0xFF : T[i][0], T[i][0] < 0 ? 0xFF : 0, 4);
+            gx_cin(i, T[i][1], T[i][2], T[i][3], T[i][4]); gx_cop(i, 0, 0, 0, 1, T[i][5]);
+            gx_ain(i, 7, 7, 7, i ? 0 : 5); gx_aop(i, 0, 0, 0, 1, 0);   /* alpha: the vertex alpha */
+        }
     }
-    gx_cin(0, 15, 15, 15, 8);  gx_cop(0, 0, 0, 0, 1, 0);     /* prev = tap 0 */
-    gx_cin(1, 0, 8, 13, 15);   gx_cop(1, 0, 0, 0, 1, 0);     /* prev = (prev + tap 1) / 2 */
-    gx_cin(2, 15, 15, 15, 8);  gx_cop(2, 0, 0, 0, 1, 1);     /* c0 = tap 2 */
-    gx_cin(3, 2, 8, 13, 15);   gx_cop(3, 0, 0, 0, 1, 1);     /* c0 = (c0 + tap 3) / 2 */
-    gx_cin(4, 0, 2, 13, 15);   gx_cop(4, 0, 0, 0, 1, 0);     /* prev = (prev + c0) / 2 */
     /* dof3: real depth. Each sheet is the blurred frame laid over the whole view at view distance d, drawn with the
        depth test (LEQUAL, no depth write): it covers only what lies farther than d. Three sheets behind the focus
        add up (1 - (1-a1)(1-a2)(1-a3)), so the blur grows with distance; the target, the farmer and anything nearer
        stay sharp. Corners from the projection: ndc x = (p1 x + p2 z) / -z, y = (p3 y + p4 z) / -z. */
     gx_blend(1, 4, 5, 0); gx_zmode(1, 3, 0); gx_acmp(7, 0, 0, 7, 0); gx_cupd(1);
-    {   static const float far_k[3] = { 1.15f, 1.6f, 2.6f }, far_add[3] = { 1.5f, 4.0f, 10.0f }, far_a[3] = { 0.40f, 0.40f, 0.45f };
+    {   static const float far_k[3] = { 1.25f, 1.8f, 2.8f }, far_add[3] = { 2.5f, 6.0f, 14.0f }, far_a[3] = { 0.30f, 0.40f, 0.50f };   /* dof5: a little further back, softer start */
         s32 k;
         for (k = 0; k < 3; k++) {
             float d = DOF.focus * far_k[k] + far_add[k], av = far_a[k] * (float)DOF_MAX * (float)DOF.a / 255.0f, x0, x1, yt, yb;
