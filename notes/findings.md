@@ -4237,3 +4237,31 @@ so, door fades are timed there, possibly per frame. Not traced yet.
   dof4: our object at 0xBFFF. (An earlier guess, the arena line at 0x80384000, was wrong: dof1 already ended at
   0x80384DC4.)
 - dof4 test (user): working.
+
+### 7.83 Marriage system (research) and m1: the proposal
+- Static research (subagent, report scratchpad marriage_report.md, decompiler scratchpad mr/dec.py; not tested):
+  counter 66 COUNTER_KONYAKU_WHO = fiancee (1 Nami, 2 Muffy, 3 Celia), 67 KOIBITO_WHO = sweetheart (same coding;
+  0x80251D40 = {-1, 4, 3, 2} -> character); wife character at game+0x27E54 (func_8011309C, scripts cmd_7C(14); -1, then
+  2 / 3 / 4); bride records game+0x14AF0 + 0x20 (id - 2), love +0x1D (0-100). Proposal is native: func_80113FBC (talk /
+  gift; held item game+0x11CC4) at 0x80114660 (cmpwi 0x51F) -> Celia func_801189A8, Muffy func_80118E84, Nami
+  func_80119280: flag 30 / 33 refuse (love -10), sweetheart -> event 12, else func_801193C8: func_8015200C (love >= 80)
+  -> event 12 (0x8011943C / 0x8011955C), else flags 33 / 295. Event 12 (Chapter1 fs[11], nami.mes 98 / 105 / 159):
+  cmd_93(67,0), cmd_93(66,1), cmd_94(265,1), cmd_94(268,1), cmd_56. Muffy event 20, Celia 28. Chapter1 fs[30] = the
+  Sprites giving the Blue Feather at map 41 (not the proposal). Chapter end: event 2 reads 66 / 67 -> cmd_01(5, bride)
+  = the wedding (Chapter1 fs[4], switch on cmd_09(0): case 4 = Nami, actor 4, group 23); else 'oshikake' / 'omiai'
+  events (nodes 13/14, 21/22, 29/30) for the highest-love bride. Chapter change func_80013AE0 -> 0x802981B0[1] =
+  0x80013838: 66 -> wife (2 -> 3, 3 -> 2, 0 / 1 -> 4) stored at 0x80013890. Married life: cmd_7C(14) branches, wife
+  talk slot 36 (table 0x802C0450, NormalTalk file 35, nami_wife.mes group 40); character -> model table unchanged by
+  marriage (Nami nami_0 ch 1-3, nami_1 ch 4-6); the son's model follows the wife (son_N_nami, models 80-83, func_8002E7F0
+  0x8002E85C). No code for a bride leaving. cmd_93 = counter set (func_80112A80, raw values), cmd_94 = flag set / clear
+  (func_801129E0 / func_80112A30 on game+0x12078).
+- User: she accepts at 4 hearts (love 80, as Nami); Nami's son gets a green-haired goddess version; if you marry
+  another bride she stays at the Spring (M1-M4).
+- m1: pm.c gd_lines: the Blue Feather (0x51F; allowed though not throwable) at the Spring: chapter 1 (func_8000FEE8 ==
+  0) and counter 66 == 0 and love >= 80 -> PA, counters 66 = 1 / 67 = 0, flags 265 / 268 (func_801129E0), counter 51
+  bit 21 GQ_ENGAGED, event 413 takes the feather (cmd_56); love < 80 -> PN; promised / later chapter -> PT.
+  spring.c gq_msg_swap: after the summoning, chapter 1, love >= 80, 66 == 0, no feather (rucksack func_8004FD68, hands)
+  and room: a Sprite's line becomes SF and the feather goes in the rucksack (bit 22 GQ_FEATHER, once). Lines
+  tools/goddess/dialogue/goddess_proposal.json (drafts), debug.mes 0x62-0x65. Next: the wedding (event 2 / Chapter1
+  fs[4] case 4 with her model and lines), Nami's farewell, married life (model 4 -> hg in chapters 2-6, nami_wife.mes
+  / speaker 4 redirected when GQ_ENGAGED), the son.

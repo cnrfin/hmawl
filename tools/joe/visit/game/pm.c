@@ -841,7 +841,7 @@ static void gs_cam(u8 *g, const struct gshot *sh, float f)
 static s32 gs_get(u8 *g, s32 i) { s32 v = *(s32 *)(g + 0x12194 + i * 4); if (v >= 128 && !(v & 127)) v >>= 7; return v; }
 /* gd1 (below): the daily visit's state */
 struct { u32 magic; s32 st, t, waited, love, hearts, l1, l2, item, summons, talks; u8 *plate; float surf;
-         s32 face, line, page, timer; } GD;   /* 'GDLY' */
+         s32 face, line, page, timer, take; } GD;   /* 'GDLY' */
 static s32 gd_daily_frame(u8 *g, s32 map);
 static void gd_hearts(u8 *g);
 static s32 gd_frame(u8 *g, s32 map, u32 t)
@@ -962,6 +962,10 @@ static s32 gd_frame(u8 *g, s32 map, u32 t)
 #define GQ_SUMM     0x10000
 #define GQ_MET      0x80000
 #define GQ_FISHED1  0x100000
+#define GQ_ENGAGED  0x200000                      /* m1: she took the Blue Feather (the game sees: engaged to Nami) */
+#define BLUE_FEATHER 0x51F
+#define chapter_now F(0x8000FEE8, s32, (void))     /* 0 = chapter 1 */
+#define flag_set_   F(0x801129E0, void, (u8 *, s32))
 #define GD_C_DAY    31
 #define GD_RISE     50                            /* frames */
 #define GD_NEAR     3.0f                          /* A this close to her (and facing her): talk / gift */
@@ -1040,7 +1044,22 @@ static void gd_lines(u8 *g, u32 t, s32 item)     /* picks the event's lines, cou
     talks = (d >> 16) & 15;
     love = (s32)((u32)c >> 24); if (love > 100) love = 100;
     hrs = love >= 60 ? 3 : 0;
-    GD.l1 = GD.l2 = 0; GD.item = item; GD.face = 0;
+    GD.l1 = GD.l2 = 0; GD.item = item; GD.face = 0; GD.take = item ? 1 : 0;
+    if (item == BLUE_FEATHER) {                   /* m1: the proposal (as Nami's: love 80, chapter 1, nobody promised yet) */
+        s32 k66 = cn[66];
+        if (k66 >= 128 && !(k66 & 127)) k66 >>= 7;
+        GD.take = 0;
+        if (chapter_now() != 0 || k66 != 0) { GD.l1 = GDL_PT; GD.face = 4; }
+        else if (love < 80) { GD.l1 = GDL_PN; GD.face = 5; }
+        else {                                    /* yes: what Nami's acceptance (Chapter1 event 12) sets, + ours */
+            GD.l1 = GDL_PA; GD.face = 2; GD.take = 1;
+            cn[66] = 1; cn[67] = 0;               /* fiancee = 1 (Nami: the chapter end plays her wedding, wife = 4) */
+            flag_set_(g + 0x12078, 265); flag_set_(g + 0x12078, 268);
+            c |= GQ_ENGAGED;
+        }
+        cn[GQ_C] = c;
+        return;
+    }
     if (item) {
         if (d & 0x100000) { GD.l1 = GDL_G3; GD.face = 4; }                      /* a second gift today: kept, no change */
         else {
@@ -1091,7 +1110,7 @@ static s32 gd_a_kind(u8 *g, s32 item, float *pt)
         float *p = (float *)(g + 0x29C78), *d = (float *)(g + 0x29F84);
         float dx = S.pos.x - p[0], dz = S.pos.z - p[2], d2 = dx * dx + dz * dz;
         if (d2 > GD_NEAR * GD_NEAR || d2 < 0.0001f || (dx * d[0] + dz * d[2]) * rsqrt(d2) < 0.3f) return 0;
-        if (item && !spring_giftable(item)) return 0;                       /* a tool in hand: the tool's A */
+        if (item && item != BLUE_FEATHER && !spring_giftable(item)) return 0;   /* a tool in hand: the tool's A */
         return 2;
     }
     return 0;
@@ -1143,7 +1162,7 @@ static void gd_daily_input(u8 *g, s32 map, u32 t)
     gd_lines(g, t, item);                         /* talk / gift */
     gd_hearts(g);
     {   s32 *cn = (s32 *)(g + 0x12194);
-        cn[GD_C_L1] = GD.l1; cn[GD_C_L2] = GD.l2; cn[GD_C_TAKE] = item ? 1 : 0;
+        cn[GD_C_L1] = GD.l1; cn[GD_C_L2] = GD.l2; cn[GD_C_TAKE] = GD.take;
     }
     GD.st = 3; GD.waited = 0;
     gd_line_start(GD.l1);                         /* gd3: her face follows the typing */

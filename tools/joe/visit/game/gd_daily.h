@@ -35,8 +35,13 @@
 #define GDL_G1 0x5F
 #define GDL_G2 0x60
 #define GDL_G3 0x61
+#define GDL_PA 0x62
+#define GDL_PN 0x63
+#define GDL_PT 0x64
+#define GDL_SF 0x65
 #define GDT_FIRST 0x42
-#define GDT_N 32
+#define GDT_N 36
+#ifndef GD_NO_TEXT
 static const struct { unsigned char pages, len[4]; } gd_text[GDT_N] = {
     { 1, { 46, 0, 0, 0 } },   /* B1 */
     { 1, { 34, 0, 0, 0 } },   /* B2 */
@@ -70,4 +75,9 @@ static const struct { unsigned char pages, len[4]; } gd_text[GDT_N] = {
     { 2, { 33, 33, 0, 0 } },   /* G1 */
     { 2, { 16, 35, 0, 0 } },   /* G2 */
     { 2, { 37, 33, 0, 0 } },   /* G3 */
+    { 4, { 25, 42, 22, 49 } },   /* PA */
+    { 2, { 17, 44, 0, 0 } },   /* PN */
+    { 2, { 55, 31, 0, 0 } },   /* PT */
+    { 3, { 45, 28, 57, 0 } },   /* SF */
 };
+#endif

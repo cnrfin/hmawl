@@ -233,6 +233,12 @@ void spring_release(void)
    The opening: the cut Sprite scene at the Spring (Common event 376, rewritten) starts on the first visit to the
    Spring from Day 2 (bit 18 of counter 51). */
 #include "gq_hints.h"
+#define GD_NO_TEXT
+#include "gd_daily.h"
+#define GQ_FEATHER    0x400000   /* m1: the Sprites gave the Blue Feather */
+#define GQ_ENGAGED_   0x200000   /* (pm.c GQ_ENGAGED) */
+#define chapter_      F(0x8000FEE8, s32, (void))
+#define item_count_   F(0x8004FD68, s32, (u8 *, s32))
 #define GQ_INTRO      0x40000
 #define CLOCK_        (**(u32 **)0x80349218)
 #define DAY_          864000u
@@ -308,6 +314,19 @@ void gq_msg_swap(s32 *grp, s32 *msg)
     GMD.magic = 0x474D5347u; GMD.calls++; GMD.grp = gr; GMD.msg = m;
     if (gr < 5 || gr > 7 || (gr == 6 && m >= 70 && m <= 74) || !OK(g) || !OK(ev) ||
         *(s32 *)(ev + 0x680) != -1 || *(s32 *)(ev + 0x58C)) return;
+    {   /* m1: after the summoning, in chapter 1, with her love 80+, nobody promised and no feather on him, a Sprite gives
+           a Blue Feather (once) */
+        s32 c = CNT(g, GQ), k66 = CNT(g, 66), room = 0, j;
+        if (k66 >= 128 && !(k66 & 127)) k66 >>= 7;
+        for (j = 0; j < 18; j++) if (!(*(u32 *)(g + 0x58 + 4 * j) >> 16)) room++;
+        if ((c & GQ_SUMMONED) && !(c & (GQ_FEATHER | GQ_ENGAGED_)) && ((u32)c >> 24) >= 80 && k66 == 0 && chapter_() == 0 &&
+            item_count_(g + 0x50, 0x51F) == 0 && HELD(g) != 0x51F && room) {
+            rucksack_add(g + 0x50, 0x51F, 1, -1);
+            CNT(g, GQ) = c | GQ_FEATHER;
+            *grp = G_DEBUG; *msg = GDL_SF;
+            return;
+        }
+    }
     {
         s32 c = CNT(g, GQ);
         u32 day = CLOCK_ / DAY_;

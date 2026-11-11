@@ -1,0 +1,9 @@
+{
+  "_about": "Proposal at the Spring (m1), drafts by Claude for the user to edit. PA: she takes the Blue Feather (love 80+, chapter 1, no fiancee yet); PN: love under 80; PT: already engaged to someone else (or past chapter 1); SF: a Harvest Sprite gives you a Blue Feather (after the summoning, chapter 1, her love 80+, no fiancee and no feather).",
+  "lines": {
+    "PA": "A Blue Feather...?\nFor me?\n\nYou know what this\nmeans, don't you,\n<name>?\n\n...Yes. I'll marry\nyou.\n\nBut you'd better\ntreat me like a\nprincess. Promise!",
+    "PN": "A Blue Feather...\n\nAsk me again once\nyou know me a\nlittle better.",
+    "PT": "You've already\npromised yourself to\nsomeone, haven't you?\n\nHmph. Go on, then.\nI'll be fine.",
+    "SF": "The goddess is awake\nand she likes you,\n<name>!\n\nHere, take this\nBlue Feather.\n\nIf you give it to her\nat the Spring... hee\nhee, you'll see~"
+  }
+}

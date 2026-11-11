@@ -26,6 +26,7 @@ DLG = os.path.join(HERE, '..', 'dialogue')
 B1J = json.load(open(os.path.join(DLG, 'goddess_lines_batch1.json')))
 B2J = json.load(open(os.path.join(DLG, 'goddess_lines_batch2.json')))
 DJ = json.load(open(os.path.join(DLG, 'goddess_daily.json')))['lines']
+DJ.update(json.load(open(os.path.join(DLG, 'goddess_proposal.json')))['lines'])   # m1: the proposal (PA / PN / PT) and the Sprites' feather (SF)
 USE = ['B%d' % i for i in range(1, 10)] + ['B14b', 'B16', '060', '0C9', '0CB', '0CC', '0CF', '0D0', '0D1', '0D4', '0D5']
 TEXT = {}
 for k in USE: TEXT[k] = B1J[k] if k in B1J else B2J[k]
@@ -108,8 +109,8 @@ for i in range(lo, hi + 1):
     boxes = [b.strip('\n') for b in TEXT[k].replace('\r', '').split('\n\n') if b.strip()] if k else []
     lens = [min(255, len(b.replace('<name>', 'xxxxxx').replace('\n', ''))) for b in boxes][:4]
     rows.append('    { %d, { %s } },   /* %s */' % (len(lens), ', '.join(map(str, lens + [0] * (4 - len(lens)))), k))
-h += ['#define GDT_FIRST 0x%X' % lo, '#define GDT_N %d' % (hi - lo + 1),
-      'static const struct { unsigned char pages, len[4]; } gd_text[GDT_N] = {'] + rows + ['};']
+h += ['#define GDT_FIRST 0x%X' % lo, '#define GDT_N %d' % (hi - lo + 1), '#ifndef GD_NO_TEXT',
+      'static const struct { unsigned char pages, len[4]; } gd_text[GDT_N] = {'] + rows + ['};', '#endif']
 open(os.path.join(outdir, 'gd_daily.h'), 'w').write('\n'.join(h) + '\n')
 print('event %d, %d lines' % (EVENT, len(ids)))
 for f in ('Common.arc', 'debug.mes'):
